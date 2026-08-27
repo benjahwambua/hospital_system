@@ -67,11 +67,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $doctorId = max(0, (int)($_POST['doctor_id'] ?? 0));
     $clinicalType = trim((string)($_POST['clinical_type'] ?? 'General'));
 
-    $temperature = trim((string)($_POST['temperature'] ?? ''));
-    $bp = trim((string)($_POST['bp'] ?? ''));
-    $weight = trim((string)($_POST['weight'] ?? ''));
-    $pulse = trim((string)($_POST['pulse'] ?? ''));
-    $respiration = trim((string)($_POST['respiration'] ?? ''));
+    // Vitals only for full registration
+    $temperature = '';
+    $bp = '';
+    $weight = '';
+    $pulse = '';
+    $respiration = '';
+    
+    if (!$isWalkin) {
+        $temperature = trim((string)($_POST['temperature'] ?? ''));
+        $bp = trim((string)($_POST['bp'] ?? ''));
+        $weight = trim((string)($_POST['weight'] ?? ''));
+        $pulse = trim((string)($_POST['pulse'] ?? ''));
+        $respiration = trim((string)($_POST['respiration'] ?? ''));
+    }
 
     // Walk-in: Only clinical type required, name & phone optional
     if ($isWalkin) {
@@ -133,17 +142,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $doctorCheck->close();
     }
 
-    if ($temperature !== '' && !is_numeric($temperature)) {
-        $errors[] = 'Temperature must be numeric.';
-    }
-    if ($weight !== '' && !is_numeric($weight)) {
-        $errors[] = 'Weight must be numeric.';
-    }
-    if ($pulse !== '' && !ctype_digit($pulse)) {
-        $errors[] = 'Pulse must be a whole number.';
-    }
-    if ($respiration !== '' && !ctype_digit($respiration)) {
-        $errors[] = 'Respiration must be a whole number.';
+    // Only validate vitals for full registration
+    if (!$isWalkin) {
+        if ($temperature !== '' && !is_numeric($temperature)) {
+            $errors[] = 'Temperature must be numeric.';
+        }
+        if ($weight !== '' && !is_numeric($weight)) {
+            $errors[] = 'Weight must be numeric.';
+        }
+        if ($pulse !== '' && !ctype_digit($pulse)) {
+            $errors[] = 'Pulse must be a whole number.';
+        }
+        if ($respiration !== '' && !ctype_digit($respiration)) {
+            $errors[] = 'Respiration must be a whole number.';
+        }
     }
 
     if (!$errors) {
@@ -189,7 +201,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $apptStmt->close();
 
-            if ($temperature !== '' || $bp !== '' || $weight !== '' || $pulse !== '' || $respiration !== '') {
+            // Only record vitals for full registration patients
+            if (!$isWalkin && ($temperature !== '' || $bp !== '' || $weight !== '' || $pulse !== '' || $respiration !== '')) {
                 $vitalsStmt = $conn->prepare(
                     'INSERT INTO vitals (patient_id, temperature, bp, weight, pulse, respiration, created_at)
                      VALUES (?, ?, ?, ?, ?, ?, NOW())'
@@ -323,7 +336,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                     </div>
 
                     <div id="walkinInfoBox" class="walkin-info-alert" style="display: none;">
-                        <strong>⚡ Fast Track Walk-in:</strong> Only service type required. Name & phone optional. No consultation fee.
+                        <strong>⚡ Fast Track Walk-in:</strong> Only service type required. Name & phone optional. No consultation fee. No vitals needed.
                     </div>
 
                     <div class="form-section">
@@ -373,7 +386,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                         </div>
                     </div>
 
-                    <div id="vitalsSection" class="form-section" style="background-color: #fcfcfc; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+                    <div id="vitalsSection" class="form-section" style="background-color: #fcfcfc; padding: 20px; border: 1px solid #eee; border-radius: 8px; display: grid;">
                         <div class="section-title">Initial Vitals (Triage)</div>
                         <div class="form-row">
                             <div class="form-group">
@@ -470,6 +483,7 @@ function toggleMode(mode) {
     const nokSection = document.getElementById('fullRegistrationFields');
     const idExtraFields = document.getElementById('idExtraFields');
     const genderField = document.getElementById('genderField');
+    const vitalsSection = document.getElementById('vitalsSection');
     const nokInput = document.getElementById('nokInput');
     const nokLabel = document.getElementById('nokLabel');
     const nameLabel = document.getElementById('nameLabel');
@@ -479,10 +493,11 @@ function toggleMode(mode) {
     const walkinInfoBox = document.getElementById('walkinInfoBox');
 
     if (mode === 'walkin') {
-        // Walk-in: Hide all extra fields, make name optional
+        // Walk-in: Hide all extra fields, make name optional, hide vitals
         nokSection.style.display = 'none';
         idExtraFields.style.display = 'none';
         genderField.style.display = 'none';
+        vitalsSection.style.display = 'none';
         nokInput.required = false;
         nokLabel.classList.remove('label-required');
         
@@ -495,10 +510,11 @@ function toggleMode(mode) {
         walkinBadge.style.display = 'inline-block';
         walkinInfoBox.style.display = 'block';
     } else {
-        // Full registration: Show all fields, require name
+        // Full registration: Show all fields, require name, show vitals
         nokSection.style.display = 'block';
         idExtraFields.style.display = 'grid';
         genderField.style.display = 'grid';
+        vitalsSection.style.display = 'grid';
         nokInput.required = true;
         nokLabel.classList.add('label-required');
         
