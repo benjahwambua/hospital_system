@@ -1,0 +1,11 @@
+# Private configuration or environment files
+config.php
+database.php
+.env
+
+# Windows files
+Thumbs.db
+desktop.ini
+
+# XAMPP/Logs
+*.log
