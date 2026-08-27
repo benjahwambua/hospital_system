@@ -1,0 +1,10 @@
+CREATE TABLE pharmacy_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    prescription_id INT NOT NULL,
+    patient_id INT NOT NULL,
+    medicine_id INT NOT NULL,
+    quantity INT NOT NULL,
+    status ENUM('pending', 'completed'),
+    created_at DATETIME,
+    FOREIGN KEY (prescription_id) REFERENCES prescriptions(id)
+);

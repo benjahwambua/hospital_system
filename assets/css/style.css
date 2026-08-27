@@ -1,0 +1,315 @@
+/* assets/css/style.css - core layout, scrollable sidebar & footer-safe content */
+:root{--blue:#0b67d9;--sidebar:#0a49a8;--bg:#f6f8fb}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#222}
+.top-header{position:fixed;top:0;left:0;right:0;height:84px;background:var(--blue);color:red;display:flex;align-items:center;padding:10px 18px;z-index:1000}
+.site-logo{height:60px;object-fit:contain}
+.header-left{width:90px}
+.header-title{flex:1;text-align:center;font-size:46px;font-weight:700}
+.header-title .subtitle{font-size:12px;font-weight:400;color:rgba(255,255,255,0.9)}
+.header-right{min-width:200px;text-align:right}
+.header-right .btn{background:#fff;color:var(--blue);padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:600}
+.layout{display:flex;margin-top:84px}
+.sidebar{width:260px;background:var(--sidebar);color:#fff;position:fixed;top:84px;left:0;bottom:60px;padding:12px;overflow:auto}
+.sidebar .brand{font-weight:700;margin-bottom:12px}
+.sidebar nav a{display:block;color:#fff;padding:10px;border-radius:6px;text-decoration:none;margin-bottom:6px}
+.sidebar nav a i{width:20px;text-align:center;margin-right:8px}
+.sidebar .menu-title{margin-top:10px;margin-bottom:6px;font-size:13px;opacity:.9}
+.content{margin-left:260px;padding:22px 26px;min-height:calc(100vh - 160px);padding-bottom:120px} /* bottom padding so footer doesn't hide content */
+.card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(10,10,10,.04);margin-bottom:14px}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+.site-footer{position:fixed;left:0;right:0;bottom:0;background:var(--blue);color:#fff;padding:12px;text-align:center;height:60px}
+@media(max-width:900px){.sidebar{position:static;width:100%;height:auto}.content{margin-left:0;padding-bottom:80px}}
+.form-control{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px}
+.btn{display:inline-block;padding:8px 12px;background:var(--blue);color:#fff;border-radius:6px;text-decoration:none}
+.alert{padding:10px;border-radius:6px;background:#ffefef;color:#900}
+.table-wrapper {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 22px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.table-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.table-actions .btn {
+    padding: 8px 14px;
+    background: #0b67d9;
+    color: #fff;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 15px;
+}
+
+table thead {
+    background: #0a49a8;
+    color: #fff;
+}
+
+table th, table td {
+    padding: 10px;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+table tbody tr:hover {
+    background: #f2f6ff;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 12px;
+}
+
+.badge.pending { background: #f39c12; }
+.badge.completed { background: #27ae60; }
+.badge.cancelled { background: #e74c3c; }
+.dashboard { padding: 20px; }
+
+.dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+    gap: 20px;
+}
+
+.dash-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.dash-card .icon {
+    font-size: 40px;
+    color: #0b67d9;
+    margin-bottom: 10px;
+}
+
+.dash-card h3 {
+    font-size: 26px;
+    margin: 5px 0;
+}
+.dashboard-container {
+    display: grid;
+    /* Creates three columns of equal width with a gap between them */
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px; /* Adds space between the grid items */
+  }
+  .dashboard-container {
+    display: flex; /* Makes children appear side by side by default */
+    gap: 20px;     /* Adds space between the cards */
+    flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
+  }
+  
+  .dashboard-item {
+    /* Add styling to the individual cards (e.g., width, padding, box-shadow) */
+    flex: 1; /* Allows the items to grow and fill available space equally */
+  }
+  <style>
+  .form-compact {
+      max-width: 520px;
+      margin: 0 auto;
+  }
+  .form-compact label {
+      font-weight: 600;
+      margin-top: 10px;
+      display: block;
+  }
+  .form-compact input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+  }
+  .form-compact button {
+      width: 100%;
+      margin-top: 15px;
+  }
+  :root{
+    --primary:#1e3a8a;
+    --primary-light:#3b82f6;
+    --bg:#f4f6f9;
+    --card:#ffffff;
+    --border:#e5e7eb;
+    --text:#1f2937;
+}
+
+body{
+    font-family:'Segoe UI',Roboto,Arial,sans-serif;
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+}
+
+/* Container */
+.container{
+    padding:25px;
+    max-width:1400px;
+    margin:auto;
+}
+
+/* Header Card */
+.patient-header{
+    background:var(--card);
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom:20px;
+}
+
+.patient-header h2{
+    margin:0;
+    color:var(--primary);
+}
+
+.patient-meta{
+    margin-top:8px;
+    font-size:14px;
+    color:#555;
+}
+
+/* Tabs */
+.dashboard-tabs{
+    display:flex;
+    gap:10px;
+    list-style:none;
+    padding:0;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+}
+
+.dashboard-tabs li{
+    padding:10px 18px;
+    border-radius:6px;
+    background:var(--card);
+    border:1px solid var(--border);
+    cursor:pointer;
+    font-weight:500;
+    transition:0.2s ease;
+}
+
+.dashboard-tabs li:hover{
+    background:var(--primary-light);
+    color:#fff;
+}
+
+/* Cards */
+.card{
+    background:var(--card);
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.05);
+    margin-bottom:20px;
+}
+
+.card h3{
+    margin-top:0;
+    color:var(--primary);
+}
+
+/* Inputs */
+input,select,textarea{
+    width:100%;
+    padding:8px 10px;
+    margin:6px 0;
+    border-radius:6px;
+    border:1px solid var(--border);
+    font-size:14px;
+}
+
+textarea{min-height:80px;}
+
+button{
+    padding:8px 16px;
+    border-radius:6px;
+    border:none;
+    background:var(--primary);
+    color:#fff;
+    cursor:pointer;
+    font-weight:500;
+}
+
+button:hover{
+    background:var(--primary-light);
+}
+
+/* Tables */
+.table-blue{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+}
+
+.table-blue th{
+    background:var(--primary);
+    color:white;
+    padding:8px;
+    text-align:left;
+}
+
+.table-blue td{
+    border:1px solid var(--border);
+    padding:8px;
+}
+
+.table-blue tr:nth-child(even){
+    background:#f9fafb;
+}
+
+/* Service Picker */
+.service-search{
+    margin:10px 0;
+    padding:8px;
+    width:100%;
+    border-radius:6px;
+    border:1px solid var(--border);
+}
+
+.service-table{
+    max-height:250px;
+    overflow-y:auto;
+    border:1px solid var(--border);
+    border-radius:6px;
+}
+
+.service-table table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.service-table th,
+.service-table td{
+    padding:8px;
+    border-bottom:1px solid var(--border);
+}
+
+.service-table tr:hover{
+    background:#eef2ff;
+}
+
+/* Billing Highlight */
+.billing-summary{
+    display:flex;
+    gap:30px;
+    font-size:16px;
+    font-weight:600;
+}
+
+  </style>
+  
+  <form method="POST" class="form-card form-compact">
+    
+
