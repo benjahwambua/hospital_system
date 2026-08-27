@@ -73,18 +73,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pulse = trim((string)($_POST['pulse'] ?? ''));
     $respiration = trim((string)($_POST['respiration'] ?? ''));
 
-    if ($fullName === '') {
-        $errors[] = 'Full name is required.';
+    // Walk-in: Only require full name and clinical type
+    if ($isWalkin) {
+        if ($fullName === '') {
+            $errors[] = 'Full name is required.';
+        }
+        if (!in_array($clinicalType, $allowedClinicalTypes, true)) {
+            $errors[] = 'Invalid clinical department selected.';
+        }
+    } else {
+        // Full registration: require all patient information
+        if ($fullName === '') {
+            $errors[] = 'Full name is required.';
+        }
+        if (!in_array($gender, $allowedGenders, true)) {
+            $errors[] = 'Invalid gender selected.';
+        }
+        if (!in_array($clinicalType, $allowedClinicalTypes, true)) {
+            $errors[] = 'Invalid clinical department selected.';
+        }
+        if ($nextOfKinName === '') {
+            $errors[] = 'Next of kin name is required for full registration.';
+        }
     }
-    if (!in_array($gender, $allowedGenders, true)) {
-        $errors[] = 'Invalid gender selected.';
-    }
-    if (!in_array($clinicalType, $allowedClinicalTypes, true)) {
-        $errors[] = 'Invalid clinical department selected.';
-    }
-    if (!$isWalkin && $nextOfKinName === '') {
-        $errors[] = 'Next of kin name is required for full registration.';
-    }
+
     if ($phone !== '' && !preg_match('/^[0-9+\-\s]{7,20}$/', $phone)) {
         $errors[] = 'Phone number format is invalid.';
     }
@@ -139,11 +151,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             $stmt = $conn->prepare(
-                'INSERT INTO patients (patient_number, full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+                'INSERT INTO patients (patient_number, full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
             );
             $stmt->bind_param(
-                'ssssssissis',
+                'ssssssissisi',
                 $patientNumber,
                 $fullName,
                 $gender,
@@ -154,7 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $nextOfKinName,
                 $nextOfKinPhone,
                 $doctorId,
-                $clinicalType
+                $clinicalType,
+                $isWalkin
             );
             if (!$stmt->execute()) {
                 throw new Exception($stmt->error ?: $conn->error);
@@ -212,9 +225,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $encounterType = 'general';
             }
 
-            $encounterStmt = $conn->prepare("INSERT INTO encounters (patient_id, type, status, presenting_complaint, created_at) VALUES (?, ?, 'open', ?, NOW())");
+            $encounterStmt = $conn->prepare("INSERT INTO encounters (patient_id, type, status, presenting_complaint, is_walkin, created_at) VALUES (?, ?, 'open', ?, ?, NOW())");
             $complaint = 'Registered via reception';
-            $encounterStmt->bind_param('iss', $patientId, $encounterType, $complaint);
+            $encounterStmt->bind_param('issi', $patientId, $encounterType, $complaint, $isWalkin);
             if (!$encounterStmt->execute()) {
                 throw new Exception($encounterStmt->error ?: $conn->error);
             }
@@ -267,6 +280,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .badge-waived { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 .badge-standard { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
 .maternity-alert { background: #fce7f3; color: #be185d; border: 1px solid #f9a8d4; font-size: 12px; padding: 7px 15px; border-radius: 20px; display: none; margin-top: 10px; font-weight: bold; }
+.walkin-info-alert { background: #e3f2fd; color: #1565c0; border-left: 4px solid #1976d2; padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
 @media (max-width: 992px) { .form-row { grid-template-columns: 1fr; } .form-body { padding: 20px; } }
 </style>
 
@@ -306,6 +320,10 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                         </label>
                     </div>
 
+                    <div id="walkinInfoBox" class="walkin-info-alert" style="display: none;">
+                        <strong>ℹ️ Walk-in Mode:</strong> Only name and service type required. No registration fee will be charged.
+                    </div>
+
                     <div class="form-section">
                         <div class="section-title">Patient Identification & Service Type</div>
                         <div class="form-row">
@@ -319,7 +337,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                             <div class="form-group">
                                 <label class="label-required" for="clinicalTypeSelect">Clinical Department / Service</label>
                                 <select name="clinical_type" id="clinicalTypeSelect" class="form-control" required onchange="checkMaternity(this.value)">
-                                    <?php foreach (['Primary Services' => ['General' => 'General Consultation', 'Emergency' => 'Emergency / Trauma', 'OPD' => 'OPD (Outpatient Department)'], 'Maternal & Child Health' => ['ANC' => 'ANC (Antenatal Care)', 'PNC' => 'PNC (Postnatal Care)', 'Maternity' => 'Labor & Delivery', 'Immunization' => 'Immunization (KEPI)', 'Family Planning' => 'Family Planning'], 'Specialized Care' => ['SGBV' => 'SGBV Case Management', 'CCC' => 'CCC (Comprehensive Care Centre)', 'Nutrition' => 'Nutrition Program', 'Dental' => 'Dental Clinic', 'Physiotherapy' => 'Physiotherapy']] as $groupLabel => $options): ?>
+                                    <?php foreach (['Primary Services' => ['General' => 'General Consultation', 'Emergency' => 'Emergency / Trauma', 'OPD' => 'OPD (Outpatient Department)'], 'Maternal & Child Health' => ['Maternity' => 'Maternity', 'ANC' => 'Antenatal Care (ANC)', 'PNC' => 'Postnatal Care (PNC)'], 'Specialized Services' => ['Immunization' => 'Immunization', 'Family Planning' => 'Family Planning', 'SGBV' => 'SGBV', 'CCC' => 'CCC (Chronic Care)', 'Nutrition' => 'Nutrition', 'Dental' => 'Dental', 'Physiotherapy' => 'Physiotherapy']] as $groupLabel => $options): ?>
                                         <optgroup label="<?= htmlspecialchars($groupLabel) ?>">
                                             <?php foreach ($options as $value => $label): ?>
                                                 <option value="<?= htmlspecialchars($value) ?>" <?= (($_POST['clinical_type'] ?? 'General') === $value) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
@@ -329,7 +347,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                                 </select>
                                 <div id="maternityIndicator" class="maternity-alert">✨ Patient will appear in Maternity Module</div>
                             </div>
-                            <div class="form-group" id="genderField">
+                            <div class="form-group" id="genderField" style="display: grid;">
                                 <label for="genderSelect">Gender</label>
                                 <select name="gender" class="form-control" id="genderSelect">
                                     <option value="" <?= add_patient_old('gender') === '' ? 'selected' : '' ?>>Select</option>
@@ -340,7 +358,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                             </div>
                         </div>
 
-                        <div class="form-row" id="idExtraFields">
+                        <div class="form-row" id="idExtraFields" style="display: grid;">
                             <div class="form-group">
                                 <label for="phone">Phone Number</label>
                                 <input id="phone" name="phone" class="form-control" placeholder="07..." value="<?= add_patient_old('phone') ?>">
@@ -388,7 +406,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                             <div class="form-row">
                                 <div class="form-group">
                                     <label id="nokLabel" class="label-required" for="nokInput">NOK Name</label>
-                                    <input name="next_of_kin_name" id="nokInput" class="form-control" value="<?= add_patient_old('next_of_kin_name') ?>" required placeholder="Full Name">
+                                    <input name="next_of_kin_name" id="nokInput" class="form-control" value="<?= add_patient_old('next_of_kin_name') ?>" placeholder="Full Name">
                                 </div>
                                 <div class="form-group">
                                     <label for="next_of_kin_phone">NOK Phone</label>
@@ -448,25 +466,33 @@ function checkMaternity(val) {
 function toggleMode(mode) {
     const nokSection = document.getElementById('fullRegistrationFields');
     const idExtraFields = document.getElementById('idExtraFields');
+    const genderField = document.getElementById('genderField');
     const nokInput = document.getElementById('nokInput');
     const nokLabel = document.getElementById('nokLabel');
     const fullBadge = document.getElementById('fullFeeBadge');
     const walkinBadge = document.getElementById('walkinFeeBadge');
+    const walkinInfoBox = document.getElementById('walkinInfoBox');
 
     if (mode === 'walkin') {
+        // Walk-in: Hide all extra fields
         nokSection.style.display = 'none';
         idExtraFields.style.display = 'none';
+        genderField.style.display = 'none';
         nokInput.required = false;
         nokLabel.classList.remove('label-required');
         fullBadge.style.display = 'none';
         walkinBadge.style.display = 'inline-block';
+        walkinInfoBox.style.display = 'block';
     } else {
+        // Full registration: Show all fields
         nokSection.style.display = 'block';
         idExtraFields.style.display = 'grid';
+        genderField.style.display = 'grid';
         nokInput.required = true;
         nokLabel.classList.add('label-required');
         fullBadge.style.display = 'inline-block';
         walkinBadge.style.display = 'none';
+        walkinInfoBox.style.display = 'none';
     }
 }
 
