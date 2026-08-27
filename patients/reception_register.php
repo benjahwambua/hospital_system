@@ -73,13 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pulse = trim((string)($_POST['pulse'] ?? ''));
     $respiration = trim((string)($_POST['respiration'] ?? ''));
 
-    // Walk-in: Only require full name and clinical type
+    // Walk-in: Only clinical type required, name & phone optional
     if ($isWalkin) {
-        if ($fullName === '') {
-            $errors[] = 'Full name is required.';
-        }
         if (!in_array($clinicalType, $allowedClinicalTypes, true)) {
             $errors[] = 'Invalid clinical department selected.';
+        }
+        // If no name provided, generate anonymous ID
+        if ($fullName === '') {
+            $fullName = 'Walk-in Patient ' . date('Hi');
         }
     } else {
         // Full registration: require all patient information
@@ -266,6 +267,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 15px; }
 .label-required::after { content: ' *'; color: #dc2626; }
+.label-optional::after { content: ' (optional)'; color: #9ca3af; font-weight: 400; }
 .form-control { width: 100%; padding: 14px 15px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 15px; transition: all 0.2s ease; }
 .form-control:focus { outline: none; border-color: #2563eb; background-color: #f8fbff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -321,14 +323,15 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                     </div>
 
                     <div id="walkinInfoBox" class="walkin-info-alert" style="display: none;">
-                        <strong>ℹ️ Walk-in Mode:</strong> Only name and service type required. No registration fee will be charged.
+                        <strong>⚡ Fast Track Walk-in:</strong> Only service type required. Name & phone optional. No consultation fee.
                     </div>
 
                     <div class="form-section">
                         <div class="section-title">Patient Identification & Service Type</div>
+                        
                         <div class="form-row">
                             <div class="form-group" style="grid-column: span 2;">
-                                <label class="label-required" for="full_name">Full Name</label>
+                                <label id="nameLabel" class="label-required" for="full_name">Full Name</label>
                                 <input id="full_name" name="full_name" class="form-control" placeholder="Patient Full Name" value="<?= add_patient_old('full_name') ?>" required>
                             </div>
                         </div>
@@ -469,27 +472,41 @@ function toggleMode(mode) {
     const genderField = document.getElementById('genderField');
     const nokInput = document.getElementById('nokInput');
     const nokLabel = document.getElementById('nokLabel');
+    const nameLabel = document.getElementById('nameLabel');
+    const nameField = document.getElementById('full_name');
     const fullBadge = document.getElementById('fullFeeBadge');
     const walkinBadge = document.getElementById('walkinFeeBadge');
     const walkinInfoBox = document.getElementById('walkinInfoBox');
 
     if (mode === 'walkin') {
-        // Walk-in: Hide all extra fields
+        // Walk-in: Hide all extra fields, make name optional
         nokSection.style.display = 'none';
         idExtraFields.style.display = 'none';
         genderField.style.display = 'none';
         nokInput.required = false;
         nokLabel.classList.remove('label-required');
+        
+        // Make name optional for walk-in
+        nameField.required = false;
+        nameLabel.classList.remove('label-required');
+        nameLabel.classList.add('label-optional');
+        
         fullBadge.style.display = 'none';
         walkinBadge.style.display = 'inline-block';
         walkinInfoBox.style.display = 'block';
     } else {
-        // Full registration: Show all fields
+        // Full registration: Show all fields, require name
         nokSection.style.display = 'block';
         idExtraFields.style.display = 'grid';
         genderField.style.display = 'grid';
         nokInput.required = true;
         nokLabel.classList.add('label-required');
+        
+        // Make name required for full registration
+        nameField.required = true;
+        nameLabel.classList.add('label-required');
+        nameLabel.classList.remove('label-optional');
+        
         fullBadge.style.display = 'inline-block';
         walkinBadge.style.display = 'none';
         walkinInfoBox.style.display = 'none';
