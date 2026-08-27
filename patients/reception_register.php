@@ -23,22 +23,6 @@ function add_patient_normalize_date(?string $value): ?string
     return ($dt && $dt->format('Y-m-d') === $value) ? $value : null;
 }
 
-function add_patient_generate_number(mysqli $conn, bool $isWalkin): string
-{
-    $prefix = $isWalkin ? 'WLK' : 'EMC';
-
-    do {
-        $candidate = sprintf('%s-%s-%04d', $prefix, date('Ymd'), random_int(1000, 9999));
-        $stmt = $conn->prepare('SELECT id FROM patients WHERE patient_number = ? LIMIT 1');
-        $stmt->bind_param('s', $candidate);
-        $stmt->execute();
-        $exists = $stmt->get_result()->num_rows > 0;
-        $stmt->close();
-    } while ($exists);
-
-    return $candidate;
-}
-
 $errors = [];
 $success = '';
 $allowedClinicalTypes = [
@@ -65,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nextOfKinName = trim((string)($_POST['next_of_kin_name'] ?? ''));
     $nextOfKinPhone = trim((string)($_POST['next_of_kin_phone'] ?? ''));
     $doctorId = max(0, (int)($_POST['doctor_id'] ?? 0));
-    $clinicalType = trim((string)($_POST['clinical_type'] ?? 'General'));
+    $clinicalType = trim((string)($_POST['clinic_category'] ?? 'General'));
 
     // Vitals only for full registration
     $temperature = '';
@@ -134,12 +118,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($doctorId > 0) {
         $doctorCheck = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'doctor' LIMIT 1");
-        $doctorCheck->bind_param('i', $doctorId);
-        $doctorCheck->execute();
-        if ($doctorCheck->get_result()->num_rows === 0) {
-            $errors[] = 'Selected doctor was not found.';
+        if ($doctorCheck) {
+            $doctorCheck->bind_param('i', $doctorId);
+            $doctorCheck->execute();
+            if ($doctorCheck->get_result()->num_rows === 0) {
+                $errors[] = 'Selected doctor was not found.';
+            }
+            $doctorCheck->close();
         }
-        $doctorCheck->close();
     }
 
     // Only validate vitals for full registration
@@ -159,17 +145,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $patientNumber = add_patient_generate_number($conn, $isWalkin);
         $conn->begin_transaction();
 
         try {
+            // Insert patient using existing table structure
             $stmt = $conn->prepare(
-                'INSERT INTO patients (patient_number, full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+                'INSERT INTO patients (full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
             );
+            
+            if (!$stmt) {
+                throw new Exception("Prepare failed: " . $conn->error);
+            }
+            
             $stmt->bind_param(
-                'ssssssissisi',
-                $patientNumber,
+                'sssssississi',
                 $fullName,
                 $gender,
                 $phone,
@@ -179,26 +169,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $nextOfKinName,
                 $nextOfKinPhone,
                 $doctorId,
-                $clinicalType,
-                $isWalkin
+                $clinicalType
             );
+            
             if (!$stmt->execute()) {
-                throw new Exception($stmt->error ?: $conn->error);
+                throw new Exception("Execute failed: " . $stmt->error);
             }
+            
             $patientId = $stmt->insert_id;
             $stmt->close();
 
+            // Create appointment
             $appointmentDate = date('Y-m-d');
             $appointmentTime = date('H:i:s');
             $reason = 'Clinical Service: ' . $clinicalType;
+            
             $apptStmt = $conn->prepare(
                 "INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status, created_at)
                  VALUES (?, ?, ?, ?, ?, 'Pending', NOW())"
             );
-            $apptStmt->bind_param('iisss', $patientId, $doctorId, $appointmentDate, $appointmentTime, $reason);
-            if (!$apptStmt->execute()) {
-                throw new Exception($apptStmt->error ?: $conn->error);
+            
+            if (!$apptStmt) {
+                throw new Exception("Appointment prepare failed: " . $conn->error);
             }
+            
+            $apptStmt->bind_param('iisss', $patientId, $doctorId, $appointmentDate, $appointmentTime, $reason);
+            
+            if (!$apptStmt->execute()) {
+                throw new Exception("Appointment execute failed: " . $apptStmt->error);
+            }
+            
             $apptStmt->close();
 
             // Only record vitals for full registration patients
@@ -207,31 +207,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'INSERT INTO vitals (patient_id, temperature, bp, weight, pulse, respiration, created_at)
                      VALUES (?, ?, ?, ?, ?, ?, NOW())'
                 );
-                $vitalsStmt->bind_param('isssss', $patientId, $temperature, $bp, $weight, $pulse, $respiration);
-                if (!$vitalsStmt->execute()) {
-                    throw new Exception($vitalsStmt->error ?: $conn->error);
+                
+                if (!$vitalsStmt) {
+                    throw new Exception("Vitals prepare failed: " . $conn->error);
                 }
+                
+                $vitalsStmt->bind_param('isssss', $patientId, $temperature, $bp, $weight, $pulse, $respiration);
+                
+                if (!$vitalsStmt->execute()) {
+                    throw new Exception("Vitals execute failed: " . $vitalsStmt->error);
+                }
+                
                 $vitalsStmt->close();
             }
 
+            // Create maternity record if applicable
             if (in_array($clinicalType, ['Maternity', 'ANC', 'PNC'], true)) {
                 $checkMaternity = $conn->prepare('SELECT id FROM maternity WHERE patient_id = ? LIMIT 1');
-                $checkMaternity->bind_param('i', $patientId);
-                $checkMaternity->execute();
-                $existingMaternity = $checkMaternity->get_result()->fetch_assoc();
-                $checkMaternity->close();
+                
+                if ($checkMaternity) {
+                    $checkMaternity->bind_param('i', $patientId);
+                    $checkMaternity->execute();
+                    $existingMaternity = $checkMaternity->get_result()->fetch_assoc();
+                    $checkMaternity->close();
 
-                if (!$existingMaternity) {
-                    $ancNumber = 'ANC-' . date('Y') . '-' . str_pad($patientId, 4, '0', STR_PAD_LEFT);
-                    $maternityStmt = $conn->prepare(
-                        'INSERT INTO maternity (patient_id, anc_number, created_at)
-                         VALUES (?, ?, NOW())'
-                    );
-                    $maternityStmt->bind_param('is', $patientId, $ancNumber);
-                    if (!$maternityStmt->execute()) {
-                        throw new Exception($maternityStmt->error ?: $conn->error);
+                    if (!$existingMaternity) {
+                        $ancNumber = 'ANC-' . date('Y') . '-' . str_pad($patientId, 4, '0', STR_PAD_LEFT);
+                        $maternityStmt = $conn->prepare(
+                            'INSERT INTO maternity (patient_id, anc_number, created_at)
+                             VALUES (?, ?, NOW())'
+                        );
+                        
+                        if ($maternityStmt) {
+                            $maternityStmt->bind_param('is', $patientId, $ancNumber);
+                            if (!$maternityStmt->execute()) {
+                                throw new Exception("Maternity insert failed: " . $maternityStmt->error);
+                            }
+                            $maternityStmt->close();
+                        }
                     }
-                    $maternityStmt->close();
                 }
 
                 $encounterType = 'maternity';
@@ -239,12 +253,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $encounterType = 'general';
             }
 
-            $encounterStmt = $conn->prepare("INSERT INTO encounters (patient_id, type, status, presenting_complaint, is_walkin, created_at) VALUES (?, ?, 'open', ?, ?, NOW())");
-            $complaint = 'Registered via reception';
-            $encounterStmt->bind_param('issi', $patientId, $encounterType, $complaint, $isWalkin);
-            if (!$encounterStmt->execute()) {
-                throw new Exception($encounterStmt->error ?: $conn->error);
+            // Create encounter record
+            $encounterStmt = $conn->prepare("INSERT INTO encounters (patient_id, type, status, presenting_complaint, created_at) VALUES (?, ?, 'open', ?, NOW())");
+            
+            if (!$encounterStmt) {
+                throw new Exception("Encounter prepare failed: " . $conn->error);
             }
+            
+            $complaint = $isWalkin ? 'Walk-in registration' : 'Registered via reception';
+            $encounterStmt->bind_param('iss', $patientId, $encounterType, $complaint);
+            
+            if (!$encounterStmt->execute()) {
+                throw new Exception("Encounter execute failed: " . $encounterStmt->error);
+            }
+            
             $encounterStmt->close();
 
             $conn->commit();
@@ -252,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         } catch (Throwable $e) {
             $conn->rollback();
-            $errors[] = 'Unable to complete registration right now. ' . $e->getMessage();
+            $errors[] = 'Unable to complete registration: ' . $e->getMessage();
         }
     }
 }
@@ -352,11 +374,11 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="label-required" for="clinicalTypeSelect">Clinical Department / Service</label>
-                                <select name="clinical_type" id="clinicalTypeSelect" class="form-control" required onchange="checkMaternity(this.value)">
+                                <select name="clinic_category" id="clinicalTypeSelect" class="form-control" required onchange="checkMaternity(this.value)">
                                     <?php foreach (['Primary Services' => ['General' => 'General Consultation', 'Emergency' => 'Emergency / Trauma', 'OPD' => 'OPD (Outpatient Department)'], 'Maternal & Child Health' => ['Maternity' => 'Maternity', 'ANC' => 'Antenatal Care (ANC)', 'PNC' => 'Postnatal Care (PNC)'], 'Specialized Services' => ['Immunization' => 'Immunization', 'Family Planning' => 'Family Planning', 'SGBV' => 'SGBV', 'CCC' => 'CCC (Chronic Care)', 'Nutrition' => 'Nutrition', 'Dental' => 'Dental', 'Physiotherapy' => 'Physiotherapy']] as $groupLabel => $options): ?>
                                         <optgroup label="<?= htmlspecialchars($groupLabel) ?>">
                                             <?php foreach ($options as $value => $label): ?>
-                                                <option value="<?= htmlspecialchars($value) ?>" <?= (($_POST['clinical_type'] ?? 'General') === $value) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                                                <option value="<?= htmlspecialchars($value) ?>" <?= (($_POST['clinic_category'] ?? 'General') === $value) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                                             <?php endforeach; ?>
                                         </optgroup>
                                     <?php endforeach; ?>
