@@ -34,10 +34,11 @@ if ($status !== 'All') {
 }
 $where_sql = implode(' AND ', $where_clauses);
 
-// --- 3. THE MASTER QUERY (Optimized with aggregated payments) ---
+// --- 3. THE MASTER QUERY (Optimized with aggregated payments & walk-in exclusion) ---
 $query = "
     SELECT i.*, 
            p.full_name as patient_name, 
+           p.is_walkin,
            w.full_name as walkin_name,
            COALESCE(pay.total_paid, 0) as amount_paid
     FROM invoices i
@@ -60,8 +61,15 @@ $total_revenue = 0;
 $total_outstanding = 0;
 $paid_count = 0;
 $unpaid_count = 0;
+$walkin_excluded_count = 0;
 
 while ($row = $result->fetch_assoc()) { 
+    // EXCLUDE walk-in patients from billing - they should not be charged consultation fees
+    if ($row['is_walkin']) {
+        $walkin_excluded_count++;
+        continue;
+    }
+    
     $invoices_data[] = $row;
     $total_invoices++;
     $total_revenue += $row['total'];
@@ -178,6 +186,13 @@ include __DIR__ . '/../includes/sidebar.php';
                 </div>
             </div>
         </div>
+
+        <?php if ($walkin_excluded_count > 0): ?>
+            <div class="alert alert-info alert-dismissible fade show mb-4">
+                <i class="fas fa-info-circle"></i> <strong><?= $walkin_excluded_count ?> walk-in patient(s)</strong> excluded from billing (fee waived).
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+            </div>
+        <?php endif; ?>
 
         <div class="card shadow mb-4">
             <div class="card-body">
