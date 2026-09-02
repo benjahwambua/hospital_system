@@ -18,8 +18,12 @@ $medications = $conn->query("SELECT id, drug_name, quantity, selling_price FROM 
 
         <form id="walkin-sale-form">
             <div class="mb-3">
-                <label>Customer Name</label>
-                <input type="text" name="customer_name" class="form-control" required placeholder="Walk-in customer">
+                <label>Customer Name (optional)</label>
+                <input type="text" name="customer_name" class="form-control" placeholder="Walk-in customer (optional)">
+            </div>
+            <div class="mb-3">
+                <label>Customer Phone (optional)</label>
+                <input type="text" name="customer_phone" class="form-control" placeholder="Phone (optional)">
             </div>
 
             <div class="table-responsive">
@@ -146,7 +150,8 @@ document.addEventListener("DOMContentLoaded", function(){
     form.addEventListener("submit", function(e){
         e.preventDefault();
 
-        const customerName = form.customer_name.value;
+        const customerName = form.customer_name ? form.customer_name.value : '';
+        const customerPhone = form.customer_phone ? form.customer_phone.value : '';
         const paymentMode = form.payment_mode.value;
         const items = [];
 
@@ -167,7 +172,9 @@ document.addEventListener("DOMContentLoaded", function(){
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                customer_name: customerName,
+                customer_type: "walkin",
+                customer_name: customerName || '',
+                customer_phone: customerPhone || '',
                 payment_mode: paymentMode,
                 items: items
             })
@@ -175,7 +182,7 @@ document.addEventListener("DOMContentLoaded", function(){
         .then(res => res.json())
         .then(data=>{
             if(data.status === "success"){
-                alert("Sale processed! Invoice: " + data.invoice_no);
+                alert("Sale processed! Invoice: " + (data.invoice_no ?? data.invoice_id));
                 location.reload();
             } else {
                 alert(data.message || "Error processing sale.");
