@@ -47,12 +47,35 @@ try {
     $walkin_id = null;
 
     if ($customer_type === 'walkin') {
-        $stmt = $conn->prepare(
-            "INSERT INTO walkin_customers (full_name, created_at)
-             VALUES ('Walk-in', NOW())"
-        );
-        if (!$stmt) {
-            throw new Exception($conn->error);
+        $custName = trim((string)($data['customer_name'] ?? ''));
+        $custPhone = trim((string)($data['customer_phone'] ?? ''));
+        if ($custName === '') {
+            $custName = 'Walk-in ' . date('Hi');
+        }
+
+        // Check if phone column exists in walkin_customers
+        $hasPhone = false;
+        $colCheck = $conn->query("SHOW COLUMNS FROM walkin_customers LIKE 'phone'");
+        if ($colCheck && $colCheck->num_rows > 0) {
+            $hasPhone = true;
+        }
+
+        if ($hasPhone) {
+            $stmt = $conn->prepare(
+                "INSERT INTO walkin_customers (full_name, phone, created_at) VALUES (?, ?, NOW())"
+            );
+            if (!$stmt) {
+                throw new Exception($conn->error);
+            }
+            $stmt->bind_param('ss', $custName, $custPhone);
+        } else {
+            $stmt = $conn->prepare(
+                "INSERT INTO walkin_customers (full_name, created_at) VALUES (?, NOW())"
+            );
+            if (!$stmt) {
+                throw new Exception($conn->error);
+            }
+            $stmt->bind_param('s', $custName);
         }
 
         $stmt->execute();
