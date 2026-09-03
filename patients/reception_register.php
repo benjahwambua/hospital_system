@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             $stmt->bind_param(
-                'sssssississi',
+                'sssssissii',
                 $fullName,
                 $gender,
                 $phone,
@@ -375,7 +375,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                             <div class="form-group">
                                 <label class="label-required" for="clinicalTypeSelect">Clinical Department / Service</label>
                                 <select name="clinic_category" id="clinicalTypeSelect" class="form-control" required onchange="checkMaternity(this.value)">
-                                    <?php foreach (['Primary Services' => ['General' => 'General Consultation', 'Emergency' => 'Emergency / Trauma', 'OPD' => 'OPD (Outpatient Department)'], 'Maternal & Child Health' => ['Maternity' => 'Maternity', 'ANC' => 'Antenatal Care (ANC)', 'PNC' => 'Postnatal Care (PNC)'], 'Specialized Services' => ['Immunization' => 'Immunization', 'Family Planning' => 'Family Planning', 'SGBV' => 'SGBV', 'CCC' => 'CCC (Chronic Care)', 'Nutrition' => 'Nutrition', 'Dental' => 'Dental', 'Physiotherapy' => 'Physiotherapy']] as $groupLabel => $options): ?>
+                                    <?php foreach (['Primary Services' => ['General' => 'General Consultation', 'Emergency' => 'Emergency / Trauma', 'OPD' => 'OPD (Outpatient Department)'], 'Maternity Services' => ['Maternity' => 'Maternity Unit', 'ANC' => 'Antenatal Care (ANC)', 'PNC' => 'Postnatal Care (PNC)'], 'Specialty Services' => ['Immunization' => 'Immunization', 'Family Planning' => 'Family Planning', 'SGBV' => 'SGBV (Gender-Based Violence)', 'CCC' => 'Comprehensive Care Clinic (CCC)', 'Nutrition' => 'Nutrition Services', 'Dental' => 'Dental Services', 'Physiotherapy' => 'Physiotherapy / Rehabilitation']] as $groupLabel => $options): ?>
                                         <optgroup label="<?= htmlspecialchars($groupLabel) ?>">
                                             <?php foreach ($options as $value => $label): ?>
                                                 <option value="<?= htmlspecialchars($value) ?>" <?= (($_POST['clinic_category'] ?? 'General') === $value) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
