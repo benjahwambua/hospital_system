@@ -17,12 +17,14 @@ $fromEsc = $conn->real_escape_string($from);
 $toEsc = $conn->real_escape_string($to);
 
 $sql = "
-    SELECT i.id, i.patient_id, i.created_at,
+    SELECT i.id, i.patient_id, i.visit_id, i.created_at,
            p.patient_number, p.full_name AS patient_name, p.is_walkin,
+           v.visit_number, v.visit_type, v.clinic_category, v.status AS visit_status,
            COALESCE(items.total, i.total, 0) AS bill_total,
            COALESCE(pay.paid, 0) AS paid_total
     FROM invoices i
     LEFT JOIN patients p ON p.id = i.patient_id
+    LEFT JOIN visits v ON v.id = i.visit_id
     LEFT JOIN (
         SELECT invoice_id, SUM(total) AS total
         FROM invoice_items GROUP BY invoice_id
@@ -32,8 +34,8 @@ $sql = "
         FROM payments WHERE invoice_id IS NOT NULL
         GROUP BY invoice_id
     ) pay ON pay.invoice_id = i.id
-    WHERE DATE(i.created_at) BETWEEN '{$fromEsc}' AND '{$toEsc}'
-    ORDER BY i.created_at DESC
+    WHERE COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
+    ORDER BY COALESCE(v.visit_date, DATE(i.created_at)) DESC, i.id DESC
 ";
 
 $pending = [];
@@ -60,6 +62,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
 <div class="main-content">
     <div class="container-fluid">
+        <div class="alert alert-info mb-4"><i class="fas fa-info-circle"></i> Cashier is the single collection point. Clinical, laboratory, pharmacy and reception staff raise charges; only the Cashier records patient payments.</div>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-cash-register"></i> Central Cashier</h2>
@@ -107,16 +110,20 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover">
                             <thead class="thead-light"><tr>
-                                <th>Patient</th><th>Patient No.</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Receive</th>
+                                <th>Visit</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Receive</th>
                             </tr></thead>
                             <tbody>
                             <?php foreach ($pending as $row): ?>
                                 <tr>
                                     <td>
-                                        <strong><?= htmlspecialchars($row['patient_name'] ?: 'Unknown') ?></strong>
+                                        <strong><?= htmlspecialchars($row['visit_number'] ?: 'Legacy / Unassigned') ?></strong><br>
+                                        <small class="text-muted"><?= htmlspecialchars($row['visit_type'] ?: 'Legacy') ?> · <?= htmlspecialchars($row['clinic_category'] ?: 'General') ?></small>
+                                    </td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($row['patient_name'] ?: 'Unknown') ?></strong><br>
+                                        <small class="text-muted"><?= htmlspecialchars($row['patient_number'] ?: 'N/A') ?></small>
                                         <?php if (!empty($row['is_walkin'])): ?><span class="badge badge-info">Walk-in</span><?php endif; ?>
                                     </td>
-                                    <td><?= htmlspecialchars($row['patient_number'] ?: 'N/A') ?></td>
                                     <td>KSH <?= number_format($row['bill_total'], 2) ?></td>
                                     <td class="text-success">KSH <?= number_format($row['paid_total'], 2) ?></td>
                                     <td class="text-danger font-weight-bold">KSH <?= number_format($row['balance'], 2) ?></td>
