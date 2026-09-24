@@ -453,44 +453,50 @@ if ($patient_id > 0) {
 
     // Billing Calculations
     // ==============================================================================
-// 4. BILLING CALCULATIONS (UPDATED TO INCLUDE CONSULTATION)
-// ==============================================================================
-$total_charges = 0; 
+    // 4. BILLING CALCULATIONS
+    // ==============================================================================
+    // The dashboard must use the same authoritative invoice totals as
+    // billing/view_invoice.php. Do not rebuild the bill from patient_services
+    // and prescriptions because that can omit charges such as Consultation.
+    $total_charges = 0.0;
 
-// 1. Calculate Services
-if($patient_services) { 
-    while($s = $patient_services->fetch_assoc()) {
-        $total_charges += $s['price']; 
+    $invoiceTotalsRes = $conn->query("
+        SELECT
+            i.id,
+            CASE
+                WHEN COALESCE(items.items_total, 0) > 0 THEN items.items_total
+                ELSE COALESCE(i.total, 0)
+            END AS invoice_total
+        FROM invoices i
+        LEFT JOIN (
+            SELECT invoice_id, SUM(total) AS items_total
+            FROM invoice_items
+            GROUP BY invoice_id
+        ) items ON items.invoice_id = i.id
+        WHERE i.patient_id = " . (int)$patient_id . "
+        ORDER BY i.id ASC
+    ");
+
+    if ($invoiceTotalsRes) {
+        while ($invoiceRow = $invoiceTotalsRes->fetch_assoc()) {
+            $total_charges += (float)($invoiceRow['invoice_total'] ?? 0);
+        }
     }
-    $patient_services->data_seek(0); 
-}
 
-// 2. Calculate Prescriptions
-if($prescriptions) { 
-    while($p = $prescriptions->fetch_assoc()) {
-        $unitPrice = (float)($p['unit_price'] ?? 0);
-        $total_charges += ($p['quantity'] * $unitPrice); 
+    // Payments are invoice-specific, matching billing/view_invoice.php.
+    $total_paid = 0.0;
+    $paidRes = $conn->query("
+        SELECT COALESCE(SUM(p.amount), 0) AS total_paid
+        FROM payments p
+        INNER JOIN invoices i ON i.id = p.invoice_id
+        WHERE i.patient_id = " . (int)$patient_id
+    );
+    if ($paidRes) {
+        $total_paid = (float)($paidRes->fetch_assoc()['total_paid'] ?? 0);
     }
-    $prescriptions->data_seek(0); 
-}
 
-// 3. Do NOT add a hard-coded consultation fee.
-// Consultation is billed only when the Consultation service exists in
-// services_master and is recorded in patient_services/invoice_items.
-
-// 4. Calculate payments against actual invoices for this patient.
-// This prevents a payment on one invoice from reducing another invoice.
-$total_paid = 0;
-$paidRes = $conn->query("SELECT COALESCE(SUM(p.amount),0) AS total_paid
-    FROM payments p
-    INNER JOIN invoices i ON i.id = p.invoice_id
-    WHERE i.patient_id = " . (int)$patient_id);
-if ($paidRes) {
-    $total_paid = (float)($paidRes->fetch_assoc()['total_paid'] ?? 0);
-}
-
-// Logic to prevent negative balance
-$balance_due = ($total_charges > $total_paid) ? ($total_charges - $total_paid) : 0;
+    // Logic to prevent negative balance.
+    $balance_due = max($total_charges - $total_paid, 0.0);
 
 $insuranceCovered = 0;
 $amountToPayNow = $balance_due;
