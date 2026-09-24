@@ -4804,6 +4804,7 @@ CREATE TABLE `payments` (
   `amount` decimal(10,2) NOT NULL,
   `method` varchar(50) DEFAULT NULL,
   `reference` varchar(100) DEFAULT NULL,
+  `invoice_id` int(11) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -4818,6 +4819,33 @@ INSERT INTO `payments` (`id`, `patient_id`, `amount`, `method`, `reference`, `cr
 (4, 8, 50.00, 'MPESA', NULL, '2026-02-24 07:52:59'),
 (5, 8, 50.00, 'MPESA', NULL, '2026-02-24 07:57:01'),
 (6, 8, 50.00, 'MPESA', NULL, '2026-02-24 07:59:10');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `mpesa_transactions`
+--
+
+CREATE TABLE `mpesa_transactions` (
+  `id` int(11) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `patient_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `phone` varchar(20) NOT NULL,
+  `merchant_request_id` varchar(100) DEFAULT NULL,
+  `checkout_request_id` varchar(100) DEFAULT NULL,
+  `mpesa_receipt` varchar(100) DEFAULT NULL,
+  `result_code` varchar(20) DEFAULT NULL,
+  `result_desc` varchar(255) DEFAULT NULL,
+  `status` enum('pending','completed','failed') NOT NULL DEFAULT 'pending',
+  `raw_response` longtext DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `uq_mpesa_checkout` (`checkout_request_id`),
+  UNIQUE KEY `uq_mpesa_receipt` (`mpesa_receipt`),
+  KEY `idx_mpesa_invoice` (`invoice_id`),
+  KEY `idx_mpesa_patient` (`patient_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -5568,6 +5596,7 @@ CREATE TABLE `prescriptions` (
   `frequency` varchar(100) DEFAULT NULL,
   `duration` varchar(100) DEFAULT NULL,
   `quantity` int(11) DEFAULT NULL,
+  `unit_price` decimal(10,2) DEFAULT NULL,
   `invoice_id` int(11) DEFAULT NULL,
   `prescribed_by` int(11) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
