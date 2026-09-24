@@ -96,15 +96,29 @@ if ($patient_id && empty($items_array)) {
     }
 }
 
-// --- ADDITION: Fetch Payment History for Balance Calculation ---
+// --- Fetch payments for THIS invoice only ---
 $total_paid = 0;
-if ($patient_id) {
-    $pay_stmt = $conn->prepare("SELECT SUM(amount) as paid_sum FROM billing WHERE patient_id = ?");
-    $pay_stmt->bind_param("i", $patient_id);
+
+$pay_stmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid_sum FROM payments WHERE invoice_id = ?");
+if ($pay_stmt) {
+    $pay_stmt->bind_param("i", $invoice_id);
     $pay_stmt->execute();
     $pay_res = $pay_stmt->get_result()->fetch_assoc();
-    $total_paid = $pay_res['paid_sum'] ?? 0;
+    $total_paid = (float)($pay_res['paid_sum'] ?? 0);
     $pay_stmt->close();
+}
+
+// Legacy billing rows are only considered when they are explicitly linked
+// to this invoice. Never aggregate another invoice's patient payments.
+if ($total_paid <= 0) {
+    $pay_stmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid_sum FROM billing WHERE invoice_id = ?");
+    if ($pay_stmt) {
+        $pay_stmt->bind_param("i", $invoice_id);
+        $pay_stmt->execute();
+        $pay_res = $pay_stmt->get_result()->fetch_assoc();
+        $total_paid = (float)($pay_res['paid_sum'] ?? 0);
+        $pay_stmt->close();
+    }
 }
 
 include __DIR__ . '/../includes/header.php';
