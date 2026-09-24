@@ -181,7 +181,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <h4 class="font-weight-bold text-gray-800 mb-1">Clinical Care</h4>
             <div class="text-muted">Doctor workspace · <?= htmlspecialchars($visit['visit_number'] ?? 'Visit not assigned') ?></div>
         </div>
-        <a href="consultations.php" class="btn btn-outline-primary"><i class="fas fa-arrow-left"></i> Consultation Queue</a>
+        <div><a href="orders.php?patient_id=<?= $patientId ?>&visit_id=<?= $visitId ?>" class="btn btn-success mr-2"><i class="fas fa-flask"></i> Orders & Referrals</a><a href="consultations.php" class="btn btn-outline-primary"><i class="fas fa-arrow-left"></i> Consultation Queue</a></div>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -247,6 +247,33 @@ include __DIR__ . '/../includes/sidebar.php';
             <button type="submit" name="save_clinical_care" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Clinical Encounter</button>
         </div>
     </form>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white"><h5 class="mb-0 font-weight-bold text-primary">Department Results — This Visit</h5></div>
+        <div class="card-body">
+            <?php
+            $clinicalResults = [];
+            if ($visitId > 0) {
+                $rs = $conn->prepare("SELECT ps.category, sm.service_name, ps.results, ps.status, ps.created_at FROM patient_services ps JOIN services_master sm ON sm.id=ps.service_id WHERE ps.patient_id=? AND ps.visit_id=? AND ps.category IN ('lab','radiology') ORDER BY ps.id DESC");
+                if ($rs) { $rs->bind_param('ii',$patientId,$visitId); $rs->execute(); $rr=$rs->get_result(); while($row=$rr->fetch_assoc()) $clinicalResults[]=$row; $rs->close(); }
+            }
+            ?>
+            <?php if ($clinicalResults): ?>
+            <div class="table-responsive"><table class="table table-sm table-bordered">
+                <thead><tr><th>Department</th><th>Investigation</th><th>Status</th><th>Result / Findings</th><th>Date</th></tr></thead>
+                <tbody>
+                <?php foreach($clinicalResults as $r): ?><tr>
+                    <td><?= htmlspecialchars(ucfirst($r['category'])) ?></td>
+                    <td><?= htmlspecialchars($r['service_name']) ?></td>
+                    <td><?= htmlspecialchars($r['status'] ?? 'Pending') ?></td>
+                    <td><?= nl2br(htmlspecialchars($r['results'] ?? 'Awaiting result')) ?></td>
+                    <td><?= htmlspecialchars($r['created_at'] ?? '') ?></td>
+                </tr><?php endforeach; ?>
+                </tbody>
+            </table></div>
+            <?php else: ?><div class="text-muted">No laboratory or radiology results have been returned for this visit yet.</div><?php endif; ?>
+        </div>
+    </div>
 
     <div class="card shadow-sm mb-5">
         <div class="card-header bg-white"><h5 class="mb-0 font-weight-bold">This Visit's Clinical History</h5></div>
