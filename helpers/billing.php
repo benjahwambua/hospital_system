@@ -243,13 +243,17 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
 
     // Walk-in patients receive laboratory/services charges only; consultation is free.
     $isWalkin = false;
-    $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id = ? LIMIT 1");
-    if ($patientStmt) {
-        $patientStmt->bind_param('i', $patient_id);
-        $patientStmt->execute();
-        $patientRow = $patientStmt->get_result()->fetch_assoc();
-        $patientStmt->close();
-        $isWalkin = !empty($patientRow['is_walkin']);
+    // Keep the application compatible with databases that have not yet run
+    // the walk-in migration.
+    if (invoice_column_exists($conn, 'is_walkin')) {
+        $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id = ? LIMIT 1");
+        if ($patientStmt) {
+            $patientStmt->bind_param('i', $patient_id);
+            $patientStmt->execute();
+            $patientRow = $patientStmt->get_result()->fetch_assoc();
+            $patientStmt->close();
+            $isWalkin = !empty($patientRow['is_walkin']);
+        }
     }
     if ($isWalkin) {
         return get_or_create_invoice($conn, $patient_id);
