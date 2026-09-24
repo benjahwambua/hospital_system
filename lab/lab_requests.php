@@ -56,15 +56,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
 
                     $conn->begin_transaction();
                     try {
-                        $patientStmt = $conn->prepare(
-                            "INSERT INTO patients (full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
-                             VALUES (?, '', ?, NULL, '', 0, '', '', 0, 'General', 1, NOW())"
+                        // Reuse the dedicated walk-in patient already in the database.
+                        // Walk-in laboratory requests should not create duplicate patient rows.
+                        $walkinLookup = $conn->prepare(
+                            "SELECT id FROM patients
+                             WHERE is_walkin = 1
+                                OR LOWER(TRIM(full_name)) IN ('walk-in', 'walk-in patient', 'walk-in customer')
+                             ORDER BY id ASC LIMIT 1"
                         );
-                        if (!$patientStmt) throw new Exception('Unable to prepare walk-in patient: ' . $conn->error);
-                        $patientStmt->bind_param('ss', $name, $phone);
-                        if (!$patientStmt->execute()) throw new Exception('Unable to create walk-in patient: ' . $patientStmt->error);
-                        $walkinPatientId = $patientStmt->insert_id;
-                        $patientStmt->close();
+                        if (!$walkinLookup) throw new Exception('Unable to locate walk-in patient: ' . $conn->error);
+                        $walkinLookup->execute();
+                        $walkinRow = $walkinLookup->get_result()->fetch_assoc();
+                        $walkinLookup->close();
+
+                        if (!$walkinRow) {
+                            throw new Exception('No walk-in patient exists in the database. Please create the dedicated walk-in patient record first.');
+                        }
+                        $walkinPatientId = (int)$walkinRow['id'];
 
                         $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'lab', ?, NOW(), 'Pending')");
                         if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
