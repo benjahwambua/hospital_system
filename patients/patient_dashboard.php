@@ -275,11 +275,24 @@ if ($patient_id <= 0) {
             $_POST['investigations'] ?? '', $_POST['management_plan'] ?? '',
             $_POST['prescription_instructions'] ?? '', $_POST['doctor_notes'] ?? ''
         ];
+        $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
         $stmt=$conn->prepare("INSERT INTO encounters (patient_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
         if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
         $stmt->bind_param("isssssssssssssssss", ...$params);
         if(!$stmt->execute()){ $error=$stmt->error; $stmt->close(); throw new Exception('Unable to save clinical record: '.$error); }
         $stmt->close();
+
+        // Move the current Visit forward once the doctor has examined the patient.
+        if ($visitId > 0) {
+            $visitStmt = $conn->prepare("UPDATE visits SET status='In Progress', doctor_id=COALESCE(NULLIF(?,0), doctor_id), updated_at=NOW() WHERE id=?");
+            if ($visitStmt) {
+                $doctorId = (int)($patient['doctor_id'] ?? 0);
+                $visitStmt->bind_param('ii', $doctorId, $visitId);
+                $visitStmt->execute();
+                $visitStmt->close();
+            }
+        }
+
         header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&success=1");
         exit;
     }
