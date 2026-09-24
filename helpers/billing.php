@@ -309,6 +309,57 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
     return $invoice_id;
 }
 
+function remove_walkin_consultation_charge($conn, int $patient_id): void {
+    if ($patient_id <= 0) return;
+
+    ensure_walkin_column($conn);
+    $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id = ? LIMIT 1");
+    if (!$patientStmt) return;
+    $patientStmt->bind_param('i', $patient_id);
+    $patientStmt->execute();
+    $patientRow = $patientStmt->get_result()->fetch_assoc();
+    $patientStmt->close();
+
+    if (empty($patientRow['is_walkin'])) return;
+
+    // Remove the mistakenly-created KES 200 consultation charge only when
+    // the invoice has no payments. Never alter an invoice that already has
+    // financial activity.
+    $invoiceRes = $conn->query("SELECT i.id
+        FROM invoices i
+        WHERE i.patient_id = " . (int)$patient_id . "
+        ORDER BY i.id DESC");
+    if (!$invoiceRes) return;
+
+    while ($invoice = $invoiceRes->fetch_assoc()) {
+        $invoiceId = (int)$invoice['id'];
+        $paymentRes = $conn->query("SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE invoice_id = " . $invoiceId);
+        $paid = $paymentRes ? (float)($paymentRes->fetch_assoc()['paid'] ?? 0) : 0.0;
+        if ($paid > 0) continue;
+
+        $conn->query("DELETE FROM invoice_items
+            WHERE invoice_id = " . $invoiceId . "
+              AND LOWER(TRIM(description)) IN ('service: consultation', 'consultation')");
+
+        // Remove the matching consultation service record as well.
+        $conn->query("DELETE ps FROM patient_services ps
+            INNER JOIN services_master sm ON sm.id = ps.service_id
+            WHERE ps.patient_id = " . (int)$patient_id . "
+              AND ps.status <> 'Cancelled'
+              AND LOWER(TRIM(sm.service_name)) = 'consultation'");
+
+        $totalRes = $conn->query("SELECT COALESCE(SUM(total),0) AS total FROM invoice_items WHERE invoice_id = " . $invoiceId);
+        $newTotal = $totalRes ? (float)($totalRes->fetch_assoc()['total'] ?? 0) : 0.0;
+        update_invoice_total($conn, $invoiceId, $newTotal);
+
+        $conn->query("UPDATE invoices
+            SET paid_amount = 0, amount_paid = 0, balance = " . $newTotal . ",
+                payment_status = " . ($newTotal > 0 ? "'unpaid'" : "'paid'") . ",
+                status = " . ($newTotal > 0 ? "'unpaid'" : "'paid'") . "
+            WHERE id = " . $invoiceId);
+    }
+}
+
 function update_invoice_total($conn, $invoice_id, $total) {
     $stmt = $conn->prepare("UPDATE invoices SET total = ? WHERE id = ?");
     if (!$stmt) {
