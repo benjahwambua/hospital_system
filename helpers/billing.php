@@ -8,6 +8,45 @@ function ensure_walkin_column($conn): void {
     }
 }
 
+function hms_visits_available($conn): bool {
+    $check = $conn->query("SHOW TABLES LIKE 'visits'");
+    return $check && $check->num_rows > 0;
+}
+
+function get_or_create_current_visit($conn, int $patient_id, string $visitType = 'Outpatient', string $clinicCategory = 'General', int $doctorId = 0): int {
+    if ($patient_id <= 0 || !hms_visits_available($conn)) {
+        return 0;
+    }
+
+    $stmt = $conn->prepare("SELECT id FROM visits WHERE patient_id = ? AND visit_date = CURDATE() AND status IN ('Open','In Progress') ORDER BY id DESC LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $patient_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($row) return (int)$row['id'];
+    }
+
+    $visitNumber = 'V-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+    $visitStmt = $conn->prepare(
+        "INSERT INTO visits (visit_number, patient_id, visit_date, visit_time, visit_type, clinic_category, doctor_id, status, created_by, created_at)
+         VALUES (?, ?, CURDATE(), CURTIME(), ?, ?, NULLIF(?,0), 'Open', NULLIF(?,0), NOW())"
+    );
+    if (!$visitStmt) {
+        throw new Exception('Unable to create patient visit: ' . $conn->error);
+    }
+    $createdBy = (int)($_SESSION['user_id'] ?? 0);
+    $visitStmt->bind_param('sissii', $visitNumber, $patient_id, $visitType, $clinicCategory, $doctorId, $createdBy);
+    if (!$visitStmt->execute()) {
+        $error = $visitStmt->error;
+        $visitStmt->close();
+        throw new Exception('Unable to create patient visit: ' . $error);
+    }
+    $id = (int)$visitStmt->insert_id;
+    $visitStmt->close();
+    return $id;
+}
+
 function invoice_column_exists($conn, $column) {
     $check = $conn->query("SHOW COLUMNS FROM invoices LIKE '" . $conn->real_escape_string($column) . "'");
     return $check && $check->num_rows > 0;
