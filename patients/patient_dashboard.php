@@ -62,7 +62,7 @@ if ($patient_id <= 0) {
     $check_stmt->close();
 
     if ($exists == 0) {
-        $consult = $conn->query("SELECT id, service_name, price FROM services_master WHERE service_name = 'Consultation' LIMIT 1")->fetch_assoc();
+        $consult = $conn->query("SELECT id, service_name, price, category FROM services_master WHERE service_name = 'Consultation' AND active = 1 LIMIT 1")->fetch_assoc();
         if ($consult) {
             $consultCategory = (string)($consult['category'] ?? 'procedures');
             $ins_stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
@@ -298,9 +298,6 @@ if ($patient_id <= 0) {
         $phone=trim((string)($_POST['mpesa_phone'] ?? ''));
         if($amount<=0) throw new Exception('Payment amount must be greater than zero.');
 
-        // Legacy invoices can contain NULL/zero totals or inconsistent paid
-        // fields. Build/select an invoice, then synchronize today's actual
-        // billable charges before calculating the balance.
         $invoice_id=get_or_create_invoice($conn,$patient_id);
         $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
         if(!$invoice) throw new Exception('Unable to load patient invoice.');
@@ -308,73 +305,75 @@ if ($patient_id <= 0) {
         $invoiceTotal=(float)($invoice['total'] ?? 0);
         $paid=max((float)($invoice['paid_amount'] ?? 0),(float)($invoice['amount_paid'] ?? 0));
 
-        // If this invoice is already settled/empty, use a fresh invoice for
-        // the current visit rather than paying against a zero-balance record.
+        // An empty/settled legacy invoice cannot receive a payment. Start a
+        // fresh invoice and populate it from today's actual billable records.
         if($invoiceTotal <= $paid){
             $invoice_id=create_invoice($conn,$patient_id);
             $invoiceTotal=0.0;
             $paid=0.0;
         }
 
-        // Synchronize today's services. med_id stores the patient_services ID
-        // for service invoice items, so we can safely avoid duplicates.
-        $svcRes=$conn->query("SELECT ps.id, sm.service_name, ps.price
-            FROM patient_services ps
-            JOIN services_master sm ON sm.id=ps.service_id
-            WHERE ps.patient_id=".(int)$patient_id."
-              AND ps.status <> 'Cancelled'
-              AND DATE(ps.created_at)=CURDATE()
-            ORDER BY ps.id ASC");
-        if($svcRes){
-            while($svc=$svcRes->fetch_assoc()){
-                if((float)$svc['price']<=0) continue;
-                $already=false;
-                $check=$conn->prepare("SELECT id FROM invoice_items WHERE invoice_id=? AND item_type='service' AND med_id=? LIMIT 1");
-                if($check){
-                    $svcId=(int)$svc['id'];
-                    $check->bind_param('ii',$invoice_id,$svcId);
-                    $check->execute();
-                    $already=$check->get_result()->num_rows>0;
-                    $check->close();
+        // First determine whether this invoice already has items.
+        $itemCount=0;
+        $itemCountRes=$conn->query("SELECT COUNT(*) AS c FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
+        if($itemCountRes) $itemCount=(int)($itemCountRes->fetch_assoc()['c'] ?? 0);
+
+        // If it is a new/empty invoice, synchronize today's services.
+        if($itemCount===0){
+            $svcRes=$conn->query("SELECT ps.id, sm.service_name, ps.price
+                FROM patient_services ps
+                INNER JOIN services_master sm ON sm.id=ps.service_id
+                WHERE ps.patient_id=".(int)$patient_id."
+                  AND ps.status <> 'Cancelled'
+                  AND DATE(ps.created_at)=CURDATE()
+                  AND COALESCE(ps.price,0)>0
+                ORDER BY ps.id ASC");
+            if($svcRes){
+                while($svc=$svcRes->fetch_assoc()){
+                    add_invoice_item(
+                        $conn,$invoice_id,'Service: '.$svc['service_name'],
+                        1,(float)$svc['price'],'service',(int)$svc['id']
+                    );
                 }
-                if(!$already){
-                    add_invoice_item($conn,$invoice_id,'Service: '.$svc['service_name'],1,(float)$svc['price'],'service',(int)$svc['id']);
+            }
+
+            // Prescriptions are only added when they are not already linked.
+            $rxRes=$conn->query("SELECT p.id, COALESCE(s.drug_name,'Prescription') AS drug_name,
+                p.quantity, COALESCE(p.unit_price,s.selling_price,0) AS unit_price,
+                p.medicine_id
+                FROM prescriptions p
+                LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id
+                WHERE p.patient_id=".(int)$patient_id."
+                  AND DATE(p.created_at)=CURDATE()
+                  AND (p.invoice_id IS NULL OR p.invoice_id=0)
+                  AND p.quantity>0
+                  AND COALESCE(p.unit_price,s.selling_price,0)>0");
+            if($rxRes){
+                while($rx=$rxRes->fetch_assoc()){
+                    $qty=(int)$rx['quantity'];
+                    $unitPrice=(float)$rx['unit_price'];
+                    add_invoice_item(
+                        $conn,$invoice_id,'Medication: '.$rx['drug_name'],
+                        $qty,$unitPrice,'pharmacy',(int)($rx['medicine_id'] ?? 0)
+                    );
+                    $rxUpdate=$conn->prepare("UPDATE prescriptions SET invoice_id=? WHERE id=?");
+                    if($rxUpdate){
+                        $rxUpdate->bind_param('ii',$invoice_id,$rx['id']);
+                        $rxUpdate->execute();
+                        $rxUpdate->close();
+                    }
                 }
             }
         }
 
-        // Synchronize today's prescriptions. Do not assume prescriptions has a
-        // drug_name column; pharmacy_stock is the source for the drug name.
-        $rxRes=$conn->query("SELECT p.id, COALESCE(s.drug_name,'Prescription') AS drug_name,
-            p.quantity, COALESCE(p.unit_price,s.selling_price,0) AS unit_price, p.medicine_id
-            FROM prescriptions p
-            LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id
-            WHERE p.patient_id=".(int)$patient_id."
-              AND DATE(p.created_at)=CURDATE()
-              AND (p.invoice_id IS NULL OR p.invoice_id=0)");
-        if($rxRes){
-            while($rx=$rxRes->fetch_assoc()){
-                $qty=(int)$rx['quantity'];
-                $unitPrice=(float)$rx['unit_price'];
-                if($unitPrice<=0 || $qty<=0) continue;
-                add_invoice_item($conn,$invoice_id,'Medication: '.$rx['drug_name'],$qty,$unitPrice,'pharmacy',(int)($rx['medicine_id'] ?? 0));
-                $rxUpdate=$conn->prepare("UPDATE prescriptions SET invoice_id=? WHERE id=?");
-                if($rxUpdate){
-                    $rxUpdate->bind_param('ii',$invoice_id,$rx['id']);
-                    $rxUpdate->execute();
-                    $rxUpdate->close();
-                }
-            }
-        }
-
-        // Re-read after synchronization. Invoice items are the authoritative
-        // source for this invoice's billable total.
+        // Re-read authoritative invoice values after item synchronization.
         $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
         $invoiceTotal=(float)($invoice['total'] ?? 0);
         $paid=max((float)($invoice['paid_amount'] ?? 0),(float)($invoice['amount_paid'] ?? 0));
 
         if($invoiceTotal<=0){
-            $itemRes=$conn->query("SELECT COALESCE(SUM(total),0) AS total FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
+            $itemRes=$conn->query("SELECT COALESCE(SUM(total),0) AS total
+                FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
             $itemTotal=$itemRes?(float)($itemRes->fetch_assoc()['total'] ?? 0):0.0;
             if($itemTotal>0){
                 update_invoice_total($conn,$invoice_id,$itemTotal);
@@ -385,7 +384,11 @@ if ($patient_id <= 0) {
         $balance=max($invoiceTotal-$paid,0);
         $amount=min($amount,$balance);
         if($amount<=0){
-            throw new Exception('No outstanding balance exists for the current invoice. Invoice total: KSH '.number_format($invoiceTotal,2).', paid: KSH '.number_format($paid,2).'.');
+            throw new Exception(
+                'No outstanding balance exists for the current invoice. Invoice total: KSH ' .
+                number_format($invoiceTotal,2) . ', paid: KSH ' .
+                number_format($paid,2) . '.'
+            );
         }
 
         if(strtolower($method)==='mpesa'){
@@ -500,21 +503,19 @@ if($prescriptions) {
     $prescriptions->data_seek(0); 
 }
 
-// 3. ADD CONSULTATION FEE (Matches view_invoice.php logic)
-// Only add if this is a valid patient session
-if ($patient_id > 0) {
-    $total_charges += 200; 
-}
+// 3. Do NOT add a hard-coded consultation fee.
+// Consultation is billed only when the Consultation service exists in
+// services_master and is recorded in patient_services/invoice_items.
 
-// 4. Calculate Payments
+// 4. Calculate payments against actual invoices for this patient.
+// This prevents a payment on one invoice from reducing another invoice.
 $total_paid = 0;
-// Calculate Payments (ensure this is only summing what is actually paid)
-$total_paid = 0;
-if($billing) { 
-    while($b = $billing->fetch_assoc()) {
-        if($b['paid']) $total_paid += $b['amount']; 
-    }
-    $billing->data_seek(0); 
+$paidRes = $conn->query("SELECT COALESCE(SUM(p.amount),0) AS total_paid
+    FROM payments p
+    INNER JOIN invoices i ON i.id = p.invoice_id
+    WHERE i.patient_id = " . (int)$patient_id);
+if ($paidRes) {
+    $total_paid = (float)($paidRes->fetch_assoc()['total_paid'] ?? 0);
 }
 
 // Logic to prevent negative balance
