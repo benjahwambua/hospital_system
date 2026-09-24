@@ -254,80 +254,60 @@ if ($patient_id <= 0) {
 
     // Existing Save Clinical Handler
     if(isset($_POST['save_clinical'])){
-        $params=[
-            $patient_id,
-            $_POST['presenting_complaint'] ?? '',
-            $_POST['hpc'] ?? '',
-            $_POST['medical_history'] ?? '',
-            $_POST['surgical_history'] ?? '',
-            $_POST['family_history'] ?? '',
-            $_POST['drug_history'] ?? '',
-            $_POST['allergies'] ?? '',
-            $_POST['social_history'] ?? '',
-            $_POST['review_systems'] ?? '',
-            $_POST['physical_exam'] ?? '',
-            $_POST['diagnosis'] ?? '',
-            $_POST['differential_diagnosis'] ?? '',
-            $_POST['investigations'] ?? '',
-            $_POST['management_plan'] ?? '',
-            $_POST['prescription_instructions'] ?? '',
-            $_POST['doctor_notes'] ?? ''
+        $params = [
+            $patient_id, $_POST['presenting_complaint'] ?? '', $_POST['hpc'] ?? '',
+            $_POST['medical_history'] ?? '', $_POST['surgical_history'] ?? '',
+            $_POST['family_history'] ?? '', $_POST['drug_history'] ?? '',
+            $_POST['allergies'] ?? '', $_POST['social_history'] ?? '',
+            $_POST['review_systems'] ?? '', $_POST['physical_exam'] ?? '',
+            $_POST['diagnosis'] ?? '', $_POST['differential_diagnosis'] ?? '',
+            $_POST['investigations'] ?? '', $_POST['management_plan'] ?? '',
+            $_POST['prescription_instructions'] ?? '', $_POST['doctor_notes'] ?? ''
         ];
         $stmt=$conn->prepare("INSERT INTO encounters (patient_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
         if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
-        $stmt->bind_param("isssssssssssssssss",...$params);
-        if(!$stmt->execute()){
-            $error=$stmt->error; $stmt->close();
-            throw new Exception('Unable to save clinical record: '.$error);
-        }
+        $stmt->bind_param("isssssssssssssssss", ...$params);
+        if(!$stmt->execute()){ $error=$stmt->error; $stmt->close(); throw new Exception('Unable to save clinical record: '.$error); }
         $stmt->close();
         header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&success=1");
         exit;
     }
 
-   // --- UNIFIED PAYMENT HANDLER ---
-if(isset($_POST['register_payment'])){
-    $amount=round((float)($_POST['amount'] ?? 0),2);
-    $method=trim((string)($_POST['method'] ?? 'Cash'));
-    $phone=trim((string)($_POST['mpesa_phone'] ?? ''));
+    // Unified payment handler
+    if(isset($_POST['register_payment'])){
+        $amount=round((float)($_POST['amount'] ?? 0),2);
+        $method=trim((string)($_POST['method'] ?? 'Cash'));
+        $phone=trim((string)($_POST['mpesa_phone'] ?? ''));
+        if($amount<=0) throw new Exception('Payment amount must be greater than zero.');
 
-    if($amount<=0) throw new Exception('Payment amount must be greater than zero.');
+        $invoice_id=get_or_create_invoice($conn,$patient_id);
+        $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
+        if(!$invoice) throw new Exception('Unable to load patient invoice.');
 
-    $invoice_id=get_or_create_invoice($conn,$patient_id);
-    $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
-    if(!$invoice) throw new Exception('Unable to load patient invoice.');
+        $invoiceTotal=(float)($invoice['total'] ?? 0);
+        $paid=(float)($invoice['paid_amount'] ?? 0);
+        $balance=max($invoiceTotal-$paid,0);
+        $amount=min($amount,$balance);
+        if($amount<=0) throw new Exception('This invoice has no outstanding balance.');
 
-    $invoiceTotal=(float)($invoice['total'] ?? 0);
-    if($invoiceTotal<=0){
-        $svc=$conn->query("SELECT COALESCE(SUM(price),0) total FROM patient_services WHERE patient_id=".(int)$patient_id." AND status NOT IN ('Cancelled','Deleted')");
-        $rx=$conn->query("SELECT COALESCE(SUM(quantity*COALESCE(unit_price,selling_price)),0) total FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=".(int)$patient_id);
-        $invoiceTotal=(float)($svc->fetch_assoc()['total'] ?? 0)+(float)($rx->fetch_assoc()['total'] ?? 0);
-        if($invoiceTotal>0) update_invoice_total($conn,$invoice_id,$invoiceTotal);
+        if(strtolower($method)==='mpesa'){
+            mpesa_initiate_stk($conn,$invoice_id,$patient_id,$amount,$phone);
+            header("Location: patient_dashboard.php?id=$patient_id&tab=billing&mpesa=initiated");
+            exit;
+        }
+
+        $conn->begin_transaction();
+        try{
+            $payment=record_payment($conn,$invoice_id,$amount,$method,null);
+            post_payment_journal($conn,$invoice_id,$payment['amount'],$method);
+            $conn->commit();
+            header("Location: billing/view_invoice.php?id=".$invoice_id."&paid=1");
+            exit;
+        }catch(Throwable $e){
+            $conn->rollback();
+            throw $e;
+        }
     }
-
-    $paid=(float)($invoice['paid_amount'] ?? 0);
-    $balance=max($invoiceTotal-$paid,0);
-    $amount=min($amount,$balance);
-    if($amount<=0) throw new Exception('This invoice has no outstanding balance.');
-
-    if(strtolower($method)==='mpesa'){
-        mpesa_initiate_stk($conn,$invoice_id,$patient_id,$amount,$phone);
-        header("Location: patient_dashboard.php?id=$patient_id&tab=billing&mpesa=initiated");
-        exit;
-    }
-
-    $conn->begin_transaction();
-    try{
-        $payment=record_payment($conn,$invoice_id,$amount,$method,null);
-        post_payment_journal($conn,$invoice_id,$payment['amount'],$method);
-        $conn->commit();
-        header("Location: billing/view_invoice.php?id=".$invoice_id."&paid=1");
-        exit;
-    }catch(Throwable $e){
-        $conn->rollback();
-        throw $e;
-    }
-}
 
 // ==============================================================================
 // 3. DATA AGGREGATION (Queries for Display)
