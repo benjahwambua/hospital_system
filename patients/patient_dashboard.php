@@ -304,10 +304,65 @@ if ($patient_id <= 0) {
         $paid=(float)($invoice['paid_amount'] ?? 0);
 
         // A payment can only be made against a real invoice total.
-        // Empty legacy invoices are ignored by get_or_create_invoice().
+        // Repair current-visit legacy charges that were created before invoice
+        // linkage was introduced. Only today's services/prescriptions are
+        // migrated here so old historical visits are not billed again.
         if ($invoiceTotal <= 0) {
             $itemTotalRes = $conn->query("SELECT COALESCE(SUM(total),0) AS total FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
             $itemTotal = $itemTotalRes ? (float)($itemTotalRes->fetch_assoc()['total'] ?? 0) : 0;
+
+            if ($itemTotal <= 0) {
+                $svcRes = $conn->query("SELECT ps.id, sm.service_name, ps.price, ps.category
+                    FROM patient_services ps
+                    JOIN services_master sm ON sm.id = ps.service_id
+                    WHERE ps.patient_id=".(int)$patient_id."
+                      AND ps.status <> 'Cancelled'
+                      AND DATE(ps.created_at)=CURDATE()");
+                if ($svcRes) {
+                    while ($svc = $svcRes->fetch_assoc()) {
+                        add_invoice_item(
+                            $conn,
+                            $invoice_id,
+                            'Service: ' . $svc['service_name'],
+                            1,
+                            (float)$svc['price'],
+                            'service',
+                            (int)$svc['id']
+                        );
+                    }
+                }
+
+                $rxRes = $conn->query("SELECT p.id, COALESCE(s.drug_name,p.drug_name,'Prescription') AS drug_name,
+                    p.quantity, COALESCE(p.unit_price,s.selling_price,0) AS unit_price, p.medicine_id
+                    FROM prescriptions p
+                    LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id
+                    WHERE p.patient_id=".(int)$patient_id."
+                      AND DATE(p.created_at)=CURDATE()
+                      AND (p.invoice_id IS NULL OR p.invoice_id=0)");
+                if ($rxRes) {
+                    while ($rx = $rxRes->fetch_assoc()) {
+                        if ((float)$rx['unit_price'] <= 0 || (int)$rx['quantity'] <= 0) continue;
+                        add_invoice_item(
+                            $conn,
+                            $invoice_id,
+                            'Medication: ' . $rx['drug_name'],
+                            (int)$rx['quantity'],
+                            (float)$rx['unit_price'],
+                            'pharmacy',
+                            (int)($rx['medicine_id'] ?? 0)
+                        );
+                        $rxUpdate = $conn->prepare("UPDATE prescriptions SET invoice_id=? WHERE id=?");
+                        if ($rxUpdate) {
+                            $rxUpdate->bind_param('ii', $invoice_id, $rx['id']);
+                            $rxUpdate->execute();
+                            $rxUpdate->close();
+                        }
+                    }
+                }
+
+                $itemTotalRes = $conn->query("SELECT COALESCE(SUM(total),0) AS total FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
+                $itemTotal = $itemTotalRes ? (float)($itemTotalRes->fetch_assoc()['total'] ?? 0) : 0;
+            }
 
             if ($itemTotal > 0) {
                 $invoiceTotal = $itemTotal;
