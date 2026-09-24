@@ -29,8 +29,8 @@ try{
     $paid = (float)($paidRow['total_paid'] ?? 0);
     $remaining=max((float)($invoice['total'] ?? 0)-$paid,0);
 
-    // M-Pesa is asynchronous: initiate STK Push and wait for Safaricom
-    // callback before creating the payment record.
+    // M-Pesa is recorded manually by receipt code. STK Push is optional
+    // and is handled separately from this payment-recording endpoint.
     if(strtolower($mode)==='mpesa' && $remaining>0){
         $phone = trim((string)($_POST['phone'] ?? ''));
         if($phone===''){
@@ -44,11 +44,15 @@ try{
                 $phone=trim((string)($prow['phone'] ?? ''));
             }
         }
-        if($phone==='') throw new Exception('A valid patient M-Pesa phone number is required.');
-        $stkAmount = $amount>0 ? min($amount,$remaining) : $remaining;
-        mpesa_initiate_stk($conn,$id,(int)($invoice['patient_id'] ?? 0),$stkAmount,$phone);
+        $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? $_POST['reference'] ?? '')));
+        if($receipt==='') throw new Exception('M-Pesa receipt/transaction code is required. STK Push is optional.');
+        if($phone==='') throw new Exception('Enter the M-Pesa phone number used for the payment.');
+        $paymentAmount = $amount>0 ? min($amount,$remaining) : $remaining;
+        $payment=record_payment($conn,$id,$paymentAmount,'Mpesa',$receipt);
+        record_manual_mpesa_transaction($conn,$id,(int)($invoice['patient_id'] ?? 0),$payment['amount'],$phone,$receipt,'Manually recorded M-Pesa payment');
+        post_payment_journal($conn,$id,$payment['amount'],'Mpesa');
         $conn->commit();
-        header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&mpesa=initiated");
+        header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1&mpesa=recorded");
         exit;
     }
 
