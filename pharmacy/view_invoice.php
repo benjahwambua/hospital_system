@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 // Get invoice ID from query string
@@ -44,66 +45,41 @@ if (!empty($invoice['patient_id'])) {
     $stmt->close();
 }
 
-// --- ADDITION: Fetch ALL billed items for this patient session ---
-$items_array = [];
+// Load only items actually attached to this invoice.
+// Never add a display-only KES 200 consultation fee.
+$items_array = invoice_load_items($conn, $invoice);
 
-// 1. Fetch items specifically linked to this invoice
-$stmt = $conn->prepare("SELECT description, quantity, price, total as amount FROM invoice_items WHERE invoice_id = ? AND description NOT LIKE '%Payment%'");
-$stmt->bind_param("i", $invoice_id);
-$stmt->execute();
-$res = $stmt->get_result();
-while($row = $res->fetch_assoc()) {
-    $items_array[] = $row;
-}
-$stmt->close();
-
-
-// 2. If it's a patient AND invoice_items is empty, fetch Services (including LAB), Prescriptions, and Consultation
+// Legacy fallback: if an old invoice has no invoice_items, show actual patient
+// services/prescriptions only. Do not invent consultation charges.
 if ($patient_id && empty($items_array)) {
-    // Fetch ALL Services (both regular and lab) - get ALL statuses except Cancelled
-    $svc_res = $conn->query("SELECT sm.service_name as description, 1 as quantity, ps.price, ps.price as amount 
-                             FROM patient_services ps 
-                             JOIN services_master sm ON ps.service_id = sm.id 
-                             WHERE ps.patient_id = $patient_id 
+    $svc_res = $conn->query("SELECT sm.service_name AS description, 1 AS quantity, ps.price, ps.price AS amount
+                             FROM patient_services ps
+                             JOIN services_master sm ON ps.service_id = sm.id
+                             WHERE ps.patient_id = $patient_id
                              AND (ps.status IS NULL OR ps.status NOT IN ('Cancelled', 'Deleted'))");
-    if($svc_res) {
-        while($row = $svc_res->fetch_assoc()) {
-            $items_array[] = $row;
-        }
+    if ($svc_res) {
+        while ($row = $svc_res->fetch_assoc()) $items_array[] = $row;
     }
 
-    // Fetch Prescriptions
-    $rx_res = $conn->query("SELECT s.drug_name as description, pr.quantity, s.selling_price as price, (pr.quantity * s.selling_price) as amount 
-                            FROM prescriptions pr 
-                            JOIN pharmacy_stock s ON pr.medicine_id = s.id 
+    $rx_res = $conn->query("SELECT s.drug_name AS description, pr.quantity,
+                            COALESCE(pr.unit_price, s.selling_price) AS price,
+                            (pr.quantity * COALESCE(pr.unit_price, s.selling_price)) AS amount
+                            FROM prescriptions pr
+                            JOIN pharmacy_stock s ON pr.medicine_id = s.id
                             WHERE pr.patient_id = $patient_id");
-    if($rx_res) {
-        while($row = $rx_res->fetch_assoc()) {
-            $items_array[] = $row;
-        }
-    }
-    
-    // Add Consultation Fee (Check for existing to avoid visual doubling)
-    $has_cons = false;
-    foreach($items_array as $item) { 
-        if(stripos($item['description'], 'Consultation') !== false) {
-            $has_cons = true;
-            break;
-        }
-    }
-    if(!$has_cons) {
-        $items_array[] = ['description' => 'Consultation Fee', 'quantity' => 1, 'price' => 200, 'amount' => 200];
+    if ($rx_res) {
+        while ($row = $rx_res->fetch_assoc()) $items_array[] = $row;
     }
 }
 
-// --- ADDITION: Fetch Payment History for Balance Calculation ---
+// Payments are invoice-specific.
 $total_paid = 0;
-if ($patient_id) {
-    $pay_stmt = $conn->prepare("SELECT SUM(amount) as paid_sum FROM billing WHERE patient_id = ?");
-    $pay_stmt->bind_param("i", $patient_id);
+$pay_stmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid_sum FROM payments WHERE invoice_id = ?");
+if ($pay_stmt) {
+    $pay_stmt->bind_param("i", $invoice_id);
     $pay_stmt->execute();
     $pay_res = $pay_stmt->get_result()->fetch_assoc();
-    $total_paid = $pay_res['paid_sum'] ?? 0;
+    $total_paid = (float)($pay_res['paid_sum'] ?? 0);
     $pay_stmt->close();
 }
 
