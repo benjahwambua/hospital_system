@@ -210,14 +210,25 @@ if ($patient_id <= 0) {
 
     // Existing Lab Request Handler
     if(isset($_POST['add_lab_request'])){
-        $service_id = intval($_POST['service_id']);
-        $price = floatval($_POST['price']);
-        $instructions = $_POST['lab_instructions'] ?? '';
-        if($service_id > 0){
-            $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, doctor_notes, created_at, status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
-            $stmt->bind_param("iids", $patient_id, $service_id, $price, $instructions);
+        $service_id=intval($_POST['service_id']);
+        $price=floatval($_POST['price']);
+        $instructions=$_POST['lab_instructions'] ?? '';
+        if($service_id>0 && $price>=0){
+            $stmt=$conn->prepare("SELECT service_name FROM services_master WHERE id=? AND active=1 AND category='lab' LIMIT 1");
+            $stmt->bind_param('i',$service_id);
+            $stmt->execute();
+            $labService=$stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if(!$labService) throw new Exception('Selected laboratory service is invalid.');
+
+            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
+            $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
             $stmt->execute();
             $stmt->close();
+
+            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
+
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&lab_success=1");
             exit;
         }
