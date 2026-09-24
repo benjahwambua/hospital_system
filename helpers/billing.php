@@ -419,18 +419,20 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
     if ($invoice_id <= 0 || $patient_id <= 0 || $amount <= 0) {
         throw new Exception('Invalid M-Pesa transaction details.');
     }
-    if ($receipt === '') {
-        throw new Exception('M-Pesa receipt/transaction code is required.');
-    }
+    // Receipt and phone are optional for manual record keeping. Check for
+    // duplicates only when a receipt has actually been supplied.
+    $receiptValue = $receipt !== '' ? $receipt : null;
 
-    $check = $conn->prepare("SELECT id FROM mpesa_transactions WHERE mpesa_receipt = ? LIMIT 1");
-    if ($check) {
-        $check->bind_param('s', $receipt);
-        $check->execute();
-        $exists = $check->get_result()->fetch_assoc();
-        $check->close();
-        if ($exists) {
-            throw new Exception('This M-Pesa receipt has already been recorded.');
+    if ($receiptValue !== null) {
+        $check = $conn->prepare("SELECT id FROM mpesa_transactions WHERE mpesa_receipt = ? LIMIT 1");
+        if ($check) {
+            $check->bind_param('s', $receiptValue);
+            $check->execute();
+            $exists = $check->get_result()->fetch_assoc();
+            $check->close();
+            if ($exists) {
+                throw new Exception('This M-Pesa receipt has already been recorded.');
+            }
         }
     }
 
@@ -440,7 +442,7 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
     if (!$stmt) {
         throw new Exception('Unable to save M-Pesa transaction. Run mpesa_migration.sql first.');
     }
-    $stmt->bind_param('iidsss', $invoice_id, $patient_id, $amount, $phone, $receipt, $resultDesc);
+    $stmt->bind_param('iidsss', $invoice_id, $patient_id, $amount, $phone, $receiptValue, $resultDesc);
     if (!$stmt->execute()) {
         $error = $stmt->error;
         $stmt->close();
