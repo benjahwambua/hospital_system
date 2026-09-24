@@ -889,10 +889,10 @@ function clearForm() {
                 <select name="service_id" required style="padding:10px;">
                     <option value="">Select Lab Test...</option>
                     <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): if($s['category'] == 'lab'): ?>
-                    <option value="<?= $s['id'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
+                    <option value="<?= $s['id'] ?>" data-price="<?= $s['price'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
                     <?php endif; endwhile; ?>
                 </select>
-                <input type="number" name="price" placeholder="Price" step="0.01" style="padding:10px;">
+                <input type="number" id="lab_service_price" name="price" placeholder="Price" step="0.01" style="padding:10px;">
                 <input type="text" name="lab_instructions" placeholder="Notes..." style="padding:10px;">
                 <button type="submit" name="add_lab_request" style="background:#2980b9; color:white; border:none; padding:10px; border-radius:5px;">Request Lab</button>
             </form>
@@ -1110,9 +1110,25 @@ function showTab(tabId) {
 
 function updatePrice(selectElement, targetInputId) {
     const price = selectElement.options[selectElement.selectedIndex].getAttribute('data-price');
-    document.getElementById(targetInputId).value = price;
+    document.getElementById(targetInputId).value = price || '';
 }
 
+// Automatically load the walk-in's previously selected service and its price.
+// This makes the dashboard ready for the next action without selecting the service again.
+document.addEventListener('DOMContentLoaded', function () {
+    const requestedServiceId = <?= (int)$walkinRequestedServiceId ?>;
+    if (requestedServiceId > 0) {
+        const serviceSelect = document.querySelector('select[name="service_id"]');
+        if (serviceSelect && serviceSelect.value === String(requestedServiceId)) {
+            updatePrice(serviceSelect, 'svc_p');
+        }
+
+        const labSelect = document.querySelector('#services select[name="service_id"]');
+        if (labSelect && labSelect.value === String(requestedServiceId)) {
+            updatePrice(labSelect, 'lab_service_price');
+        }
+    }
+});
 
 // Keep the active tab after reload if specified in URL
 const urlParams = new URLSearchParams(window.location.search);
