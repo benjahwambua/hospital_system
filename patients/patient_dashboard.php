@@ -54,9 +54,14 @@ if ($patient_id <= 0) {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )");
-    // Consultation billing is created as a real charge for registered patients only.
-    // Walk-in patients are explicitly exempt from the consultation fee.
-    ensure_registered_consultation_charge($conn, $patient_id, 200.00);
+    // Consultation billing is created only for registered patients.
+    // Walk-in patients are explicitly exempt; clean up any legacy KES 200
+    // consultation charge that may have been created before this rule was fixed.
+    if (!empty($patient['is_walkin'])) {
+        remove_walkin_consultation_charge($conn, $patient_id);
+    } else {
+        ensure_registered_consultation_charge($conn, $patient_id, 200.00);
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedToken = $_POST['csrf_token'] ?? '';
