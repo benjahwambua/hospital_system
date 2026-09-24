@@ -5,6 +5,14 @@ require_once __DIR__.'/../helpers/billing.php';
 require_once __DIR__.'/../config/mpesa.php';
 require_login();
 
+// Centralize all patient collections through the Cashier module.
+$role = strtolower(trim((string)($_SESSION['role'] ?? '')));
+$isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
+if (!$isSuper && !in_array($role, ['admin', 'cashier'], true)) {
+    http_response_code(403);
+    die('Access denied. Patient payments must be recorded by the Cashier.');
+}
+
 $id=(int)($_POST['invoice_id'] ?? $_GET['id'] ?? 0);
 $amount=(float)($_POST['amount'] ?? 0);
 $mode=trim((string)($_POST['payment_mode'] ?? 'Cash'));
@@ -51,7 +59,11 @@ try{
         record_manual_mpesa_transaction($conn,$id,(int)($invoice['patient_id'] ?? 0),$payment['amount'],$phone,$receipt,'Manually recorded M-Pesa payment');
         post_payment_journal($conn,$id,$payment['amount'],'Mpesa');
         $conn->commit();
-        header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1&mpesa=recorded");
+        if (($_POST['return_to'] ?? '') === 'cashier') {
+            header("Location: /hospital_system/cashier/index.php?success=1");
+        } else {
+            header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1&mpesa=recorded");
+        }
         exit;
     }
 
@@ -68,7 +80,11 @@ try{
     if(isset($_POST['ajax'])){
         echo json_encode(['status'=>'success']);
     }else{
-        header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1");
+        if (($_POST['return_to'] ?? '') === 'cashier') {
+            header("Location: /hospital_system/cashier/index.php?success=1");
+        } else {
+            header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1");
+        }
         exit;
     }
 }catch(Throwable $e){
