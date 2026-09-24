@@ -1,11 +1,51 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../config/mpesa.php';
 require_login();
 
 if (!isset($_SESSION['is_super']) || (int)$_SESSION['is_super'] !== 1) {
     http_response_code(403);
     exit('Access denied.');
+}
+
+$mpesa_message = '';
+$mpesa_error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
+    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+    $stkAmount = round((float)($_POST['amount'] ?? 0), 2);
+    $phone = trim((string)($_POST['phone'] ?? ''));
+
+    if ($invoiceId <= 0 || $stkAmount <= 0 || $phone === '') {
+        $mpesa_error = 'Invoice, amount and M-Pesa phone number are required.';
+    } else {
+        try {
+            $stmt = $conn->prepare("SELECT id, patient_id, total FROM invoices WHERE id=? LIMIT 1");
+            if (!$stmt) throw new Exception('Unable to load invoice: ' . $conn->error);
+            $stmt->bind_param('i', $invoiceId);
+            $stmt->execute();
+            $invoice = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$invoice) throw new Exception('Invoice not found.');
+
+            $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE invoice_id=?");
+            if (!$paidStmt) throw new Exception('Unable to calculate invoice balance.');
+            $paidStmt->bind_param('i', $invoiceId);
+            $paidStmt->execute();
+            $paid = (float)($paidStmt->get_result()->fetch_assoc()['paid'] ?? 0);
+            $paidStmt->close();
+
+            $balance = max((float)$invoice['total'] - $paid, 0);
+            if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
+            if ($stkAmount > $balance) $stkAmount = $balance;
+
+            mpesa_initiate_stk($conn, $invoiceId, (int)$invoice['patient_id'], $stkAmount, $phone);
+            $mpesa_message = 'STK Push sent to ' . htmlspecialchars($phone) . ' for KES ' . number_format($stkAmount, 2) . '. Awaiting customer confirmation.';
+        } catch (Throwable $e) {
+            $mpesa_error = $e->getMessage();
+        }
+    }
 }
 
 $from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
@@ -54,6 +94,36 @@ include __DIR__ . '/../includes/sidebar.php';
         <?php if ($error): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
+
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-success"><i class="fas fa-mobile-alt"></i> Daraja STK Push</h6>
+            </div>
+            <div class="card-body">
+                <?php if ($mpesa_message): ?><div class="alert alert-success"><?= $mpesa_message ?></div><?php endif; ?>
+                <?php if ($mpesa_error): ?><div class="alert alert-danger"><?= htmlspecialchars($mpesa_error) ?></div><?php endif; ?>
+                <form method="POST" class="row align-items-end">
+                    <div class="col-md-3">
+                        <label class="small font-weight-bold">Invoice ID</label>
+                        <input type="number" name="invoice_id" class="form-control" min="1" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small font-weight-bold">Amount (KES)</label>
+                        <input type="number" name="amount" class="form-control" min="1" step="0.01" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small font-weight-bold">M-Pesa Phone</label>
+                        <input type="text" name="phone" class="form-control" placeholder="0712345678" required>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" name="initiate_stk" class="btn btn-success btn-block">
+                            <i class="fas fa-paper-plane"></i> Send STK Push
+                        </button>
+                    </div>
+                </form>
+                <small class="text-muted d-block mt-2">The payment is posted to the invoice only after Safaricom sends a successful Daraja callback.</small>
+            </div>
+        </div>
 
         <div class="card shadow mb-4">
             <div class="card-body">
