@@ -66,6 +66,17 @@ if (!$paymentHistory) {
 }
 
 $outstandingBalance = max($invoiceTotal - $totalPaid, 0);
+
+// Always derive the displayed status from the actual invoice total and
+// invoice-linked payments. This prevents stale status values on old invoices.
+if ($outstandingBalance <= 0.00001 && $invoiceTotal > 0) {
+    $displayStatus = 'Paid';
+} elseif ($totalPaid > 0) {
+    $displayStatus = 'Partial';
+} else {
+    $displayStatus = 'Unpaid';
+}
+
 $paymentMode = trim((string)($invoice['payment_mode'] ?? ''));
 if ($paymentMode === '' && $paymentHistory) {
     $paymentMode = (string)($paymentHistory[0]['method'] ?? 'Not recorded');
@@ -189,8 +200,8 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h1 class="invoice-title">Official Invoice</h1>
                 <p class="invoice-number">Invoice #<?= htmlspecialchars((string)$invoice['id']) ?></p>
             </div>
-            <div class="status-badge status-<?= htmlspecialchars(strtolower((string)$invoice['status'])) ?>">
-                <?= htmlspecialchars((string)$invoice['status']) ?>
+            <div class="status-badge status-<?= htmlspecialchars(strtolower($displayStatus)) ?>">
+                <?= htmlspecialchars($displayStatus) ?>
             </div>
         </div>
 
