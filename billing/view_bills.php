@@ -29,9 +29,6 @@ $to_date   = $_GET['to_date'] ?? date('Y-m-d');
 $status    = $_GET['status'] ?? 'All';
 
 $where_clauses = ["DATE(i.created_at) BETWEEN '$from_date' AND '$to_date'"];
-if ($status !== 'All') {
-    $where_clauses[] = "i.status = '" . $conn->real_escape_string($status) . "'";
-}
 $where_sql = implode(' AND ', $where_clauses);
 
 // --- 3. THE MASTER QUERY (Optimized with aggregated payments & walk-in exclusion) ---
@@ -73,13 +70,29 @@ $walkin_excluded_count = 0;
 while ($row = $result->fetch_assoc()) { 
     // Walk-ins are exempt from consultation, but their actual laboratory,
     // pharmacy and other service charges must remain visible in billing.
+    $row['total'] = (float)$row['total'];
+    $row['amount_paid'] = (float)$row['amount_paid'];
+    $outstanding = max($row['total'] - $row['amount_paid'], 0);
+    if ($outstanding <= 0.00001 && $row['total'] > 0) {
+        $row['display_status'] = 'Paid';
+    } elseif ($row['amount_paid'] > 0) {
+        $row['display_status'] = 'Partial';
+    } else {
+        $row['display_status'] = 'Unpaid';
+    }
+
+    // Filter using the derived financial state, not the legacy invoices.status field.
+    if ($status !== 'All' && strcasecmp($row['display_status'], $status) !== 0) {
+        continue;
+    }
+
+    $row['balance'] = $outstanding;
     $invoices_data[] = $row;
     $total_invoices++;
     $total_revenue += $row['total'];
-    $outstanding = $row['total'] - $row['amount_paid'];
     $total_outstanding += $outstanding;
-    
-    if ($row['status'] == 'Paid' || $outstanding <= 0) {
+
+    if ($row['display_status'] === 'Paid') {
         $paid_count++;
     } else {
         $unpaid_count++;
@@ -96,7 +109,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     foreach ($invoices_data as $row) {
         $name = $row['patient_name'] ?: ($row['walkin_name'] ?: 'Unknown');
         $balance = $row['total'] - $row['amount_paid'];
-        fputcsv($output, [$row['id'], $row['created_at'], $name, ($row['patient_id'] ? 'In-Patient' : 'Walk-in'), $row['total'], $row['amount_paid'], $balance, $row['status']]);
+        fputcsv($output, [$row['id'], $row['created_at'], $name, ($row['patient_id'] ? 'In-Patient' : 'Walk-in'), $row['total'], $row['amount_paid'], $balance, $row['display_status']]);
     }
     fclose($output);
     exit();
@@ -250,7 +263,7 @@ include __DIR__ . '/../includes/sidebar.php';
                             <?php foreach ($invoices_data as $row): 
                                 $is_patient = !empty($row['patient_id']);
                                 $name = htmlspecialchars($row['patient_name'] ?: ($row['walkin_name'] ?: 'Unknown'));
-                                $outstanding = $row['total'] - $row['amount_paid'];
+                                $outstanding = $row['balance'] ?? max($row['total'] - $row['amount_paid'], 0);
                             ?>
                             <tr>
                                 <td><strong>#<?= str_pad($row['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
@@ -265,8 +278,8 @@ include __DIR__ . '/../includes/sidebar.php';
                                     KSH <?= number_format($outstanding, 2) ?>
                                 </td>
                                 <td>
-                                    <span class="badge badge-pill badge-<?= $row['status'] == 'Paid' ? 'success' : ($outstanding > 0 ? 'danger' : 'warning') ?>">
-                                        <?= $row['status'] ?>
+                                    <span class="badge badge-pill badge-<?= $row['display_status'] == 'Paid' ? 'success' : ($row['display_status'] == 'Partial' ? 'warning' : 'danger') ?>">
+                                        <?= htmlspecialchars($row['display_status']) ?>
                                     </span>
                                 </td>
                                 <td>
@@ -298,7 +311,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                                 <a class="dropdown-item" href="/hospital_system/billing/view_invoice.php?id=<?= $row['id'] ?>&edit=1">
                                                     <i class="fas fa-edit"></i> Edit Invoice
                                                 </a>
-                                                <?php if ($row['status'] !== 'Paid'): ?>
+                                                <?php if ($row['display_status'] !== 'Paid'): ?>
                                                     <a class="dropdown-item" href="#" onclick="markAsPaid(<?= $row['id'] ?>)">
                                                         <i class="fas fa-check"></i> Mark as Paid
                                                     </a>
