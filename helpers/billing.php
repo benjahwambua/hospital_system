@@ -413,6 +413,28 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     if (!$invoice) throw new Exception('Invoice not found.');
 
     $total = (float)($invoice['total'] ?? 0);
+
+    // Invoice items are the authoritative source for the bill total. This also
+    // repairs legacy invoices whose invoices.total missed the KES 200 consultation.
+    $itemTotal = 0.0;
+    $itemStmt = $conn->prepare("SELECT COALESCE(SUM(total), 0) AS items_total FROM invoice_items WHERE invoice_id = ?");
+    if ($itemStmt) {
+        $itemStmt->bind_param('i', $invoice_id);
+        $itemStmt->execute();
+        $itemRow = $itemStmt->get_result()->fetch_assoc();
+        $itemStmt->close();
+        $itemTotal = (float)($itemRow['items_total'] ?? 0);
+    }
+    if ($itemTotal > 0 && abs($itemTotal - $total) > 0.009) {
+        $total = $itemTotal;
+        $sync = $conn->prepare("UPDATE invoices SET total = ? WHERE id = ?");
+        if ($sync) {
+            $sync->bind_param('di', $total, $invoice_id);
+            $sync->execute();
+            $sync->close();
+        }
+    }
+
     $paid = (float)($invoice['paid_amount'] ?? 0);
     $balance = max($total - $paid, 0);
     if ($balance <= 0) throw new Exception('Invoice is already fully paid.');
