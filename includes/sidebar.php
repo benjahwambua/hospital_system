@@ -235,7 +235,8 @@ function isParentActive($paths) {
             </a>
             <div class="submenu">
                 <a href="/hospital_system/clinical/triage.php" class="<?= isActive('triage.php') ?>"><i class="fas fa-heartbeat"></i> Triage & Vitals</a>
-                <a href="/hospital_system/clinical/consultations.php" class="<?= isActive('consultations.php') ?>"><i class="fas fa-user-md"></i> Doctor's Queue</a>
+                <a href="/hospital_system/clinical/care.php" class="sidebar-link"><i class="fas fa-user-md"></i> Clinical Care</a>
+                    <a href="/hospital_system/clinical/consultations.php" class="<?= isActive('consultations.php') ?>"><i class="fas fa-user-md"></i> Doctor's Queue</a>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
                 <a href="/hospital_system/diagnostics/diagnostics.php" class="<?= isActive('diagnostics.php') ?>"><i class="fas fa-diagnoses"></i> Diagnostics</a>
             </div>
