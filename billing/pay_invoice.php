@@ -2,6 +2,7 @@
 require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/session.php';
 require_once __DIR__.'/../helpers/billing.php';
+require_once __DIR__.'/../helpers/cashier.php';
 require_once __DIR__.'/../config/mpesa.php';
 require_login();
 
@@ -17,8 +18,11 @@ $id=(int)($_POST['invoice_id'] ?? $_GET['id'] ?? 0);
 $amount=(float)($_POST['amount'] ?? 0);
 $mode=trim((string)($_POST['payment_mode'] ?? 'Cash'));
 $mark_paid=isset($_POST['mark_paid']) && $_POST['mark_paid']=='1';
+$cashierId=(int)($_SESSION['user_id']??0);
+$shift=get_open_cashier_shift($conn,$cashierId);
 
 if(!$id) die("Invalid invoice ID");
+if(!$shift) die("No open cashier shift. Please open your cashier shift before receiving patient payments.");
 
 $stmt=$conn->prepare("SELECT * FROM invoices WHERE id=? LIMIT 1");
 $stmt->bind_param('i',$id);
@@ -55,7 +59,7 @@ try{
         $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? $_POST['reference'] ?? '')));
         // Receipt and phone are optional for manual M-Pesa record keeping.
         $paymentAmount = $amount>0 ? min($amount,$remaining) : $remaining;
-        $payment=record_payment($conn,$id,$paymentAmount,'Mpesa',$receipt);
+        $payment=record_payment($conn,$id,$paymentAmount,'Mpesa',$receipt,(int)$shift['id']);
         record_manual_mpesa_transaction($conn,$id,(int)($invoice['patient_id'] ?? 0),$payment['amount'],$phone,$receipt,'Manually recorded M-Pesa payment');
         post_payment_journal($conn,$id,$payment['amount'],'Mpesa');
         $conn->commit();
@@ -68,10 +72,10 @@ try{
     }
 
     if($mark_paid && $remaining>0){
-        $payment=record_payment($conn,$id,$remaining,$mode,null);
+        $payment=record_payment($conn,$id,$remaining,$mode,null,(int)$shift['id']);
         post_payment_journal($conn,$id,$payment['amount'],$mode);
     }elseif($amount>0 && $remaining>0){
-        $payment=record_payment($conn,$id,min($amount,$remaining),$mode,null);
+        $payment=record_payment($conn,$id,min($amount,$remaining),$mode,null,(int)$shift['id']);
         post_payment_journal($conn,$id,$payment['amount'],$mode);
     }
 
