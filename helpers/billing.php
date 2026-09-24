@@ -332,6 +332,59 @@ function get_service_total($conn, $patient_id) {
     return (float)($result['total'] ?? 0);
 }
 
+function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $reference = null) {
+    $invoice_id = (int)$invoice_id;
+    $amount = (float)$amount;
+    if ($invoice_id <= 0 || $amount <= 0) throw new Exception('Invalid invoice payment.');
+
+    $stmt = $conn->prepare("SELECT id, patient_id, total, paid_amount FROM invoices WHERE id = ? LIMIT 1");
+    if (!$stmt) throw new Exception('Unable to load invoice: ' . $conn->error);
+    $stmt->bind_param('i', $invoice_id);
+    $stmt->execute();
+    $invoice = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$invoice) throw new Exception('Invoice not found.');
+
+    $total = (float)($invoice['total'] ?? 0);
+    $paid = (float)($invoice['paid_amount'] ?? 0);
+    $balance = max($total - $paid, 0);
+    if ($balance <= 0) throw new Exception('Invoice is already fully paid.');
+    $amount = min($amount, $balance);
+
+    $patientId = (int)($invoice['patient_id'] ?? 0);
+    $method = trim((string)$payment_method);
+    $referenceValue = $reference !== null ? (string)$reference : null;
+
+    $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, invoice_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+    if ($stmt) {
+        $stmt->bind_param('idssi', $patientId, $amount, $method, $referenceValue, $invoice_id);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, created_at) VALUES (?, ?, ?, ?, NOW())");
+        if (!$stmt) throw new Exception('Unable to record payment: ' . $conn->error);
+        $stmt->bind_param('idss', $patientId, $amount, $method, $referenceValue);
+    }
+    if (!$stmt->execute()) throw new Exception('Unable to save payment: ' . $stmt->error);
+    $stmt->close();
+
+    $billingStmt = $conn->prepare("INSERT INTO billing (patient_id, invoice_id, amount, paid_amount, method, paid, status, created_at) VALUES (?, ?, ?, ?, ?, 1, 'PAID', NOW())");
+    if ($billingStmt) {
+        $billingStmt->bind_param('iidds', $patientId, $invoice_id, $amount, $amount, $method);
+        $billingStmt->execute();
+        $billingStmt->close();
+    }
+
+    $newPaid = $paid + $amount;
+    $newStatus = ($newPaid >= $total - 0.00001) ? 'paid' : 'unpaid';
+
+    $update = $conn->prepare("UPDATE invoices SET paid_amount = ?, amount_paid = ?, balance = GREATEST(COALESCE(total,0) - ?, 0), payment_status = ?, status = ?, payment_mode = ?, paid_at = CASE WHEN ? = 'paid' THEN NOW() ELSE paid_at END WHERE id = ?");
+    if (!$update) throw new Exception('Unable to update invoice: ' . $conn->error);
+    $update->bind_param('dddssssi', $newPaid, $newPaid, $newPaid, $newStatus, $newStatus, $method, $newStatus, $invoice_id);
+    $update->execute();
+    $update->close();
+
+    return ['amount'=>$amount, 'paid_amount'=>$newPaid, 'balance'=>max($total-$newPaid,0), 'status'=>$newStatus];
+}
+
 function get_invoice_number($conn, $invoice_id) {
     $col = get_invoice_number_column($conn);
     if ($col === null) {
