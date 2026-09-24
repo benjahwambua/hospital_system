@@ -4,6 +4,9 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
+// Ensure walk-in registrations work even if the migration has not yet been run.
+ensure_walkin_column($conn);
+
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
