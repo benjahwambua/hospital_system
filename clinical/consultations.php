@@ -18,15 +18,42 @@ if ($vitalsColumns) {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
-// Fetch patients with vitals recorded today who haven't been "completed"
-$sql = "SELECT v.*, p.full_name, p.gender, p.age 
-        FROM vitals v 
-        JOIN patients p ON v.patient_id = p.id 
-        WHERE DATE(v.created_at) = CURDATE()";
-if ($vitalsHasStatus) {
-    $sql .= " AND v.status = 'pending'";
+// Build the clinical queue from today's open visits.
+// This includes registered patients and fast-track walk-ins.
+// If the Visit migration is unavailable, retain the legacy vitals queue.
+$hasVisits = false;
+$visitCheck = $conn->query("SHOW TABLES LIKE 'visits'");
+if ($visitCheck && $visitCheck->num_rows > 0) {
+    $hasVisits = true;
 }
-$sql .= " ORDER BY v.created_at ASC";
+
+if ($hasVisits) {
+    $sql = "SELECT v.id AS visit_id, v.visit_number, v.visit_type, v.clinic_category,
+                   v.status AS visit_status, v.visit_time,
+                   p.id AS patient_id, p.full_name, p.gender, p.age, p.patient_number,
+                   vt.bp, vt.temp, vt.weight, vt.pulse, vt.complaints
+            FROM visits v
+            INNER JOIN patients p ON p.id = v.patient_id
+            LEFT JOIN vitals vt ON vt.id = (
+                SELECT v2.id FROM vitals v2
+                WHERE v2.patient_id = v.patient_id
+                  AND DATE(v2.created_at) = CURDATE()
+                ORDER BY v2.id DESC LIMIT 1
+            )
+            WHERE v.visit_date = CURDATE()
+              AND v.status IN ('Open','In Progress')
+            ORDER BY v.id ASC";
+} else {
+    $sql = "SELECT v.*, p.full_name, p.gender, p.age, p.patient_number,
+                   p.id AS patient_id
+            FROM vitals v
+            JOIN patients p ON v.patient_id = p.id
+            WHERE DATE(v.created_at) = CURDATE()";
+    if ($vitalsHasStatus) {
+        $sql .= " AND v.status = 'pending'";
+    }
+    $sql .= " ORDER BY v.created_at ASC";
+}
 $res = $conn->query($sql);
 ?>
 
