@@ -25,34 +25,36 @@ $patientId = $invoiceCustomer['patient_id'];
 $patientNumber = $invoiceCustomer['patient_number'];
 
 $items = invoice_load_items($conn, $invoice);
-invoice_add_consultation_if_missing($items, invoice_is_walkin($invoice));
-
-$invoiceTotal = 0.0;
-foreach ($items as $item) {
-    $invoiceTotal += (float)$item['amount'];
-}
-if ($invoiceTotal <= 0 && isset($invoice['total'])) {
-    $invoiceTotal = (float)$invoice['total'];
+$invoiceTotal = (float)($invoice['total'] ?? 0);
+if ($invoiceTotal <= 0 && $items) {
+    foreach ($items as $item) {
+        $invoiceTotal += (float)$item['amount'];
+    }
 }
 
 $totalPaid = 0.0;
 $paymentHistory = [];
-if ($patientId) {
-    // New payments are linked to the invoice. Fall back to legacy patient-level
-    // billing records only when this invoice has no linked payment history.
-    $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE invoice_id = ? ORDER BY created_at DESC');
+
+// The payment ledger is invoice-specific. Never use all payments belonging to
+// the patient because that makes one invoice consume another invoice's money.
+$stmt = $conn->prepare('SELECT amount, method, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC');
+if ($stmt) {
     $stmt->bind_param('i', $invoiceId);
     $stmt->execute();
     $payRes = $stmt->get_result();
     while ($row = $payRes->fetch_assoc()) {
+        $row['paid'] = 1;
         $paymentHistory[] = $row;
-        if (!empty($row['paid'])) $totalPaid += (float)$row['amount'];
+        $totalPaid += (float)$row['amount'];
     }
     $stmt->close();
+}
 
-    if (!$paymentHistory) {
-        $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE patient_id = ? AND invoice_id IS NULL ORDER BY created_at DESC');
-        $stmt->bind_param('i', $patientId);
+// Legacy billing entries are used only when explicitly linked to this invoice.
+if (!$paymentHistory) {
+    $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE invoice_id = ? ORDER BY created_at DESC');
+    if ($stmt) {
+        $stmt->bind_param('i', $invoiceId);
         $stmt->execute();
         $payRes = $stmt->get_result();
         while ($row = $payRes->fetch_assoc()) {
@@ -61,8 +63,6 @@ if ($patientId) {
         }
         $stmt->close();
     }
-} elseif (strtolower((string)($invoice['status'] ?? '')) === 'paid') {
-    $totalPaid = (float)($invoice['paid_amount'] ?? $invoiceTotal);
 }
 
 $outstandingBalance = max($invoiceTotal - $totalPaid, 0);
