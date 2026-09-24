@@ -130,9 +130,16 @@ if ($patient_id <= 0) {
         if ($unit_price <= 0 && $stock) $unit_price = (float)$stock['selling_price'];
         $invoice_total = $qty * $unit_price;
 
-        $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Pharmacy');
+        $stmt = $conn->prepare($visitId > 0
+            ? "INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, visit_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())"
+            : "INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
         $invoiceLink = 0;
-        $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
+        if ($visitId > 0) {
+            $stmt->bind_param("iiidiis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $visitId, $instructions);
+        } else {
+            $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
+        }
         $stmt->execute();
         $prescription_id = $stmt->insert_id;
         $stmt->close();
@@ -174,8 +181,14 @@ if ($patient_id <= 0) {
 
             if(!$service) throw new Exception('Selected service is not active or does not exist.');
 
-            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
-            $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
+            $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category']);
+            if ($visitId > 0) {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at, status) VALUES (?, ?, ?, ?, ?, NOW(), 'Completed')");
+                $stmt->bind_param("iisdi",$patient_id,$service_id,$service['category'],$price,$visitId);
+            } else {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
+                $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
+            }
             $stmt->execute();
             $stmt->close();
 
@@ -213,8 +226,14 @@ if ($patient_id <= 0) {
             $stmt->close();
             if(!$labService) throw new Exception('Selected laboratory service is invalid.');
 
-            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
-            $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
+            $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Laboratory');
+            if ($visitId > 0) {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, ?, NOW(), 'Pending')");
+                $stmt->bind_param("iidis",$patient_id,$service_id,$price,$visitId,$instructions);
+            } else {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
+                $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
+            }
             $stmt->execute();
             $stmt->close();
 
