@@ -76,9 +76,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                         $walkinPatientId = (int)$walkinPatientStmt->insert_id;
                         $walkinPatientStmt->close();
 
-                        $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'lab', ?, NOW(), 'Pending')");
-                        if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
-                        $serviceInsert->bind_param('iid', $walkinPatientId, $service_id, $price);
+                        // Put the walk-in laboratory request under the same Visit/Encounter.
+                        $visitId = get_or_create_current_visit($conn, $walkinPatientId, 'Walk-in', 'Laboratory');
+                        if ($visitId > 0) {
+                            $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at, status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
+                            if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
+                            $serviceInsert->bind_param('iidi', $walkinPatientId, $service_id, $price, $visitId);
+                        } else {
+                            $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'lab', ?, NOW(), 'Pending')");
+                            if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
+                            $serviceInsert->bind_param('iid', $walkinPatientId, $service_id, $price);
+                        }
                         if (!$serviceInsert->execute()) throw new Exception('Unable to create walk-in laboratory request: ' . $serviceInsert->error);
                         $serviceInsert->close();
 
