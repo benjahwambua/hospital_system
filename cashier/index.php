@@ -34,7 +34,8 @@ $sql = "
         FROM payments WHERE invoice_id IS NOT NULL
         GROUP BY invoice_id
     ) pay ON pay.invoice_id = i.id
-    WHERE COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
+    WHERE i.visit_id IS NOT NULL
+      AND COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
     ORDER BY COALESCE(v.visit_date, DATE(i.created_at)) DESC, i.id DESC
 ";
 
@@ -62,7 +63,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
 <div class="main-content">
     <div class="container-fluid">
-        <div class="alert alert-info mb-4"><i class="fas fa-info-circle"></i> Cashier is the single collection point. Clinical, laboratory, pharmacy and reception staff raise charges; only the Cashier records patient payments.</div>
+        <div class="alert alert-info mb-4"><i class="fas fa-info-circle"></i> Cashier is the single collection point. Clinical, laboratory, pharmacy and reception staff raise charges; only the Cashier records patient payments. Legacy invoices without a Visit are kept in billing history but are not placed in the active cashier queue.</div>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-cash-register"></i> Central Cashier</h2>
