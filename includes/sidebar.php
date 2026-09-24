@@ -349,6 +349,9 @@ function isParentActive($paths) {
         <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>">
             <i class="fas fa-cash-register icon-main"></i> Central Cashier
         </a>
+        <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>">
+            <i class="fas fa-clock icon-main"></i> Cashier Shift
+        </a>
         <?php endif; ?>
 
         <div class="menu-title">Exit</div>
