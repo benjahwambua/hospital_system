@@ -53,7 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
 
                     $conn->begin_transaction();
                     try {
-                        $patientStmt = $conn->prepare("INSERT INTO patients (full_name, phone, clinic_category, is_walkin, created_at) VALUES (?, ?, 'General', 1, NOW())");
+                        $patientStmt = $conn->prepare(
+                            "INSERT INTO patients (full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
+                             VALUES (?, '', ?, NULL, '', 0, '', '', 0, 'General', 1, NOW())"
+                        );
                         if (!$patientStmt) throw new Exception('Unable to prepare walk-in patient: ' . $conn->error);
                         $patientStmt->bind_param('ss', $name, $phone);
                         if (!$patientStmt->execute()) throw new Exception('Unable to create walk-in patient: ' . $patientStmt->error);
