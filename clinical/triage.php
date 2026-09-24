@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 // Load patients for the triage dropdown
@@ -31,7 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $complaints = $_POST['complaints'] ?? '';
     $recorded_by = $_SESSION['user_id'];
 
+    $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General');
+    $hasVisitColumn = false;
+    $visitColCheck = $conn->query("SHOW COLUMNS FROM vitals LIKE 'visit_id'");
+    if ($visitColCheck && $visitColCheck->num_rows > 0) $hasVisitColumn = true;
+
     $sql = "INSERT INTO vitals (patient_id, bp, temp, weight, pulse, complaints, recorded_by";
+    if ($hasVisitColumn) $sql .= ", visit_id";
     if ($vitalsHasStatus) {
         $sql .= ", status";
     }
@@ -42,7 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sql .= ", NOW())";
 
     $stmt = $conn->prepare($sql);
-    if ($vitalsHasStatus) {
+    if (!$stmt) {
+        $message = "<div class='alert alert-danger'>Unable to prepare vitals: " . htmlspecialchars($conn->error) . "</div>";
+    } elseif ($hasVisitColumn && $vitalsHasStatus) {
+        $status = 'pending';
+        $stmt->bind_param("isssssiis", $patient_id, $bp, $temp, $weight, $pulse, $complaints, $recorded_by, $visitId, $status);
+    } elseif ($hasVisitColumn) {
+        $stmt->bind_param("isssssii", $patient_id, $bp, $temp, $weight, $pulse, $complaints, $recorded_by, $visitId);
+    } elseif ($vitalsHasStatus) {
         $status = 'pending';
         $stmt->bind_param("isssssis", $patient_id, $bp, $temp, $weight, $pulse, $complaints, $recorded_by, $status);
     } else {
