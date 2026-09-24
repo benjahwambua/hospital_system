@@ -3,6 +3,9 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
+$csrfToken=$_SESSION['csrf_token'];
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
@@ -10,6 +13,8 @@ include __DIR__ . '/../includes/sidebar.php';
 // Handle Lab Result Submission
 // -------------------------
 if (isset($_POST['save_lab_result'])) {
+    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) { $error='Invalid security token.'; }
+    else {
     $record_id = intval($_POST['record_id']);
     $findings = $_POST['findings'] ?? '';
     $status = 'Completed'; 
@@ -24,6 +29,7 @@ if (isset($_POST['save_lab_result'])) {
         $error = "Error updating record: " . $conn->error;
     }
     $stmt->close();
+    }
 }
 
 // -------------------------
@@ -116,6 +122,7 @@ $lab_jobs = $conn->query($query);
                                 <textarea name="findings" rows="2" placeholder="Enter results..."><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
                             </td>
                             <td>
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                 <input type="hidden" name="record_id" value="<?= $job['id'] ?>">
                                 <button type="submit" name="save_lab_result" class="btn-action btn-save">
                                     <?= $is_done ? 'Update Result' : 'Save & Close' ?>
