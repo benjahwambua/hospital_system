@@ -152,38 +152,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
 
         try {
-            // Insert patient using existing table structure
-            $stmt = $conn->prepare(
-                'INSERT INTO patients (full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
-            );
-            
-            if (!$stmt) {
-                throw new Exception("Prepare failed: " . $conn->error);
+            // Walk-in registrations use the dedicated walk-in patient already stored in the database.
+            // This avoids creating multiple patient records with an empty/duplicate patient_number.
+            if ($isWalkin) {
+                $walkinStmt = $conn->prepare(
+                    "SELECT id FROM patients
+                     WHERE is_walkin = 1
+                        OR LOWER(TRIM(full_name)) IN ('walk-in', 'walk-in patient', 'walk-in customer')
+                     ORDER BY id ASC LIMIT 1"
+                );
+                if (!$walkinStmt) {
+                    throw new Exception("Unable to locate the existing walk-in patient: " . $conn->error);
+                }
+                $walkinStmt->execute();
+                $walkinRow = $walkinStmt->get_result()->fetch_assoc();
+                $walkinStmt->close();
+
+                if (!$walkinRow) {
+                    throw new Exception("No walk-in patient exists in the database. Please create the dedicated walk-in patient record first.");
+                }
+
+                $patientId = (int)$walkinRow['id'];
+            } else {
+                // Full registration creates a new patient record.
+                $patientNumber = 'P-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+
+                $stmt = $conn->prepare(
+                    'INSERT INTO patients (patient_number, full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+                );
+
+                if (!$stmt) {
+                    throw new Exception("Prepare failed: " . $conn->error);
+                }
+
+                $walkinFlag = 0;
+                $stmt->bind_param(
+                    'ssssssissisi',
+                    $patientNumber,
+                    $fullName,
+                    $gender,
+                    $phone,
+                    $dob,
+                    $address,
+                    $age,
+                    $nextOfKinName,
+                    $nextOfKinPhone,
+                    $doctorId,
+                    $clinicalType,
+                    $walkinFlag
+                );
+
+                if (!$stmt->execute()) {
+                    throw new Exception("Execute failed: " . $stmt->error);
+                }
+
+                $patientId = $stmt->insert_id;
+                $stmt->close();
             }
-            
-            $walkinFlag = $isWalkin ? 1 : 0;
-            $stmt->bind_param(
-                'sssssissisi',
-                $fullName,
-                $gender,
-                $phone,
-                $dob,
-                $address,
-                $age,
-                $nextOfKinName,
-                $nextOfKinPhone,
-                $doctorId,
-                $clinicalType,
-                $walkinFlag
-            );
-            
-            if (!$stmt->execute()) {
-                throw new Exception("Execute failed: " . $stmt->error);
-            }
-            
-            $patientId = $stmt->insert_id;
-            $stmt->close();
 
             // Create appointment
             $appointmentDate = date('Y-m-d');
