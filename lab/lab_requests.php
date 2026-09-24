@@ -4,6 +4,9 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
+// Ensure walk-in registrations work even if the migration has not yet been run.
+ensure_walkin_column($conn);
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
