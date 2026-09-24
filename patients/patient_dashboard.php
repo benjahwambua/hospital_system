@@ -62,11 +62,27 @@ if ($patient_id <= 0) {
     $check_stmt->close();
 
     if ($exists == 0) {
-        $consult = $conn->query("SELECT id, price FROM services_master WHERE service_name = 'Consultation' LIMIT 1")->fetch_assoc();
+        $consult = $conn->query("SELECT id, service_name, price FROM services_master WHERE service_name = 'Consultation' LIMIT 1")->fetch_assoc();
         if ($consult) {
-            $ins_stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, price, created_at, status) VALUES (?, ?, ?, NOW(), 'Completed')");
+            $ins_stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'procedure', ?, NOW(), 'Completed')");
             $ins_stmt->bind_param("iid", $patient_id, $consult['id'], $consult['price']);
-            $ins_stmt->execute();
+            if ($ins_stmt->execute()) {
+                $ins_stmt->close();
+
+                // Keep the consultation charge and invoice total in sync.
+                $invoice_id = get_or_create_invoice($conn, $patient_id);
+                add_invoice_item(
+                    $conn,
+                    $invoice_id,
+                    'Service: ' . $consult['service_name'],
+                    1,
+                    (float)$consult['price'],
+                    'service',
+                    (int)$consult['id']
+                );
+            } else {
+                $ins_stmt->close();
+            }
         }
     }
     // ------------------------------------------
@@ -287,32 +303,13 @@ if ($patient_id <= 0) {
         $invoiceTotal=(float)($invoice['total'] ?? 0);
         $paid=(float)($invoice['paid_amount'] ?? 0);
 
-        // Repair legacy/empty invoices before accepting a payment. Some older
-        // invoices were created before invoice_items were linked to charges,
-        // leaving total=0 even though the patient has billable services.
+        // A payment can only be made against a real invoice total.
+        // Empty legacy invoices are ignored by get_or_create_invoice().
         if ($invoiceTotal <= 0) {
             $itemTotalRes = $conn->query("SELECT COALESCE(SUM(total),0) AS total FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
             $itemTotal = $itemTotalRes ? (float)($itemTotalRes->fetch_assoc()['total'] ?? 0) : 0;
 
-            if ($itemTotal <= 0) {
-                $chargeTotal = 0;
-
-                $svcRes = $conn->query("SELECT COALESCE(SUM(price),0) AS total FROM patient_services WHERE patient_id=".(int)$patient_id." AND status <> 'Cancelled'");
-                if ($svcRes) $chargeTotal += (float)($svcRes->fetch_assoc()['total'] ?? 0);
-
-                $rxRes = $conn->query("SELECT COALESCE(SUM(COALESCE(p.unit_price,s.selling_price) * p.quantity),0) AS total FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=".(int)$patient_id);
-                if ($rxRes) $chargeTotal += (float)($rxRes->fetch_assoc()['total'] ?? 0);
-
-                if ($chargeTotal > 0) {
-                    $invoiceTotal = $chargeTotal;
-                    $fixStmt = $conn->prepare("UPDATE invoices SET total=? WHERE id=?");
-                    if ($fixStmt) {
-                        $fixStmt->bind_param('di', $invoiceTotal, $invoice_id);
-                        $fixStmt->execute();
-                        $fixStmt->close();
-                    }
-                }
-            } else {
+            if ($itemTotal > 0) {
                 $invoiceTotal = $itemTotal;
                 $fixStmt = $conn->prepare("UPDATE invoices SET total=? WHERE id=?");
                 if ($fixStmt) {
