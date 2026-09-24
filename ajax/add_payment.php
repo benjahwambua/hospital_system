@@ -1,28 +1,29 @@
 <?php
-include('../config/config.php');
+require_once('../config/config.php');
+require_once('../includes/session.php');
+require_once('../helpers/billing.php');
 
-$invoice_id = $_POST['invoice_id'];
-$new_payment = $_POST['amount'];
+require_login();
 
-$get_invoice = $conn->query("SELECT * FROM invoices WHERE id = $invoice_id");
-$invoice = $get_invoice->fetch_assoc();
+$invoice_id = (int)($_POST['invoice_id'] ?? 0);
+$new_payment = round((float)($_POST['amount'] ?? 0), 2);
+$method = trim((string)($_POST['method'] ?? 'Cash'));
 
-$new_amount_paid = $invoice['amount_paid'] + $new_payment;
-$new_balance = $invoice['total_amount'] - $new_amount_paid;
-
-if ($new_balance <= 0) {
-    $payment_status = "Paid";
-    $new_balance = 0;
-} else {
-    $payment_status = "Partial";
+if ($invoice_id <= 0 || $new_payment <= 0) {
+    echo "Invalid payment details";
+    exit;
 }
 
-$update = $conn->prepare("UPDATE invoices 
-SET amount_paid = ?, balance = ?, payment_status = ? 
-WHERE id = ?");
+$conn->begin_transaction();
+try {
+    $payment = record_payment($conn, $invoice_id, $new_payment, $method, null);
+    post_payment_journal($conn, $invoice_id, $payment['amount'], $method);
+    $conn->commit();
 
-$update->bind_param("ddsi", $new_amount_paid, $new_balance, $payment_status, $invoice_id);
-$update->execute();
-
-echo "Payment Updated Successfully";
+    echo "Payment Updated Successfully";
+} catch (Throwable $e) {
+    $conn->rollback();
+    http_response_code(400);
+    echo $e->getMessage();
+}
 ?>
