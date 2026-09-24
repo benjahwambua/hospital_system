@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 if (empty($_SESSION['csrf_token'])) {
@@ -150,16 +151,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Insert patient using existing table structure
             $stmt = $conn->prepare(
-                'INSERT INTO patients (full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+                'INSERT INTO patients (full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
             );
             
             if (!$stmt) {
                 throw new Exception("Prepare failed: " . $conn->error);
             }
             
+            $walkinFlag = $isWalkin ? 1 : 0;
             $stmt->bind_param(
-                'sssssissii',
+                'sssssissisi',
                 $fullName,
                 $gender,
                 $phone,
@@ -169,7 +171,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $nextOfKinName,
                 $nextOfKinPhone,
                 $doctorId,
-                $clinicalType
+                $clinicalType,
+                $walkinFlag
             );
             
             if (!$stmt->execute()) {
@@ -268,6 +271,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             $encounterStmt->close();
+
+            // Registered patients always receive the fixed KES 200 consultation
+            // charge. Walk-in registrations are explicitly exempt.
+            if (!$isWalkin) {
+                ensure_registered_consultation_charge($conn, $patientId, 200.00);
+            }
 
             $conn->commit();
             header('Location: /hospital_system/patients/appointments.php?success=1&patient_id=' . $patientId);
