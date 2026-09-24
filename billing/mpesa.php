@@ -1,0 +1,122 @@
+<?php
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_login();
+
+if (!isset($_SESSION['is_super']) || (int)$_SESSION['is_super'] !== 1) {
+    http_response_code(403);
+    exit('Access denied.');
+}
+
+$from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
+$to   = $_GET['to'] ?? date('Y-m-d');
+
+$stmt = $conn->prepare("
+    SELECT mt.*, i.invoice_number, p.full_name AS patient_name
+    FROM mpesa_transactions mt
+    LEFT JOIN invoices i ON i.id = mt.invoice_id
+    LEFT JOIN patients p ON p.id = mt.patient_id
+    WHERE DATE(mt.created_at) BETWEEN ? AND ?
+    ORDER BY mt.created_at DESC
+");
+$transactions = [];
+$error = '';
+
+if (!$stmt) {
+    $error = 'Unable to load M-Pesa transactions. Please run mpesa_migration.sql first.';
+} else {
+    $stmt->bind_param('ss', $from, $to);
+    if (!$stmt->execute()) {
+        $error = 'Unable to load M-Pesa transactions: ' . $stmt->error;
+    } else {
+        $res = $stmt->get_result();
+        while ($row = $res->fetch_assoc()) $transactions[] = $row;
+    }
+    $stmt->close();
+}
+
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
+?>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</h2>
+                <p class="text-muted mb-0">STK Push transactions and payment status</p>
+            </div>
+            <a href="/hospital_system/billing/view_bills.php" class="btn btn-primary">
+                <i class="fas fa-file-invoice-dollar"></i> Billing Management
+            </a>
+        </div>
+
+        <?php if ($error): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <form method="GET" class="row align-items-end">
+                    <div class="col-md-4">
+                        <label class="small font-weight-bold">From Date</label>
+                        <input type="date" name="from" class="form-control" value="<?= htmlspecialchars($from) ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small font-weight-bold">To Date</label>
+                        <input type="date" name="to" class="form-control" value="<?= htmlspecialchars($to) ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-info btn-block"><i class="fas fa-filter"></i> Apply Filter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-primary">M-Pesa Transaction History</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Invoice</th>
+                                <th>Patient</th>
+                                <th>Phone</th>
+                                <th>Amount</th>
+                                <th>M-Pesa Receipt</th>
+                                <th>Status</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php if (!$transactions): ?>
+                            <tr><td colspan="8" class="text-center text-muted">No M-Pesa transactions found for this period.</td></tr>
+                        <?php else: foreach ($transactions as $tx): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($tx['created_at']) ?></td>
+                                <td><?= htmlspecialchars($tx['invoice_number'] ?: ('#' . $tx['invoice_id'])) ?></td>
+                                <td><?= htmlspecialchars($tx['patient_name'] ?: 'Unknown') ?></td>
+                                <td><?= htmlspecialchars($tx['phone']) ?></td>
+                                <td>KES <?= number_format((float)$tx['amount'], 2) ?></td>
+                                <td><?= htmlspecialchars($tx['mpesa_receipt'] ?: '—') ?></td>
+                                <td>
+                                    <span class="badge badge-<?= $tx['status'] === 'completed' ? 'success' : ($tx['status'] === 'failed' ? 'danger' : 'warning') ?>">
+                                        <?= htmlspecialchars(ucfirst($tx['status'])) ?>
+                                    </span>
+                                </td>
+                                <td><?= htmlspecialchars($tx['result_desc'] ?: '—') ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
