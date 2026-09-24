@@ -7,7 +7,7 @@ require_role(['admin','accountant']);
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $categories = ['general', 'billing', 'clinical', 'pharmacy', 'users'];
+    $categories = ['general', 'billing', 'clinical', 'pharmacy', 'mpesa', 'users'];
     $updateStmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
     $insertStmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
 
