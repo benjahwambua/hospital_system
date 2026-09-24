@@ -365,10 +365,7 @@ if ($patient_id <= 0) {
         if(strtolower($method)==='mpesa'){
             // Manual M-Pesa recording is the normal workflow. STK Push is optional.
             $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? '')));
-            if ($receipt === '') {
-                throw new Exception('Enter the M-Pesa receipt/transaction code. STK Push is optional.');
-            }
-
+            // Receipt and phone are optional for manual M-Pesa record keeping.
             $conn->begin_transaction();
             try {
                 $payment = record_payment($conn, $invoice_id, $amount, 'Mpesa', $receipt);
