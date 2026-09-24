@@ -6,6 +6,7 @@ require_login();
 
 if(empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token']; $message='';
+$recordedBy=(int)($_SESSION['user_id']??0);
 
 $vitalsHasStatus=false;
 $vc=$conn->query("SHOW COLUMNS FROM vitals");
@@ -27,16 +28,16 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
      $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient',$clinic);
      if($hasVisitColumn && $vitalsHasStatus){
       $status='pending'; $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssiis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$_SESSION['user_id'],$visitId,$status);
+      $stmt->bind_param('isssssiis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId,$status);
      }elseif($hasVisitColumn){
       $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssii',$patientId,$bp,$temp,$weight,$pulse,$complaints,$_SESSION['user_id'],$visitId);
+      $stmt->bind_param('isssssii',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId);
      }elseif($vitalsHasStatus){
       $status='pending'; $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,status,created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$_SESSION['user_id'],$status);
+      $stmt->bind_param('isssssis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$status);
      }else{
       $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,created_at) VALUES (?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssi',$patientId,$bp,$temp,$weight,$pulse,$complaints,$_SESSION['user_id']);
+      $stmt->bind_param('isssssi',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy);
      }
      if(!$stmt || !$stmt->execute()) throw new Exception($stmt?$stmt->error:$conn->error);
      if($stmt)$stmt->close();
