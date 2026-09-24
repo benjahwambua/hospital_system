@@ -65,12 +65,8 @@ $unpaid_count = 0;
 $walkin_excluded_count = 0;
 
 while ($row = $result->fetch_assoc()) { 
-    // EXCLUDE walk-in patients from billing - they should not be charged consultation fees
-    if ($row['is_walkin']) {
-        $walkin_excluded_count++;
-        continue;
-    }
-    
+    // Walk-ins are exempt from consultation, but their actual laboratory,
+    // pharmacy and other service charges must remain visible in billing.
     $invoices_data[] = $row;
     $total_invoices++;
     $total_revenue += $row['total'];
@@ -188,12 +184,6 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
 
-        <?php if ($walkin_excluded_count > 0): ?>
-            <div class="alert alert-info alert-dismissible fade show mb-4">
-                <i class="fas fa-info-circle"></i> <strong><?= $walkin_excluded_count ?> walk-in patient(s)</strong> excluded from billing (fee waived).
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-            </div>
-        <?php endif; ?>
 
         <div class="card shadow mb-4">
             <div class="card-body">
