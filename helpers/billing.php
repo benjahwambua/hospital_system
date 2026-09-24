@@ -111,7 +111,7 @@ function get_or_create_invoice($conn, $patient_id, $encounter_id = null) {
         SELECT id
         FROM invoices
         WHERE patient_id = ?
-          AND COALESCE(total, 0) > COALESCE(paid_amount, 0)
+          AND COALESCE(total, 0) > GREATEST(COALESCE(paid_amount, 0), COALESCE(amount_paid, 0))
         ORDER BY id DESC
         LIMIT 1
     ");
@@ -324,7 +324,7 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
     $stmt->close();
 
     if ($total !== 0) {
-        $conn->query("UPDATE invoices SET total = total + $total WHERE id = $invoice_id");
+        $conn->query("UPDATE invoices SET total = COALESCE(total, 0) + $total WHERE id = $invoice_id");
     }
 }
 
