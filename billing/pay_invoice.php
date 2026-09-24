@@ -45,8 +45,7 @@ try{
             }
         }
         $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? $_POST['reference'] ?? '')));
-        if($receipt==='') throw new Exception('M-Pesa receipt/transaction code is required. STK Push is optional.');
-        if($phone==='') throw new Exception('Enter the M-Pesa phone number used for the payment.');
+        // Receipt and phone are optional for manual M-Pesa record keeping.
         $paymentAmount = $amount>0 ? min($amount,$remaining) : $remaining;
         $payment=record_payment($conn,$id,$paymentAmount,'Mpesa',$receipt);
         record_manual_mpesa_transaction($conn,$id,(int)($invoice['patient_id'] ?? 0),$payment['amount'],$phone,$receipt,'Manually recorded M-Pesa payment');
