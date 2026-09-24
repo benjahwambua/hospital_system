@@ -12,6 +12,53 @@ if (!isset($_SESSION['is_super']) || (int)$_SESSION['is_super'] !== 1) {
 $mpesa_message = '';
 $mpesa_error = '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa'])) {
+    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+    $amount = round((float)($_POST['amount'] ?? 0), 2);
+    $phone = trim((string)($_POST['phone'] ?? ''));
+    $receipt = strtoupper(trim((string)($_POST['receipt'] ?? '')));
+
+    try {
+        if ($invoiceId <= 0 || $amount <= 0 || $phone === '' || $receipt === '') {
+            throw new Exception('Invoice, amount, phone number and M-Pesa receipt are required.');
+        }
+
+        $stmt = $conn->prepare("SELECT id, patient_id, total FROM invoices WHERE id=? LIMIT 1");
+        if (!$stmt) throw new Exception('Unable to load invoice: ' . $conn->error);
+        $stmt->bind_param('i', $invoiceId);
+        $stmt->execute();
+        $invoice = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$invoice) throw new Exception('Invoice not found.');
+
+        $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE invoice_id=?");
+        if (!$paidStmt) throw new Exception('Unable to calculate invoice balance.');
+        $paidStmt->bind_param('i', $invoiceId);
+        $paidStmt->execute();
+        $paid = (float)($paidStmt->get_result()->fetch_assoc()['paid'] ?? 0);
+        $paidStmt->close();
+
+        $balance = max((float)$invoice['total'] - $paid, 0);
+        if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
+        $amount = min($amount, $balance);
+
+        $conn->begin_transaction();
+        try {
+            $payment = record_payment($conn, $invoiceId, $amount, 'Mpesa', $receipt);
+            record_manual_mpesa_transaction($conn, $invoiceId, (int)$invoice['patient_id'], $payment['amount'], $phone, $receipt, 'Manually recorded M-Pesa payment');
+            post_payment_journal($conn, $invoiceId, $payment['amount'], 'Mpesa');
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
+
+        $mpesa_message = 'M-Pesa payment ' . htmlspecialchars($receipt) . ' recorded successfully for KES ' . number_format($payment['amount'], 2) . '.';
+    } catch (Throwable $e) {
+        $mpesa_error = $e->getMessage();
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
     $invoiceId = (int)($_POST['invoice_id'] ?? 0);
     $stkAmount = round((float)($_POST['amount'] ?? 0), 2);
@@ -84,7 +131,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</h2>
-                <p class="text-muted mb-0">STK Push transactions and payment status</p>
+                <p class="text-muted mb-0">M-Pesa payment records, reconciliation and optional STK Push</p>
             </div>
             <a href="/hospital_system/billing/view_bills.php" class="btn btn-primary">
                 <i class="fas fa-file-invoice-dollar"></i> Billing Management
@@ -97,8 +144,38 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <div class="card shadow mb-4">
             <div class="card-header">
-                <h6 class="m-0 font-weight-bold text-success"><i class="fas fa-mobile-alt"></i> Daraja STK Push</h6>
+                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-receipt"></i> Record M-Pesa Payment</h6>
             </div>
+            <div class="card-body">
+                <p class="text-muted">M-Pesa recording does not require Daraja/STK configuration. Enter the receipt received from the customer and the payment will be posted to the invoice.</p>
+                <form method="POST" class="row align-items-end">
+                    <div class="col-md-3">
+                        <label class="small font-weight-bold">Invoice ID</label>
+                        <input type="number" name="invoice_id" class="form-control" min="1" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small font-weight-bold">Amount (KES)</label>
+                        <input type="number" name="amount" class="form-control" min="1" step="0.01" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small font-weight-bold">M-Pesa Phone</label>
+                        <input type="text" name="phone" class="form-control" placeholder="0712345678" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small font-weight-bold">Receipt / Code</label>
+                        <input type="text" name="receipt" class="form-control" placeholder="QK12ABC345" required>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" name="record_manual_mpesa" class="btn btn-primary btn-block">
+                            <i class="fas fa-save"></i> Record M-Pesa Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow mb-4">
+            <div class="card-header">
             <div class="card-body">
                 <?php if ($mpesa_message): ?><div class="alert alert-success"><?= $mpesa_message ?></div><?php endif; ?>
                 <?php if ($mpesa_error): ?><div class="alert alert-danger"><?= htmlspecialchars($mpesa_error) ?></div><?php endif; ?>
@@ -121,7 +198,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         </button>
                     </div>
                 </form>
-                <small class="text-muted d-block mt-2">The payment is posted to the invoice only after Safaricom sends a successful Daraja callback.</small>
+                <small class="text-muted d-block mt-2">STK Push is optional. It requires Daraja credentials and a reachable callback URL. Manual M-Pesa recording above does not require STK configuration.</small>
             </div>
         </div>
 
