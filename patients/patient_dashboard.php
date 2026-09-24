@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
+require_once __DIR__ . '/../config/mpesa.php';
 require_login();
 
 if (empty($_SESSION['csrf_token'])) {
@@ -133,12 +134,13 @@ if ($patient_id <= 0) {
         $instructions = $_POST['dosage_instructions'] ?? '';
 
         $stock = $conn->query("SELECT drug_name, selling_price FROM pharmacy_stock WHERE id = $medicine_id")->fetch_assoc();
-        $unit_price = $stock ? max($price_override, (float)$stock['selling_price']) : max($price_override, 0);
+        $unit_price = max($price_override, 0);
+        if ($unit_price <= 0 && $stock) $unit_price = (float)$stock['selling_price'];
         $invoice_total = $qty * $unit_price;
 
-        $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
         $invoiceLink = 0;
-        $stmt->bind_param("iiiis", $patient_id, $medicine_id, $qty, $invoiceLink, $instructions);
+        $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
         $stmt->execute();
         $prescription_id = $stmt->insert_id;
         $stmt->close();
@@ -169,27 +171,24 @@ if ($patient_id <= 0) {
 
     // Handle Service/Billing Item Add
     if(isset($_POST['add_service'])){
-        $service_id = intval($_POST['service_id']);
-        $price = floatval($_POST['price']);
-        if($service_id > 0){
-            $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, price, created_at, status) VALUES (?, ?, ?, NOW(), 'Completed')");
-            $stmt->bind_param("iid", $patient_id, $service_id, $price);
+        $service_id=intval($_POST['service_id']);
+        $price=floatval($_POST['price']);
+        if($service_id>0 && $price>=0){
+            $serviceStmt=$conn->prepare("SELECT service_name, category FROM services_master WHERE id=? AND active=1 LIMIT 1");
+            $serviceStmt->bind_param('i',$service_id);
+            $serviceStmt->execute();
+            $service=$serviceStmt->get_result()->fetch_assoc();
+            $serviceStmt->close();
+
+            if(!$service) throw new Exception('Selected service is not active or does not exist.');
+
+            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
+            $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
             $stmt->execute();
             $stmt->close();
 
-            if ($price > 0) {
-                $service = $conn->query("SELECT service_name FROM services_master WHERE id = $service_id LIMIT 1")->fetch_assoc();
-                $invoice_id = get_or_create_invoice($conn, $patient_id);
-                add_invoice_item(
-                    $conn,
-                    $invoice_id,
-                    'Service: ' . ($service['service_name'] ?? 'General Service'),
-                    1,
-                    $price,
-                    'service',
-                    $service_id
-                );
-            }
+            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
             exit;
@@ -242,11 +241,10 @@ if ($patient_id <= 0) {
         }
     }
 
-    // Existing Save Clinical Handler (UPDATED TO REPLACE/UPDATE)
+    // Existing Save Clinical Handler
     if(isset($_POST['save_clinical'])){
-        $clinic_patient_id = intval($_POST['patient_id']);
-        $params = [
-            $clinic_patient_id,
+        $params=[
+            $patient_id,
             $_POST['presenting_complaint'] ?? '',
             $_POST['hpc'] ?? '',
             $_POST['medical_history'] ?? '',
@@ -264,57 +262,60 @@ if ($patient_id <= 0) {
             $_POST['prescription_instructions'] ?? '',
             $_POST['doctor_notes'] ?? ''
         ];
-
-        $stmt = $conn->prepare("REPLACE INTO encounters (patient_id, presenting_complaint, hpc, medical_history, surgical_history, family_history, drug_history, allergies, social_history, review_systems, physical_exam, diagnosis, differential_diagnosis, investigations, management_plan, prescription_instructions, doctor_notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("issssssssssssssss", ...$params);
-
-        if($stmt->execute()){
-            $stmt->close();
-            header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&success=1");
-            exit;
+        $stmt=$conn->prepare("INSERT INTO encounters (patient_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
+        $stmt->bind_param("isssssssssssssssss",...$params);
+        if(!$stmt->execute()){
+            $error=$stmt->error; $stmt->close();
+            throw new Exception('Unable to save clinical record: '.$error);
         }
+        $stmt->close();
+        header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&success=1");
+        exit;
     }
 
-   // --- UPDATED PAYMENT HANDLER ---
+   // --- UNIFIED PAYMENT HANDLER ---
 if(isset($_POST['register_payment'])){
-    $amount = floatval($_POST['amount']);
-    $method = trim((string)($_POST['method'] ?? 'Cash'));
-    if($amount > 0){
-        $service_total = get_service_total($conn, $patient_id);
-        $prescription_total = get_prescription_total($conn, $patient_id);
-        $paid_total = 0;
-        $paid_total_result = $conn->query("SELECT COALESCE(SUM(amount), 0) AS total FROM billing WHERE patient_id=$patient_id AND paid=1");
-        if($paid_total_result) {
-            $paid_total = (float)($paid_total_result->fetch_assoc()['total'] ?? 0);
-        }
+    $amount=round((float)($_POST['amount'] ?? 0),2);
+    $method=trim((string)($_POST['method'] ?? 'Cash'));
+    $phone=trim((string)($_POST['mpesa_phone'] ?? ''));
 
-        $consultation_fee = 200;
-        $current_balance = max((($service_total + $prescription_total + $consultation_fee) - $paid_total), 0);
-        $invoice_status = $amount >= $current_balance ? 'paid' : 'partial';
+    if($amount<=0) throw new Exception('Payment amount must be greater than zero.');
 
-        $stmt = $conn->prepare("INSERT INTO billing (patient_id, amount, method, paid, created_at) VALUES (?,?,?,1,NOW())");
-        $stmt->bind_param("ids", $patient_id, $amount, $method);
-        
-        if($stmt->execute()){
-            $invoice_id = create_invoice(
-                $conn,
-                $patient_id,
-                null,
-                null,
-                $invoice_status,
-                $method,
-                $amount,
-                null
-            );
+    $invoice_id=get_or_create_invoice($conn,$patient_id);
+    $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
+    if(!$invoice) throw new Exception('Unable to load patient invoice.');
 
-            // Post payment journal entries so the ledger reflects the treatment
-            post_payment_journal($conn, $invoice_id, $amount, $method);
-
-            header("Location: /hospital_system/pharmacy/view_invoice.php?id=" . $invoice_id);
-            exit;
-        }
+    $invoiceTotal=(float)($invoice['total'] ?? 0);
+    if($invoiceTotal<=0){
+        $svc=$conn->query("SELECT COALESCE(SUM(price),0) total FROM patient_services WHERE patient_id=".(int)$patient_id." AND status NOT IN ('Cancelled','Deleted')");
+        $rx=$conn->query("SELECT COALESCE(SUM(quantity*COALESCE(unit_price,selling_price)),0) total FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=".(int)$patient_id);
+        $invoiceTotal=(float)($svc->fetch_assoc()['total'] ?? 0)+(float)($rx->fetch_assoc()['total'] ?? 0);
+        if($invoiceTotal>0) update_invoice_total($conn,$invoice_id,$invoiceTotal);
     }
-}
+
+    $paid=(float)($invoice['paid_amount'] ?? 0);
+    $balance=max($invoiceTotal-$paid,0);
+    $amount=min($amount,$balance);
+    if($amount<=0) throw new Exception('This invoice has no outstanding balance.');
+
+    if(strtolower($method)==='mpesa'){
+        mpesa_initiate_stk($conn,$invoice_id,$patient_id,$amount,$phone);
+        header("Location: patient_dashboard.php?id=$patient_id&tab=billing&mpesa=initiated");
+        exit;
+    }
+
+    $conn->begin_transaction();
+    try{
+        $payment=record_payment($conn,$invoice_id,$amount,$method,null);
+        post_payment_journal($conn,$invoice_id,$payment['amount'],$method);
+        $conn->commit();
+        header("Location: billing/view_invoice.php?id=".$invoice_id."&paid=1");
+        exit;
+    }catch(Throwable $e){
+        $conn->rollback();
+        throw $e;
+    }
 }
 
 // ==============================================================================
@@ -328,7 +329,7 @@ if ($patient_id > 0) {
         $vitals->data_seek(0);
     }
     $encounter = $conn->query("SELECT * FROM encounters WHERE patient_id=$patient_id ORDER BY created_at DESC LIMIT 1")->fetch_assoc();
-    $prescriptions = $conn->query("SELECT p.*, s.drug_name, s.selling_price AS unit_price FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=$patient_id ORDER BY p.created_at DESC");
+    $prescriptions = $conn->query("SELECT p.*, s.drug_name, COALESCE(p.unit_price,s.selling_price) AS unit_price FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=$patient_id ORDER BY p.created_at DESC");
     $patient_services = $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id=ps.service_id WHERE ps.patient_id=$patient_id ORDER BY ps.created_at DESC");
     $billing = $conn->query("SELECT * FROM billing WHERE patient_id=$patient_id ORDER BY created_at DESC");
     $all_services = $conn->query("SELECT * FROM services_master ORDER BY category, service_name");
@@ -865,7 +866,9 @@ function clearForm() {
                 <form method="post">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                     <label class="info-label">Amount to Pay</label>
-                    <input type="number" name="amount" value="<?= $amountToPayNow ?>" step="0.01" style="width:100%; padding:10px; margin-bottom:15px;">
+                    <input type="number" name="amount" value="<?= $amountToPayNow ?>" step="0.01" min="0.01" style="width:100%; padding:10px; margin-bottom:15px;">
+                    <label class="info-label">M-Pesa Phone (07XXXXXXXX / 2547XXXXXXXX)</label>
+                    <input type="text" name="mpesa_phone" placeholder="07XXXXXXXX" style="width:100%; padding:10px; margin-bottom:15px;">
                     <label class="info-label">Payment Mode</label>
                     <select name="method" style="width:100%; padding:10px; margin-bottom:15px;">
                         <option value="Cash">Cash Payment</option>
@@ -888,8 +891,8 @@ function clearForm() {
                             <td><?= date('d/m/Y', strtotime($inv['created_at'])) ?></td>
                             <td><span class="badge-info"><?= strtoupper($inv['status']) ?></span></td>
                             <td>
-                                <a href="/hospital_system/pharmacy/view_invoice.php?id=<?= $inv['id'] ?>" target="_blank">View</a> | 
-                                <a href="/hospital_system/pharmacy/view_invoice.php?id=<?= $inv['id'] ?>&print=1" target="_blank">Print</a>
+                                <a href="/hospital_system/billing/view_invoice.php?id=<?= $inv['id'] ?>" target="_blank">View</a> | 
+                                <a href="/hospital_system/billing/view_invoice.php?id=<?= $inv['id'] ?>&print=1" target="_blank">Print</a>
                             </td>
                         </tr>
                         <?php endwhile; ?>
