@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_role(['admin','doctor','nurse']);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 $csrfToken = $_SESSION['csrf_token'];
@@ -22,7 +24,9 @@ if ($v) { $v->bind_param('ii',$visitId,$patientId); $v->execute(); $visit=$v->ge
 if (!$visit) die('Visit not found.');
 
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
-    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
+    if (($visit['status'] ?? '') === 'Completed') {
+        $message = 'This visit is already completed. Start a new visit before placing additional orders.';
+    } elseif (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
         $message = 'Invalid security token.';
     } else {
         $type = strtolower(trim($_POST['order_type'] ?? ''));
