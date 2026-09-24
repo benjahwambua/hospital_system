@@ -222,7 +222,7 @@ function isParentActive($paths) {
         <div class="menu-title">Hospital Core</div>
         <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier', 'receptionist'], true)): ?>
         <div class="menu-title">Front Desk</div>
-        <a href="/hospital_system/patients/reception_register.php" class="<?= isActive('reception_register.php') ?>">
+        <a href="/hospital_system/reception/index.php" class="<?= isActive('reception/index.php') ?>">
             <i class="fas fa-concierge-bell icon-main"></i> Reception Desk
         </a>
         <?php endif; ?>
