@@ -30,10 +30,11 @@ if (isset($_POST['save_lab_result'])) {
 // Fetch Lab Worklist
 // -------------------------
 // Primary Sort: Pending items first. Secondary Sort: Newest requests first.
-$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name 
+$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name, v.visit_number
           FROM patient_services ps 
           JOIN patients p ON ps.patient_id = p.id 
-          JOIN services_master sm ON ps.service_id = sm.id 
+          JOIN services_master sm ON ps.service_id = sm.id
+          LEFT JOIN visits v ON v.id = ps.visit_id
           WHERE ps.category = 'lab' 
           ORDER BY (ps.status = 'Pending') DESC, ps.created_at DESC";
 
@@ -80,7 +81,8 @@ $lab_jobs = $conn->query($query);
             <thead>
                 <tr>
                     <th width="15%">Date & Time</th>
-                    <th width="20%">Patient Details</th>
+                    <th width="18%">Patient Details</th>
+                    <th width="12%">Visit</th>
                     <th width="20%">Investigation</th>
                     <th width="30%">Results/Findings</th>
                     <th width="15%">Action</th>
@@ -102,6 +104,7 @@ $lab_jobs = $conn->query($query);
                                 <span class="patient-id">ID: <?= htmlspecialchars($job['patient_number']) ?></span>
                             </div>
                         </td>
+                        <td><?= htmlspecialchars($job['visit_number'] ?? 'Legacy') ?></td>
                         <td>
                             <strong><?= htmlspecialchars($job['service_name']) ?></strong><br>
                             <span class="status-badge <?= $is_done ? 'badge-completed' : 'badge-pending' ?>">
@@ -128,7 +131,7 @@ $lab_jobs = $conn->query($query);
                     </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
-                    <tr><td colspan="5" style="text-align:center; padding:30px;">No lab requests found.</td></tr>
+                    <tr><td colspan="6" style="text-align:center; padding:30px;">No lab requests found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
