@@ -1,5 +1,8 @@
 -- HMS billing/M-Pesa migration. Run once in hms_db.
-ALTER TABLE prescriptions ADD COLUMN unit_price DECIMAL(10,2) NULL AFTER quantity;
+ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS unit_price DECIMAL(10,2) NULL AFTER quantity;
+
+-- Walk-in patients use the normal patient workflow but are exempt from the KES 200 consultation charge.
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS is_walkin TINYINT(1) NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS mpesa_transactions (
  id INT AUTO_INCREMENT PRIMARY KEY,
@@ -22,9 +25,9 @@ CREATE TABLE IF NOT EXISTS mpesa_transactions (
  KEY idx_mpesa_patient (patient_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE payments ADD COLUMN invoice_id INT NULL AFTER reference;
-ALTER TABLE payments ADD KEY idx_payments_invoice (invoice_id);
-ALTER TABLE billing ADD KEY idx_billing_invoice (invoice_id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS invoice_id INT NULL AFTER reference;
+ALTER TABLE payments ADD KEY IF NOT EXISTS idx_payments_invoice (invoice_id);
+ALTER TABLE billing ADD KEY IF NOT EXISTS idx_billing_invoice (invoice_id);
 
 UPDATE invoices SET status='unpaid' WHERE status IS NULL OR LOWER(status) NOT IN ('unpaid','paid');
 UPDATE invoices SET payment_status=CASE WHEN COALESCE(paid_amount,0)>=COALESCE(total,0) AND COALESCE(total,0)>0 THEN 'Paid' ELSE 'Unpaid' END;
