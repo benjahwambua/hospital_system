@@ -412,6 +412,43 @@ function get_service_total($conn, $patient_id) {
     return (float)($result['total'] ?? 0);
 }
 
+function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id, float $amount, string $phone, string $receipt, ?string $resultDesc = null): void {
+    $amount = round($amount, 2);
+    $phone = trim($phone);
+    $receipt = strtoupper(trim($receipt));
+    if ($invoice_id <= 0 || $patient_id <= 0 || $amount <= 0) {
+        throw new Exception('Invalid M-Pesa transaction details.');
+    }
+    if ($receipt === '') {
+        throw new Exception('M-Pesa receipt/transaction code is required.');
+    }
+
+    $check = $conn->prepare("SELECT id FROM mpesa_transactions WHERE mpesa_receipt = ? LIMIT 1");
+    if ($check) {
+        $check->bind_param('s', $receipt);
+        $check->execute();
+        $exists = $check->get_result()->fetch_assoc();
+        $check->close();
+        if ($exists) {
+            throw new Exception('This M-Pesa receipt has already been recorded.');
+        }
+    }
+
+    $stmt = $conn->prepare("INSERT INTO mpesa_transactions
+        (invoice_id, patient_id, amount, phone, mpesa_receipt, result_code, result_desc, status, raw_response, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, '0', ?, 'completed', NULL, NOW(), NOW())");
+    if (!$stmt) {
+        throw new Exception('Unable to save M-Pesa transaction. Run mpesa_migration.sql first.');
+    }
+    $stmt->bind_param('iidsss', $invoice_id, $patient_id, $amount, $phone, $receipt, $resultDesc);
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new Exception('Unable to save M-Pesa transaction: ' . $error);
+    }
+    $stmt->close();
+}
+
 function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $reference = null) {
     $invoice_id = (int)$invoice_id;
     $amount = (float)$amount;
