@@ -587,108 +587,37 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
 }
 
 function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $reference = null, $cashier_shift_id = null) {
-    $invoice_id = (int)$invoice_id;
-    $amount = (float)$amount;
-    if ($invoice_id <= 0 || $amount <= 0) throw new Exception('Invalid invoice payment.');
-
-    $stmt = $conn->prepare("SELECT id, patient_id, total, paid_amount, amount_paid FROM invoices WHERE id = ? LIMIT 1");
-    if (!$stmt) throw new Exception('Unable to load invoice: ' . $conn->error);
-    $stmt->bind_param('i', $invoice_id);
-    $stmt->execute();
-    $invoice = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if (!$invoice) throw new Exception('Invoice not found.');
-
-    $total = (float)($invoice['total'] ?? 0);
-
-    // Invoice items are authoritative whenever itemized charges exist.
-    $itemStmt = $conn->prepare("SELECT COALESCE(SUM(total), 0) AS items_total FROM invoice_items WHERE invoice_id = ?");
-    if ($itemStmt) {
-        $itemStmt->bind_param('i', $invoice_id);
-        $itemStmt->execute();
-        $itemRow = $itemStmt->get_result()->fetch_assoc();
-        $itemStmt->close();
-        $itemTotal = (float)($itemRow['items_total'] ?? 0);
-        if ($itemTotal > 0 && abs($itemTotal - $total) > 0.00001) {
-            $total = $itemTotal;
-            $sync = $conn->prepare("UPDATE invoices SET total = ? WHERE id = ?");
-            if (!$sync) throw new Exception('Unable to synchronize invoice total: ' . $conn->error);
-            $sync->bind_param('di', $total, $invoice_id);
-            if (!$sync->execute()) {
-                $err = $sync->error;
-                $sync->close();
-                throw new Exception('Unable to synchronize invoice total: ' . $err);
-            }
-            $sync->close();
-        }
+    $invoice_id=(int)$invoice_id; $amount=(float)$amount;
+    if($invoice_id<=0||$amount<=0) throw new Exception('Invalid invoice payment.');
+    $stmt=$conn->prepare("SELECT id,patient_id,total,paid_amount,amount_paid FROM invoices WHERE id=? LIMIT 1");
+    if(!$stmt) throw new Exception('Unable to load invoice: '.$conn->error);
+    $stmt->bind_param('i',$invoice_id); $stmt->execute(); $invoice=$stmt->get_result()->fetch_assoc(); $stmt->close();
+    if(!$invoice) throw new Exception('Invoice not found.');
+    $total=(float)($invoice['total']??0);
+    $itemStmt=$conn->prepare("SELECT COALESCE(SUM(total),0) items_total FROM invoice_items WHERE invoice_id=?");
+    if($itemStmt){$itemStmt->bind_param('i',$invoice_id);$itemStmt->execute();$itemTotal=(float)(($itemStmt->get_result()->fetch_assoc()['items_total'])??0);$itemStmt->close();if($itemTotal>0)$total=$itemTotal;}
+    $paidStmt=$conn->prepare("SELECT COALESCE(SUM(amount),0) total_paid FROM payments WHERE invoice_id=?");
+    if($paidStmt){$paidStmt->bind_param('i',$invoice_id);$paidStmt->execute();$paid=(float)(($paidStmt->get_result()->fetch_assoc()['total_paid'])??0);$paidStmt->close();}else{$paid=max((float)($invoice['paid_amount']??0),(float)($invoice['amount_paid']??0));}
+    $balance=max($total-$paid,0); if($balance<=0) throw new Exception('Invoice is already fully paid.'); $amount=min($amount,$balance);
+    $patientId=(int)$invoice['patient_id']; $method=trim((string)$payment_method); $referenceValue=$reference!==null?(string)$reference:null; $shiftId=(int)($cashier_shift_id??0);
+    if($shiftId>0 && invoice_column_exists($conn,'cashier_shift_id')){
+        $stmt=$conn->prepare("INSERT INTO payments (patient_id,amount,method,reference,invoice_id,cashier_shift_id,created_at) VALUES (?,?,?,?,?,?,NOW())");
+        if(!$stmt) throw new Exception('Unable to record payment with cashier shift: '.$conn->error);
+        $stmt->bind_param('idssii',$patientId,$amount,$method,$referenceValue,$invoice_id,$shiftId);
+    }else{
+        $stmt=$conn->prepare("INSERT INTO payments (patient_id,amount,method,reference,invoice_id,created_at) VALUES (?,?,?,?,?,NOW())");
+        if(!$stmt) throw new Exception('Unable to record payment: '.$conn->error);
+        $stmt->bind_param('idssi',$patientId,$amount,$method,$referenceValue,$invoice_id);
     }
-
-    // The invoice-linked payment ledger is authoritative.
-    $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM payments WHERE invoice_id = ?");
-    if ($paidStmt) {
-        $paidStmt->bind_param('i', $invoice_id);
-        $paidStmt->execute();
-        $paidRow = $paidStmt->get_result()->fetch_assoc();
-        $paidStmt->close();
-        $paid = (float)($paidRow['total_paid'] ?? 0);
-    } else {
-        $paid = max((float)($invoice['paid_amount'] ?? 0), (float)($invoice['amount_paid'] ?? 0));
-    }
-
-    $balance = max($total - $paid, 0);
-    if ($balance <= 0) throw new Exception('Invoice is already fully paid.');
-    $amount = min($amount, $balance);
-
-    $patientId = (int)($invoice['patient_id'] ?? 0);
-    $method = trim((string)$payment_method);
-    $referenceValue = $reference !== null ? (string)$reference : null;
-
-    $shiftId = $cashier_shift_id !== null ? (int)$cashier_shift_id : 0;
-    if ($shiftId > 0 && invoice_column_exists($conn, 'cashier_shift_id')) {
-        $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, invoice_id, cashier_shift_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        if ($stmt) {
-            $stmt->bind_param('idssii', $patientId, $amount, $method, $referenceValue, $invoice_id, $shiftId);
-        } else {
-            throw new Exception('Unable to record payment with cashier shift: ' . $conn->error);
-        }
-    } else {
-        $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, invoice_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        if ($stmt) {
-            $stmt->bind_param('idssi', $patientId, $amount, $method, $referenceValue, $invoice_id);
-        } else {
-        $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, created_at) VALUES (?, ?, ?, ?, NOW())");
-        if (!$stmt) throw new Exception('Unable to record payment: ' . $conn->error);
-        $stmt->bind_param('idss', $patientId, $amount, $method, $referenceValue);
-    }
-    if (!$stmt->execute()) throw new Exception('Unable to save payment: ' . $stmt->error);
-    $stmt->close();
-
-    $newPaid = $paid + $amount;
-    $newBalance = max($total - $newPaid, 0);
-    $newStatus = ($newBalance <= 0.00001) ? 'paid' : 'unpaid';
-
-    $update = $conn->prepare("UPDATE invoices SET total = ?, paid_amount = ?, amount_paid = ?, balance = ?, payment_status = ?, status = ?, payment_mode = ?, paid_at = CASE WHEN ? = 'paid' THEN NOW() ELSE paid_at END WHERE id = ?");
-    if (!$update) throw new Exception('Unable to update invoice: ' . $conn->error);
-    $update->bind_param('ddddssssi', $total, $newPaid, $newPaid, $newBalance, $newStatus, $newStatus, $method, $newStatus, $invoice_id);
-    if (!$update->execute()) {
-        $err = $update->error;
-        $update->close();
-        throw new Exception('Unable to update invoice payment status: ' . $err);
-    }
-    $update->close();
-
-    $billingStmt = $conn->prepare("INSERT INTO billing (patient_id, invoice_id, amount, paid_amount, method, paid, status, created_at) VALUES (?, ?, ?, ?, ?, 1, 'PAID', NOW())");
-    if ($billingStmt) {
-        $billingStmt->bind_param('iidds', $patientId, $invoice_id, $amount, $amount, $method);
-        if (!$billingStmt->execute()) {
-            $err = $billingStmt->error;
-            $billingStmt->close();
-            throw new Exception('Unable to save billing payment: ' . $err);
-        }
-        $billingStmt->close();
-    }
-
-    return ['amount'=>$amount, 'paid_amount'=>$newPaid, 'balance'=>$newBalance, 'status'=>$newStatus];
+    if(!$stmt->execute()){ $err=$stmt->error;$stmt->close();throw new Exception('Unable to save payment: '.$err); } $stmt->close();
+    $newPaid=$paid+$amount;$newBalance=max($total-$newPaid,0);$newStatus=$newBalance<=0.00001?'paid':'unpaid';
+    $update=$conn->prepare("UPDATE invoices SET total=?,paid_amount=?,amount_paid=?,balance=?,payment_status=?,status=?,payment_mode=?,paid_at=CASE WHEN ?='paid' THEN NOW() ELSE paid_at END WHERE id=?");
+    if(!$update) throw new Exception('Unable to update invoice: '.$conn->error);
+    $update->bind_param('ddddssssi',$total,$newPaid,$newPaid,$newBalance,$newStatus,$newStatus,$method,$newStatus,$invoice_id);
+    if(!$update->execute()){ $err=$update->error;$update->close();throw new Exception('Unable to update invoice payment status: '.$err); } $update->close();
+    $billingStmt=$conn->prepare("INSERT INTO billing (patient_id,invoice_id,amount,paid_amount,method,paid,status,created_at) VALUES (?,?,?,?,?,1,'PAID',NOW())");
+    if($billingStmt){$billingStmt->bind_param('iidds',$patientId,$invoice_id,$amount,$amount,$method);if(!$billingStmt->execute()){$err=$billingStmt->error;$billingStmt->close();throw new Exception('Unable to save billing payment: '.$err);} $billingStmt->close();}
+    return ['amount'=>$amount,'paid_amount'=>$newPaid,'balance'=>$newBalance,'status'=>$newStatus];
 }
 
 function get_invoice_number($conn, $invoice_id) {
