@@ -68,9 +68,14 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-cash-register"></i> Central Cashier</h2>
                 <p class="text-muted mb-0">All patient payments are collected here.</p>
             </div>
-            <a href="/hospital_system/billing/view_bills.php" class="btn btn-outline-secondary">
-                <i class="fas fa-history"></i> Billing History
-            </a>
+            <div>
+                <a href="/hospital_system/cashier/payment_history.php" class="btn btn-outline-primary mr-2">
+                    <i class="fas fa-receipt"></i> Payment History
+                </a>
+                <a href="/hospital_system/billing/view_bills.php" class="btn btn-outline-secondary">
+                    <i class="fas fa-history"></i> Billing History
+                </a>
+            </div>
         </div>
 
         <?php if (isset($_GET['success'])): ?>
