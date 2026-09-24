@@ -38,19 +38,31 @@ if ($invoiceTotal <= 0 && isset($invoice['total'])) {
 $totalPaid = 0.0;
 $paymentHistory = [];
 if ($patientId) {
-    $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE patient_id = ? ORDER BY created_at DESC');
-    $stmt->bind_param('i', $patientId);
+    // New payments are linked to the invoice. Fall back to legacy patient-level
+    // billing records only when this invoice has no linked payment history.
+    $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE invoice_id = ? ORDER BY created_at DESC');
+    $stmt->bind_param('i', $invoiceId);
     $stmt->execute();
     $payRes = $stmt->get_result();
     while ($row = $payRes->fetch_assoc()) {
         $paymentHistory[] = $row;
-        if (!empty($row['paid'])) {
-            $totalPaid += (float)$row['amount'];
-        }
+        if (!empty($row['paid'])) $totalPaid += (float)$row['amount'];
     }
     $stmt->close();
+
+    if (!$paymentHistory) {
+        $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE patient_id = ? AND invoice_id IS NULL ORDER BY created_at DESC');
+        $stmt->bind_param('i', $patientId);
+        $stmt->execute();
+        $payRes = $stmt->get_result();
+        while ($row = $payRes->fetch_assoc()) {
+            $paymentHistory[] = $row;
+            if (!empty($row['paid'])) $totalPaid += (float)$row['amount'];
+        }
+        $stmt->close();
+    }
 } elseif (strtolower((string)($invoice['status'] ?? '')) === 'paid') {
-    $totalPaid = $invoiceTotal;
+    $totalPaid = (float)($invoice['paid_amount'] ?? $invoiceTotal);
 }
 
 $outstandingBalance = max($invoiceTotal - $totalPaid, 0);
