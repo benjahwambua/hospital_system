@@ -231,27 +231,69 @@ function invoice_load_items($conn, array $invoice): array {
 }
 
 function invoice_add_consultation_if_missing(array &$items, bool $isWalkin, float $consultationFee = 200.0): void {
-    if ($isWalkin) {
-        return;
+    // Consultation is a real charge created during registration, not a display-only
+    // fallback. Never invent a KES 200 line while rendering an invoice.
+    return;
+}
+
+function ensure_registered_consultation_charge($conn, int $patient_id, float $fee = 200.0): int {
+    if ($patient_id <= 0) {
+        throw new Exception('Invalid patient for consultation billing.');
     }
 
-    $hasConsultation = false;
-    foreach ($items as $item) {
-        if (stripos((string)($item['description'] ?? ''), 'consultation') !== false) {
-            $hasConsultation = true;
-            break;
+    // Walk-in patients receive laboratory/services charges only; consultation is free.
+    $isWalkin = false;
+    $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id = ? LIMIT 1");
+    if ($patientStmt) {
+        $patientStmt->bind_param('i', $patient_id);
+        $patientStmt->execute();
+        $patientRow = $patientStmt->get_result()->fetch_assoc();
+        $patientStmt->close();
+        $isWalkin = !empty($patientRow['is_walkin']);
+    }
+    if ($isWalkin) {
+        return get_or_create_invoice($conn, $patient_id);
+    }
+
+    $invoice_id = get_or_create_invoice($conn, $patient_id);
+
+    $check = $conn->prepare("SELECT id FROM patient_services ps INNER JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = ? AND sm.service_name = 'Consultation' AND DATE(ps.created_at) = CURDATE() AND ps.status <> 'Cancelled' LIMIT 1");
+    $hasService = false;
+    if ($check) {
+        $check->bind_param('i', $patient_id);
+        $check->execute();
+        $hasService = (bool)$check->get_result()->fetch_assoc();
+        $check->close();
+    }
+
+    if (!$hasService) {
+        $consult = $conn->query("SELECT id, service_name, category FROM services_master WHERE service_name = 'Consultation' AND active = 1 LIMIT 1");
+        $consult = $consult ? $consult->fetch_assoc() : null;
+        if ($consult) {
+            $category = (string)($consult['category'] ?? 'procedures');
+            $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
+            if (!$stmt) throw new Exception('Unable to prepare consultation service: ' . $conn->error);
+            $stmt->bind_param('iisd', $patient_id, $consult['id'], $category, $fee);
+            if (!$stmt->execute()) throw new Exception('Unable to create consultation service: ' . $stmt->error);
+            $stmt->close();
         }
     }
 
-    if (!$hasConsultation) {
-        $items[] = [
-            'description' => 'Consultation Fee',
-            'quantity' => 1.0,
-            'price' => $consultationFee,
-            'amount' => $consultationFee,
-            'source' => 'service',
-        ];
+    // Add the fixed KES 200 once to the actual invoice. If the service master is
+    // unavailable, the invoice item still records the legitimate registration fee.
+    $itemCheck = $conn->prepare("SELECT id FROM invoice_items WHERE invoice_id = ? AND LOWER(description) LIKE 'service: consultation%' LIMIT 1");
+    $hasItem = false;
+    if ($itemCheck) {
+        $itemCheck->bind_param('i', $invoice_id);
+        $itemCheck->execute();
+        $hasItem = (bool)$itemCheck->get_result()->fetch_assoc();
+        $itemCheck->close();
     }
+    if (!$hasItem) {
+        add_invoice_item($conn, $invoice_id, 'Service: Consultation', 1, $fee, 'service', null);
+    }
+
+    return $invoice_id;
 }
 
 function update_invoice_total($conn, $invoice_id, $total) {
