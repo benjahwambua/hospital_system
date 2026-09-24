@@ -1,10 +1,91 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
+
+$walkin_message = '';
+$walkin_error = '';
+
+/* --- WALK-IN LABORATORY REGISTRATION ---
+ * A walk-in is represented as a patient record flagged is_walkin=1 so the
+ * existing laboratory worklist/results workflow can be reused. No consultation
+ * charge is created for this patient.
+ */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab'])) {
+    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
+        $walkin_error = 'Security token mismatch. Please refresh the page and try again.';
+    } else {
+        $name = trim((string)($_POST['walkin_name'] ?? ''));
+        $phone = trim((string)($_POST['walkin_phone'] ?? ''));
+        $service_id = (int)($_POST['walkin_service_id'] ?? 0);
+        $payment_mode = trim((string)($_POST['walkin_payment_mode'] ?? 'Cash'));
+        $payment_amount = round((float)($_POST['walkin_payment_amount'] ?? 0), 2);
+
+        if ($name === '') $name = 'Walk-in Lab ' . date('Hi');
+        if ($service_id <= 0) $walkin_error = 'Please select a laboratory test.';
+        if (!in_array($payment_mode, ['Cash', 'Mpesa', 'Bank', 'Wire Transfer'], true)) $payment_mode = 'Cash';
+
+        if ($walkin_error === '') {
+            $serviceStmt = $conn->prepare("SELECT id, service_name, price FROM services_master WHERE id = ? AND active = 1 AND category = 'lab' LIMIT 1");
+            if (!$serviceStmt) {
+                $walkin_error = 'Unable to load laboratory service: ' . $conn->error;
+            } else {
+                $serviceStmt->bind_param('i', $service_id);
+                $serviceStmt->execute();
+                $labService = $serviceStmt->get_result()->fetch_assoc();
+                $serviceStmt->close();
+
+                if (!$labService) {
+                    $walkin_error = 'Selected laboratory service is invalid.';
+                } else {
+                    $price = (float)$labService['price'];
+                    if ($payment_amount < 0) $payment_amount = 0;
+                    $payment_amount = min($payment_amount, $price);
+
+                    $conn->begin_transaction();
+                    try {
+                        $patientStmt = $conn->prepare("INSERT INTO patients (full_name, phone, clinic_category, is_walkin, created_at) VALUES (?, ?, 'General', 1, NOW())");
+                        if (!$patientStmt) throw new Exception('Unable to prepare walk-in patient: ' . $conn->error);
+                        $patientStmt->bind_param('ss', $name, $phone);
+                        if (!$patientStmt->execute()) throw new Exception('Unable to create walk-in patient: ' . $patientStmt->error);
+                        $walkinPatientId = $patientStmt->insert_id;
+                        $patientStmt->close();
+
+                        $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'lab', ?, NOW(), 'Pending')");
+                        if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
+                        $serviceInsert->bind_param('iid', $walkinPatientId, $service_id, $price);
+                        if (!$serviceInsert->execute()) throw new Exception('Unable to create walk-in laboratory request: ' . $serviceInsert->error);
+                        $serviceInsert->close();
+
+                        $invoiceId = create_invoice($conn, $walkinPatientId, null, null, $payment_amount >= $price ? 'paid' : 'unpaid', $payment_mode, 0.0);
+                        add_invoice_item($conn, $invoiceId, 'Lab: ' . $labService['service_name'], 1, $price, 'lab', $service_id);
+                        post_invoice_journal($conn, $invoiceId, $walkinPatientId, $price, 'Walk-in laboratory');
+
+                        if ($payment_amount > 0) {
+                            $payment = record_payment($conn, $invoiceId, $payment_amount, $payment_mode, null);
+                            post_payment_journal($conn, $invoiceId, $payment['amount'], $payment_mode);
+                        }
+
+                        $conn->commit();
+                        $walkin_message = 'Walk-in laboratory request created successfully. Invoice #' . $invoiceId . '.';
+                    } catch (Throwable $e) {
+                        $conn->rollback();
+                        $walkin_error = $e->getMessage();
+                    }
+                }
+            }
+        }
+    }
+}
 
 // --- 1. HANDLE DATE RANGE (Defaults to today) ---
 $start_date = $_GET['start_date'] ?? date('Y-m-d');
@@ -50,6 +131,8 @@ $stmt = $conn->prepare($query);
 $stmt->bind_param("ss", $start_date, $end_date);
 $stmt->execute();
 $lab_jobs = $stmt->get_result();
+
+$walkin_lab_services = $conn->query("SELECT id, service_name, price FROM services_master WHERE active = 1 AND category = 'lab' ORDER BY service_name ASC");
 
 $total_revenue = 0;
 $total_count = 0;
@@ -121,6 +204,55 @@ while($row = $lab_jobs->fetch_assoc()) {
 </style>
 
 <div class="container">
+    <div class="worklist-card" style="margin-bottom:20px; border-left:5px solid #f39c12;">
+        <div class="header-flex" style="margin-bottom:15px;">
+            <h2 class="page-title" style="font-size:20px;">🚶 Walk-in Laboratory</h2>
+            <span style="font-size:12px;color:#7f8c8d;">No consultation fee</span>
+        </div>
+        <?php if ($walkin_message): ?>
+            <div style="background:#d4edda;color:#155724;padding:12px;border-radius:6px;margin-bottom:15px;"><?= htmlspecialchars($walkin_message) ?></div>
+        <?php endif; ?>
+        <?php if ($walkin_error): ?>
+            <div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px;margin-bottom:15px;"><?= htmlspecialchars($walkin_error) ?></div>
+        <?php endif; ?>
+        <form method="post" style="display:grid;grid-template-columns:1.3fr 1fr 1.5fr 1fr 1fr auto;gap:10px;align-items:end;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <div>
+                <label style="font-size:12px;font-weight:600;">Patient Name</label>
+                <input type="text" name="walkin_name" class="form-control" placeholder="Optional" />
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;">Phone</label>
+                <input type="text" name="walkin_phone" class="form-control" placeholder="Optional" />
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;">Laboratory Test</label>
+                <select name="walkin_service_id" class="form-control" required>
+                    <option value="">Select test...</option>
+                    <?php if ($walkin_lab_services): while ($ws = $walkin_lab_services->fetch_assoc()): ?>
+                        <option value="<?= (int)$ws['id'] ?>" data-price="<?= (float)$ws['price'] ?>">
+                            <?= htmlspecialchars($ws['service_name']) ?> (KES <?= number_format((float)$ws['price'], 2) ?>)
+                        </option>
+                    <?php endwhile; endif; ?>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;">Payment</label>
+                <input type="number" name="walkin_payment_amount" step="0.01" min="0" value="0" class="form-control" />
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;">Mode</label>
+                <select name="walkin_payment_mode" class="form-control">
+                    <option value="Cash">Cash</option>
+                    <option value="Mpesa">M-Pesa</option>
+                    <option value="Bank">Bank</option>
+                    <option value="Wire Transfer">Transfer</option>
+                </select>
+            </div>
+            <button type="submit" name="create_walkin_lab" class="btn-filter" style="background:#f39c12;">Create Request</button>
+        </form>
+    </div>
+
     <div class="filter-bar">
         <form method="GET" class="filter-form">
             <label style="font-weight: 600; color: #2c3e50;">From:</label>
