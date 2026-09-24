@@ -1,4 +1,13 @@
 <?php
+function ensure_walkin_column($conn): void {
+    $check = $conn->query("SHOW COLUMNS FROM patients LIKE 'is_walkin'");
+    if (!$check || $check->num_rows === 0) {
+        if (!$conn->query("ALTER TABLE patients ADD COLUMN is_walkin TINYINT(1) NOT NULL DEFAULT 0")) {
+            throw new Exception('Unable to prepare walk-in patient field: ' . $conn->error);
+        }
+    }
+}
+
 function invoice_column_exists($conn, $column) {
     $check = $conn->query("SHOW COLUMNS FROM invoices LIKE '" . $conn->real_escape_string($column) . "'");
     return $check && $check->num_rows > 0;
@@ -243,8 +252,8 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
 
     // Walk-in patients receive laboratory/services charges only; consultation is free.
     $isWalkin = false;
-    // Keep the application compatible with databases that have not yet run
-    // the walk-in migration.
+    // Ensure the live database has the walk-in flag before using it.
+    ensure_walkin_column($conn);
     if (invoice_column_exists($conn, 'is_walkin')) {
         $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id = ? LIMIT 1");
         if ($patientStmt) {
