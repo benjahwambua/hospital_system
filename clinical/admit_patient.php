@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrfToken = $_SESSION['csrf_token'];
 require_once __DIR__ . '/../includes/auth.php';
 require_role(['admin', 'doctor', 'nurse', 'receptionist']);
 
@@ -16,45 +20,62 @@ $pre_bed  = $_GET['bed'] ?? '';
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $patient_id      = intval($_POST['patient_id']);
-    $ward_name       = mysqli_real_escape_string($conn, $_POST['ward_name']);
-    $bed_number      = intval($_POST['bed_number']);
-    $admit_date      = mysqli_real_escape_string($conn, $_POST['admit_date']);
-    $reason          = mysqli_real_escape_string($conn, $_POST['reason']);
-    $attending_doc   = mysqli_real_escape_string($conn, $_POST['attending_doctor']);
-    
-    $current_user_id = $_SESSION['user_id'] ?? 0;
-    $status          = 'Admitted';
-
-    $check_stmt = $conn->prepare("SELECT id FROM admissions WHERE ward_name = ? AND bed_number = ? AND status = 'Admitted'");
-    $check_stmt->bind_param("si", $ward_name, $bed_number);
-    $check_stmt->execute();
-    $result = $check_stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $message = "<div class='alert alert-danger border-0 shadow-sm mb-4'>
-                        <div class='d-flex align-items-center'>
-                            <i class='fas fa-exclamation-circle fa-2x mr-3'></i>
-                            <div><strong>Bed Conflict:</strong> Bed $bed_number in $ward_name is currently occupied.</div>
-                        </div>
-                    </div>";
+    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
+        $message = "<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
     } else {
-        $sql = "INSERT INTO admissions (patient_id, ward_name, bed_number, admit_date, reason, admitted_by, attending_doctor, created_by, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("isisisiss", 
-            $patient_id, $ward_name, $bed_number, $admit_date, $reason, 
-            $current_user_id, $attending_doc, $current_user_id, $status
-        );
-        
-        if ($stmt->execute()) {
-            $message = "<div class='alert alert-success border-0 shadow-sm mb-4'>
-                            <div class='d-flex align-items-center'>
-                                <i class='fas fa-check-double fa-2x mr-3'></i>
-                                <div><strong>Success!</strong> Patient has been successfully admitted. <a href='ward_management.php' class='alert-link ml-2'>Return to Ward Map</a></div>
-                            </div>
-                        </div>";
+        $patient_id = intval($_POST['patient_id'] ?? 0);
+        $ward_name = trim($_POST['ward_name'] ?? '');
+        $bed_number = intval($_POST['bed_number'] ?? 0);
+        $admit_date = trim($_POST['admit_date'] ?? '');
+        $reason = trim($_POST['reason'] ?? '');
+        $attending_doc = trim($_POST['attending_doctor'] ?? '');
+        $current_user_id = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($patient_id <= 0 || $bed_number <= 0 || $ward_name === '' || $reason === '' || $attending_doc === '') {
+            $message = "<div class='alert alert-danger'>Complete all required admission details.</div>";
+        } else {
+            $check_stmt = $conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' LIMIT 1");
+            $check_stmt->bind_param("si", $ward_name, $bed_number);
+            $check_stmt->execute();
+            $occupied = $check_stmt->get_result()->fetch_assoc();
+            $check_stmt->close();
+
+            $existingPatient = $conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1");
+            $existingPatient->bind_param('i', $patient_id);
+            $existingPatient->execute();
+            $alreadyAdmitted = $existingPatient->get_result()->fetch_assoc();
+            $existingPatient->close();
+
+            if ($occupied) {
+                $message = "<div class='alert alert-danger'><strong>Bed Conflict:</strong> Bed ".(int)$bed_number." in ".htmlspecialchars($ward_name)." is currently occupied.</div>";
+            } elseif ($alreadyAdmitted) {
+                $message = "<div class='alert alert-warning'>This patient is already admitted. Review the current admission before creating another one.</div>";
+            } else {
+                $visitId = get_or_create_current_visit($conn, $patient_id, 'Inpatient', $ward_name);
+                $hasAdmissionVisit = false;
+                $vc = $conn->query("SHOW COLUMNS FROM admissions LIKE 'visit_id'");
+                if ($vc && $vc->num_rows > 0) $hasAdmissionVisit = true;
+
+                $status = 'Admitted';
+                if ($hasAdmissionVisit && $visitId > 0) {
+                    $stmt = $conn->prepare("INSERT INTO admissions (patient_id, visit_id, ward_name, bed_number, admit_date, reason, admitted_by, attending_doctor, created_by, status) VALUES (?,?,?,?,?,?,?,?,?,?)");
+                    $stmt->bind_param("iisisisiss", $patient_id, $visitId, $ward_name, $bed_number, $admit_date, $reason, $current_user_id, $attending_doc, $current_user_id, $status);
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO admissions (patient_id, ward_name, bed_number, admit_date, reason, admitted_by, attending_doctor, created_by, status) VALUES (?,?,?,?,?,?,?,?,?)");
+                    $stmt->bind_param("isisisiss", $patient_id, $ward_name, $bed_number, $admit_date, $reason, $current_user_id, $attending_doc, $current_user_id, $status);
+                }
+
+                if ($stmt && $stmt->execute()) {
+                    if ($visitId > 0) {
+                        $v = $conn->prepare("UPDATE visits SET visit_type='Inpatient', clinic_category=?, status='In Progress', updated_at=NOW() WHERE id=? AND patient_id=?");
+                        if ($v) { $v->bind_param('sii', $ward_name, $visitId, $patient_id); $v->execute(); $v->close(); }
+                    }
+                    $message = "<div class='alert alert-success'><strong>Patient admitted successfully.</strong> Bed ".(int)$bed_number." in ".htmlspecialchars($ward_name)." is now occupied. <a href='ward_management.php' class='alert-link ml-2'>View Ward</a></div>";
+                } else {
+                    $message = "<div class='alert alert-danger'>Unable to complete admission: ".htmlspecialchars($stmt ? $stmt->error : $conn->error)."</div>";
+                }
+                if ($stmt) $stmt->close();
+            }
         }
     }
 }
@@ -150,6 +171,7 @@ $patients_query = $conn->query("SELECT id, full_name, phone FROM patients ORDER 
                 <div class="card card-admission shadow-sm">
                     <div class="card-body p-4 p-md-5">
                         <form method="POST" autocomplete="off" class="form-with-icon">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                             
                             <div class="section-title">1. Patient Identification</div>
                             <div class="row">
