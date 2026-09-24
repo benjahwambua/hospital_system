@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 // Detect whether vitals has a status column so the queue query remains compatible.
@@ -28,17 +29,26 @@ if ($visitCheck && $visitCheck->num_rows > 0) {
 }
 
 if ($hasVisits) {
+    $vitalTempColumn = 'NULL';
+    $tempCheck = $conn->query("SHOW COLUMNS FROM vitals");
+    if ($tempCheck) {
+        while ($col = $tempCheck->fetch_assoc()) {
+            if (($col['Field'] ?? '') === 'temp') { $vitalTempColumn = 'vt.temp'; break; }
+            if (($col['Field'] ?? '') === 'temperature') { $vitalTempColumn = 'vt.temperature'; }
+        }
+    }
     $sql = "SELECT v.id AS visit_id, v.visit_number, v.visit_type, v.clinic_category,
                    v.status AS visit_status, v.visit_time,
                    p.id AS patient_id, p.full_name, p.gender, p.age, p.patient_number,
-                   vt.bp, vt.temp, vt.weight, vt.pulse, vt.complaints
+                   vt.bp, {$vitalTempColumn} AS temp, vt.weight, vt.pulse, vt.complaints
             FROM visits v
             INNER JOIN patients p ON p.id = v.patient_id
             LEFT JOIN vitals vt ON vt.id = (
                 SELECT v2.id FROM vitals v2
                 WHERE v2.patient_id = v.patient_id
                   AND DATE(v2.created_at) = CURDATE()
-                ORDER BY v2.id DESC LIMIT 1
+                  AND (v2.visit_id = v.id OR v2.visit_id IS NULL)
+                ORDER BY CASE WHEN v2.visit_id = v.id THEN 0 ELSE 1 END, v2.id DESC LIMIT 1
             )
             WHERE v.visit_date = CURDATE()
               AND v.status IN ('Open','In Progress')
@@ -68,11 +78,11 @@ $res = $conn->query($sql);
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
                                 <div class="text-xs font-weight-bold text-primary text-uppercase mb-1"><?= $row['full_name'] ?> (<?= $row['gender'] ?>, <?= $row['age'] ?> yrs)</div>
-                                <div class="small text-muted mb-2">BP: <?= $row['bp'] ?> | Temp: <?= $row['temp'] ?>°C</div>
+                                <div class="small text-muted mb-2">Visit: <?= htmlspecialchars($row['visit_number']) ?> · BP: <?= htmlspecialchars($row['bp'] ?? '') ?> | Temp: <?= htmlspecialchars($row['temp'] ?? '') ?>°C</div>
                                 <div class="mb-0 text-gray-800 small"><strong>Complaints:</strong> <?= substr($row['complaints'], 0, 60) ?>...</div>
                             </div>
                             <div class="col-auto">
-                                <a href="../patients/patient_dashboard.php?id=<?= (int)$row['patient_id'] ?>&tab=clinical" class="btn btn-sm btn-primary px-3">Examine</a>
+                                <a href="../clinical/care.php?patient_id=<?= (int)$row['patient_id'] ?>&visit_id=<?= (int)$row['visit_id'] ?>" class="btn btn-sm btn-primary px-3">Examine</a>
                             </div>
                         </div>
                     </div>
