@@ -586,7 +586,7 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
     $stmt->close();
 }
 
-function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $reference = null) {
+function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $reference = null, $cashier_shift_id = null) {
     $invoice_id = (int)$invoice_id;
     $amount = (float)$amount;
     if ($invoice_id <= 0 || $amount <= 0) throw new Exception('Invalid invoice payment.');
@@ -643,10 +643,19 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     $method = trim((string)$payment_method);
     $referenceValue = $reference !== null ? (string)$reference : null;
 
-    $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, invoice_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-    if ($stmt) {
-        $stmt->bind_param('idssi', $patientId, $amount, $method, $referenceValue, $invoice_id);
+    $shiftId = $cashier_shift_id !== null ? (int)$cashier_shift_id : 0;
+    if ($shiftId > 0 && invoice_column_exists($conn, 'cashier_shift_id')) {
+        $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, invoice_id, cashier_shift_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        if ($stmt) {
+            $stmt->bind_param('idssii', $patientId, $amount, $method, $referenceValue, $invoice_id, $shiftId);
+        } else {
+            throw new Exception('Unable to record payment with cashier shift: ' . $conn->error);
+        }
     } else {
+        $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, invoice_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        if ($stmt) {
+            $stmt->bind_param('idssi', $patientId, $amount, $method, $referenceValue, $invoice_id);
+        } else {
         $stmt = $conn->prepare("INSERT INTO payments (patient_id, amount, method, reference, created_at) VALUES (?, ?, ?, ?, NOW())");
         if (!$stmt) throw new Exception('Unable to record payment: ' . $conn->error);
         $stmt->bind_param('idss', $patientId, $amount, $method, $referenceValue);
