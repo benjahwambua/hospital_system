@@ -228,16 +228,20 @@ function isParentActive($paths) {
         <?php endif; ?>
 
 
-        <div class="has-submenu <?= isParentActive(['triage.php', 'consultations.php', 'ward_management.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'triage.php', 'consultations.php', 'care.php', 'orders.php', 'ward_management.php', 'admit_patient.php', 'discharge_patient.php', 'diagnostics.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-stethoscope icon-main"></i> Clinical Care
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
+                <a href="/hospital_system/clinical/index.php" class="<?= isActive('clinical/index.php') ?>"><i class="fas fa-th-large"></i> Clinical Dashboard</a>
                 <a href="/hospital_system/clinical/triage.php" class="<?= isActive('triage.php') ?>"><i class="fas fa-heartbeat"></i> Triage & Vitals</a>
-                <a href="/hospital_system/clinical/care.php" class="sidebar-link"><i class="fas fa-user-md"></i> Clinical Care</a>
+                <a href="/hospital_system/clinical/care.php" class="<?= isActive('clinical/care.php') ?>"><i class="fas fa-user-md"></i> Clinical Care</a>
+                <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
                     <a href="/hospital_system/clinical/consultations.php" class="<?= isActive('consultations.php') ?>"><i class="fas fa-user-md"></i> Doctor's Queue</a>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
+                <a href="/hospital_system/clinical/admit_patient.php" class="<?= isActive('admit_patient.php') ?>"><i class="fas fa-procedures"></i> Admissions</a>
+                <a href="/hospital_system/clinical/discharge_patient.php" class="<?= isActive('discharge_patient.php') ?>"><i class="fas fa-sign-out-alt"></i> Discharge</a>
                 <a href="/hospital_system/diagnostics/diagnostics.php" class="<?= isActive('diagnostics.php') ?>"><i class="fas fa-diagnoses"></i> Diagnostics</a>
             </div>
         </div>
