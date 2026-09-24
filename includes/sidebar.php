@@ -281,12 +281,13 @@ function isParentActive($paths) {
             </div>
         </div>
 
-        <div class="has-submenu <?= isParentActive(['sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['dispensing_queue.php', 'sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-pills icon-main"></i> Pharmacy
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
+                <a href="/hospital_system/pharmacy/dispensing_queue.php" class="<?= isActive('dispensing_queue.php') ?>"><i class="fas fa-clipboard-check"></i> Dispensing Queue</a>
                 <a href="/hospital_system/pharmacy/sell_medicine.php" class="<?= isActive('sell_medicine.php') ?>"><i class="fas fa-file-prescription"></i> Sell Medicine</a>
                 <a href="/hospital_system/pharmacy/add_stock.php" class="<?= isActive('add_stock.php') ?>"><i class="fas fa-box-open"></i> Add Stock</a>
                 <a href="/hospital_system/pharmacy/view_stock.php" class="<?= isActive('view_stock.php') ?>"><i class="fas fa-capsules"></i> View Stock</a>
