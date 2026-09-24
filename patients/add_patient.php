@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = "Next of kin name is required.";
     } else {
         // generate patient number
-        $patient_number = 'EMC-' . date('Ymd') . '-' . substr((string)time(), -4) . rand(10,99);
+        $patient_number = 'TEMP-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
 
         // Calculate age from DOB
         $age = 0;
@@ -40,8 +40,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->execute()) {
             $pid = $stmt->insert_id;
             $stmt->close();
-            audit('patient_register', "patient_id={$pid}");
-            $success = "Patient registered successfully.";
+
+            // Keep registered patient numbers short and consistent: EMC00125, EMC00126, etc.
+            $patient_number = 'EMC' . str_pad((string)$pid, 5, '0', STR_PAD_LEFT);
+            $numberStmt = $conn->prepare("UPDATE patients SET patient_number = ? WHERE id = ?");
+            if ($numberStmt) {
+                $numberStmt->bind_param('si', $patient_number, $pid);
+                if (!$numberStmt->execute()) {
+                    $numberStmt->close();
+                    $err = "Unable to assign patient number: " . $conn->error;
+                } else {
+                    $numberStmt->close();
+                }
+            } else {
+                $err = "Unable to assign patient number: " . $conn->error;
+            }
+
+            if ($err === '') {
+                audit('patient_register', "patient_id={$pid}");
+                $success = "Patient registered successfully.";
             header("Location: /hospital_system/patients/patient_dashboard.php?id={$pid}");
             exit;
         } else {
