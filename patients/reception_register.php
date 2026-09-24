@@ -214,6 +214,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $patientId = $stmt->insert_id;
                 $stmt->close();
+
+                // Registered patient numbers use the short EMC format, e.g. EMC00125.
+                $patientNumber = 'EMC' . str_pad((string)$patientId, 5, '0', STR_PAD_LEFT);
+                $numberStmt = $conn->prepare('UPDATE patients SET patient_number = ? WHERE id = ?');
+                if (!$numberStmt) {
+                    throw new Exception("Patient number update failed: " . $conn->error);
+                }
+                $numberStmt->bind_param('si', $patientNumber, $patientId);
+                if (!$numberStmt->execute()) {
+                    throw new Exception("Patient number update failed: " . $numberStmt->error);
+                }
+                $numberStmt->close();
             }
 
             // Create appointment
