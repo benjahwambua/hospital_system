@@ -19,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
     $receipt = strtoupper(trim((string)($_POST['receipt'] ?? '')));
 
     try {
-        if ($invoiceId <= 0 || $amount <= 0 || $phone === '' || $receipt === '') {
-            throw new Exception('Invoice, amount, phone number and M-Pesa receipt are required.');
+        if ($invoiceId <= 0 || $amount <= 0) {
+            throw new Exception('Invoice and amount are required.');
         }
 
         $stmt = $conn->prepare("SELECT id, patient_id, total FROM invoices WHERE id=? LIMIT 1");
@@ -147,7 +147,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-receipt"></i> Record M-Pesa Payment</h6>
             </div>
             <div class="card-body">
-                <p class="text-muted">M-Pesa recording does not require Daraja/STK configuration. Enter the receipt received from the customer and the payment will be posted to the invoice.</p>
+                <p class="text-muted">M-Pesa recording does not require Daraja/STK configuration. Phone number and receipt are optional and can be added when available.</p>
                 <form method="POST" class="row align-items-end">
                     <div class="col-md-3">
                         <label class="small font-weight-bold">Invoice ID</label>
@@ -158,12 +158,12 @@ include __DIR__ . '/../includes/sidebar.php';
                         <input type="number" name="amount" class="form-control" min="1" step="0.01" required>
                     </div>
                     <div class="col-md-2">
-                        <label class="small font-weight-bold">M-Pesa Phone</label>
-                        <input type="text" name="phone" class="form-control" placeholder="0712345678" required>
+                        <label class="small font-weight-bold">M-Pesa Phone (optional)</label>
+                        <input type="text" name="phone" class="form-control" placeholder="0712345678">
                     </div>
                     <div class="col-md-2">
-                        <label class="small font-weight-bold">Receipt / Code</label>
-                        <input type="text" name="receipt" class="form-control" placeholder="QK12ABC345" required>
+                        <label class="small font-weight-bold">Receipt / Code (optional)</label>
+                        <input type="text" name="receipt" class="form-control" placeholder="QK12ABC345">
                     </div>
                     <div class="col-md-3">
                         <button type="submit" name="record_manual_mpesa" class="btn btn-primary btn-block">
