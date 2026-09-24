@@ -404,7 +404,7 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     $amount = (float)$amount;
     if ($invoice_id <= 0 || $amount <= 0) throw new Exception('Invalid invoice payment.');
 
-    $stmt = $conn->prepare("SELECT id, patient_id, total, paid_amount FROM invoices WHERE id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT id, patient_id, total, paid_amount, amount_paid FROM invoices WHERE id = ? LIMIT 1");
     if (!$stmt) throw new Exception('Unable to load invoice: ' . $conn->error);
     $stmt->bind_param('i', $invoice_id);
     $stmt->execute();
@@ -414,9 +414,7 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
 
     $total = (float)($invoice['total'] ?? 0);
 
-    // Invoice items are the authoritative source for the bill total. This also
-    // repairs legacy invoices whose invoices.total missed the KES 200 consultation.
-    $itemTotal = 0.0;
+    // Invoice items are authoritative whenever itemized charges exist.
     $itemStmt = $conn->prepare("SELECT COALESCE(SUM(total), 0) AS items_total FROM invoice_items WHERE invoice_id = ?");
     if ($itemStmt) {
         $itemStmt->bind_param('i', $invoice_id);
@@ -424,18 +422,32 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
         $itemRow = $itemStmt->get_result()->fetch_assoc();
         $itemStmt->close();
         $itemTotal = (float)($itemRow['items_total'] ?? 0);
-    }
-    if ($itemTotal > 0 && abs($itemTotal - $total) > 0.009) {
-        $total = $itemTotal;
-        $sync = $conn->prepare("UPDATE invoices SET total = ? WHERE id = ?");
-        if ($sync) {
+        if ($itemTotal > 0 && abs($itemTotal - $total) > 0.00001) {
+            $total = $itemTotal;
+            $sync = $conn->prepare("UPDATE invoices SET total = ? WHERE id = ?");
+            if (!$sync) throw new Exception('Unable to synchronize invoice total: ' . $conn->error);
             $sync->bind_param('di', $total, $invoice_id);
-            $sync->execute();
+            if (!$sync->execute()) {
+                $err = $sync->error;
+                $sync->close();
+                throw new Exception('Unable to synchronize invoice total: ' . $err);
+            }
             $sync->close();
         }
     }
 
-    $paid = (float)($invoice['paid_amount'] ?? 0);
+    // The invoice-linked payment ledger is authoritative.
+    $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM payments WHERE invoice_id = ?");
+    if ($paidStmt) {
+        $paidStmt->bind_param('i', $invoice_id);
+        $paidStmt->execute();
+        $paidRow = $paidStmt->get_result()->fetch_assoc();
+        $paidStmt->close();
+        $paid = (float)($paidRow['total_paid'] ?? 0);
+    } else {
+        $paid = max((float)($invoice['paid_amount'] ?? 0), (float)($invoice['amount_paid'] ?? 0));
+    }
+
     $balance = max($total - $paid, 0);
     if ($balance <= 0) throw new Exception('Invoice is already fully paid.');
     $amount = min($amount, $balance);
@@ -455,23 +467,32 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     if (!$stmt->execute()) throw new Exception('Unable to save payment: ' . $stmt->error);
     $stmt->close();
 
+    $newPaid = $paid + $amount;
+    $newBalance = max($total - $newPaid, 0);
+    $newStatus = ($newBalance <= 0.00001) ? 'paid' : 'unpaid';
+
+    $update = $conn->prepare("UPDATE invoices SET total = ?, paid_amount = ?, amount_paid = ?, balance = ?, payment_status = ?, status = ?, payment_mode = ?, paid_at = CASE WHEN ? = 'paid' THEN NOW() ELSE paid_at END WHERE id = ?");
+    if (!$update) throw new Exception('Unable to update invoice: ' . $conn->error);
+    $update->bind_param('ddddssssi', $total, $newPaid, $newPaid, $newBalance, $newStatus, $newStatus, $method, $newStatus, $invoice_id);
+    if (!$update->execute()) {
+        $err = $update->error;
+        $update->close();
+        throw new Exception('Unable to update invoice payment status: ' . $err);
+    }
+    $update->close();
+
     $billingStmt = $conn->prepare("INSERT INTO billing (patient_id, invoice_id, amount, paid_amount, method, paid, status, created_at) VALUES (?, ?, ?, ?, ?, 1, 'PAID', NOW())");
     if ($billingStmt) {
         $billingStmt->bind_param('iidds', $patientId, $invoice_id, $amount, $amount, $method);
-        $billingStmt->execute();
+        if (!$billingStmt->execute()) {
+            $err = $billingStmt->error;
+            $billingStmt->close();
+            throw new Exception('Unable to save billing payment: ' . $err);
+        }
         $billingStmt->close();
     }
 
-    $newPaid = $paid + $amount;
-    $newStatus = ($newPaid >= $total - 0.00001) ? 'paid' : 'unpaid';
-
-    $update = $conn->prepare("UPDATE invoices SET paid_amount = ?, amount_paid = ?, balance = GREATEST(COALESCE(total,0) - ?, 0), payment_status = ?, status = ?, payment_mode = ?, paid_at = CASE WHEN ? = 'paid' THEN NOW() ELSE paid_at END WHERE id = ?");
-    if (!$update) throw new Exception('Unable to update invoice: ' . $conn->error);
-    $update->bind_param('dddssssi', $newPaid, $newPaid, $newPaid, $newStatus, $newStatus, $method, $newStatus, $invoice_id);
-    $update->execute();
-    $update->close();
-
-    return ['amount'=>$amount, 'paid_amount'=>$newPaid, 'balance'=>max($total-$newPaid,0), 'status'=>$newStatus];
+    return ['amount'=>$amount, 'paid_amount'=>$newPaid, 'balance'=>$newBalance, 'status'=>$newStatus];
 }
 
 function get_invoice_number($conn, $invoice_id) {
