@@ -380,7 +380,7 @@ if ($patient_id <= 0) {
                 );
                 post_payment_journal($conn, $invoice_id, $payment['amount'], 'Mpesa');
                 $conn->commit();
-                header("Location: billing/view_invoice.php?id=".$invoice_id."&paid=1&mpesa=recorded");
+                header("Location: patient_dashboard.php?id=".$patient_id."&tab=billing&payment_success=1");
                 exit;
             } catch (Throwable $e) {
                 $conn->rollback();
@@ -646,6 +646,7 @@ if ($patient_id <= 0) {
     </ul>
 
    <div id="clinical" class="card">
+    <?php if (isset($_GET['payment_success'])): ?><div class="alert alert-success" style="font-weight:600; margin-bottom:20px;"><i class="fas fa-check-circle"></i> Payment successful. The M-Pesa payment has been recorded.</div><?php endif; ?>
     <?php if (isset($_GET['vitals_saved'])): ?><div class="alert alert-success">Vitals saved successfully.</div><?php endif; ?>
     <?php if (isset($_GET['error']) && $_GET['error'] === 'csrf'): ?><div class="alert alert-danger">Security token mismatch. Please retry the action.</div><?php endif; ?>
 
