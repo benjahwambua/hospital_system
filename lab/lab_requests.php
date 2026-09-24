@@ -56,23 +56,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
 
                     $conn->begin_transaction();
                     try {
-                        // Reuse the dedicated walk-in patient already in the database.
-                        // Walk-in laboratory requests should not create duplicate patient rows.
-                        $walkinLookup = $conn->prepare(
-                            "SELECT id FROM patients
-                             WHERE is_walkin = 1
-                                OR LOWER(TRIM(full_name)) IN ('walk-in', 'walk-in patient', 'walk-in customer')
-                             ORDER BY id ASC LIMIT 1"
+                        // Create a separate walk-in patient for each laboratory visit so the
+                        // patient's name, phone, test, invoice and payment remain traceable.
+                        $walkinPatientNumber = 'W-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+                        $walkinName = $name !== '' ? $name : 'Walk-in Patient';
+                        $walkinGender = '';
+                        $walkinFlag = 1;
+                        $walkinPatientStmt = $conn->prepare(
+                            'INSERT INTO patients (patient_number, full_name, gender, phone, is_walkin, created_at)
+                             VALUES (?, ?, ?, ?, ?, NOW())'
                         );
-                        if (!$walkinLookup) throw new Exception('Unable to locate walk-in patient: ' . $conn->error);
-                        $walkinLookup->execute();
-                        $walkinRow = $walkinLookup->get_result()->fetch_assoc();
-                        $walkinLookup->close();
-
-                        if (!$walkinRow) {
-                            throw new Exception('No walk-in patient exists in the database. Please create the dedicated walk-in patient record first.');
+                        if (!$walkinPatientStmt) {
+                            throw new Exception('Unable to create walk-in patient: ' . $conn->error);
                         }
-                        $walkinPatientId = (int)$walkinRow['id'];
+                        $walkinPatientStmt->bind_param('ssssi', $walkinPatientNumber, $walkinName, $walkinGender, $phone, $walkinFlag);
+                        if (!$walkinPatientStmt->execute()) {
+                            throw new Exception('Unable to create walk-in patient: ' . $walkinPatientStmt->error);
+                        }
+                        $walkinPatientId = (int)$walkinPatientStmt->insert_id;
+                        $walkinPatientStmt->close();
 
                         $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'lab', ?, NOW(), 'Pending')");
                         if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
