@@ -286,6 +286,43 @@ if ($patient_id <= 0) {
 
         $invoiceTotal=(float)($invoice['total'] ?? 0);
         $paid=(float)($invoice['paid_amount'] ?? 0);
+
+        // Repair legacy/empty invoices before accepting a payment. Some older
+        // invoices were created before invoice_items were linked to charges,
+        // leaving total=0 even though the patient has billable services.
+        if ($invoiceTotal <= 0) {
+            $itemTotalRes = $conn->query("SELECT COALESCE(SUM(total),0) AS total FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
+            $itemTotal = $itemTotalRes ? (float)($itemTotalRes->fetch_assoc()['total'] ?? 0) : 0;
+
+            if ($itemTotal <= 0) {
+                $chargeTotal = 0;
+
+                $svcRes = $conn->query("SELECT COALESCE(SUM(price),0) AS total FROM patient_services WHERE patient_id=".(int)$patient_id." AND status <> 'Cancelled'");
+                if ($svcRes) $chargeTotal += (float)($svcRes->fetch_assoc()['total'] ?? 0);
+
+                $rxRes = $conn->query("SELECT COALESCE(SUM(COALESCE(p.unit_price,s.selling_price) * p.quantity),0) AS total FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=".(int)$patient_id);
+                if ($rxRes) $chargeTotal += (float)($rxRes->fetch_assoc()['total'] ?? 0);
+
+                if ($chargeTotal > 0) {
+                    $invoiceTotal = $chargeTotal;
+                    $fixStmt = $conn->prepare("UPDATE invoices SET total=? WHERE id=?");
+                    if ($fixStmt) {
+                        $fixStmt->bind_param('di', $invoiceTotal, $invoice_id);
+                        $fixStmt->execute();
+                        $fixStmt->close();
+                    }
+                }
+            } else {
+                $invoiceTotal = $itemTotal;
+                $fixStmt = $conn->prepare("UPDATE invoices SET total=? WHERE id=?");
+                if ($fixStmt) {
+                    $fixStmt->bind_param('di', $invoiceTotal, $invoice_id);
+                    $fixStmt->execute();
+                    $fixStmt->close();
+                }
+            }
+        }
+
         $balance=max($invoiceTotal-$paid,0);
         $amount=min($amount,$balance);
         if($amount<=0) throw new Exception('This invoice has no outstanding balance.');
