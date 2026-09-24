@@ -54,40 +54,9 @@ if ($patient_id <= 0) {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )");
-    // --- ADDITION: AUTO-CONSULTATION BILLING ---
-    $check_stmt = $conn->prepare("SELECT id FROM patient_services WHERE patient_id = ? AND service_id = (SELECT id FROM services_master WHERE service_name = 'Consultation' LIMIT 1) AND DATE(created_at) = CURDATE()");
-    $check_stmt->bind_param("i", $patient_id);
-    $check_stmt->execute();
-    $exists = $check_stmt->get_result()->num_rows;
-    $check_stmt->close();
-
-    if ($exists == 0) {
-        $consult = $conn->query("SELECT id, service_name, price, category FROM services_master WHERE service_name = 'Consultation' AND active = 1 LIMIT 1")->fetch_assoc();
-        if ($consult) {
-            $consultCategory = (string)($consult['category'] ?? 'procedures');
-            $ins_stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
-            if (!$ins_stmt) throw new Exception('Unable to prepare consultation billing: ' . $conn->error);
-            $ins_stmt->bind_param("iisd", $patient_id, $consult['id'], $consultCategory, $consult['price']);
-            if ($ins_stmt->execute()) {
-                $ins_stmt->close();
-
-                // Keep the consultation charge and invoice total in sync.
-                $invoice_id = get_or_create_invoice($conn, $patient_id);
-                add_invoice_item(
-                    $conn,
-                    $invoice_id,
-                    'Service: ' . $consult['service_name'],
-                    1,
-                    (float)$consult['price'],
-                    'service',
-                    (int)$consult['id']
-                );
-            } else {
-                $ins_stmt->close();
-            }
-        }
-    }
-    // ------------------------------------------
+    // Consultation billing is created as a real charge for registered patients only.
+    // Walk-in patients are explicitly exempt from the consultation fee.
+    ensure_registered_consultation_charge($conn, $patient_id, 200.00);
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedToken = $_POST['csrf_token'] ?? '';
@@ -298,7 +267,9 @@ if ($patient_id <= 0) {
         $phone=trim((string)($_POST['mpesa_phone'] ?? ''));
         if($amount<=0) throw new Exception('Payment amount must be greater than zero.');
 
-        $invoice_id=get_or_create_invoice($conn,$patient_id);
+        // Ensure the standard KES 200 consultation charge exists for registered
+        // patients before calculating what can be paid. Walk-ins remain exempt.
+        $invoice_id=ensure_registered_consultation_charge($conn,$patient_id,200.00);
         $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
         if(!$invoice) throw new Exception('Unable to load patient invoice.');
 
