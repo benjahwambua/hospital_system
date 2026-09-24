@@ -308,7 +308,6 @@ function isParentActive($paths) {
                     <i class="fas fa-chevron-down caret"></i>
                 </a>
                 <div class="submenu">
-                    <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register"></i> Central Cashier</a>
                     <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
                     <a href="/hospital_system/billing/create_invoice.php" class="<?= isActive('create_invoice.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Generate Invoice</a>
                     <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-receipt"></i> View Bills</a>
@@ -344,6 +343,13 @@ function isParentActive($paths) {
             </div>
         <?php endif; ?>
         
+        <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier'], true)): ?>
+        <div class="menu-title">Finance</div>
+        <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>">
+            <i class="fas fa-cash-register icon-main"></i> Central Cashier
+        </a>
+        <?php endif; ?>
+
         <div class="menu-title">Exit</div>
         <a href="/hospital_system/logout.php" class="logout-link">
             <i class="fas fa-power-off icon-main"></i> Logout
