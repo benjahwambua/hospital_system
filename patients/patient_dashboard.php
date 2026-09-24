@@ -955,11 +955,11 @@ function clearForm() {
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                     <label class="info-label">Amount to Pay</label>
                     <input type="number" name="amount" value="<?= $amountToPayNow ?>" step="0.01" min="0.01" style="width:100%; padding:10px; margin-bottom:15px;">
-                    <label class="info-label">M-Pesa Phone (07XXXXXXXX / 2547XXXXXXXX)</label>
+                    <label class="info-label">M-Pesa Phone (optional)</label>
                     <input type="text" name="mpesa_phone" value="<?= htmlspecialchars($patient['phone'] ?? '') ?>" placeholder="07XXXXXXXX" style="width:100%; padding:10px; margin-bottom:15px;">
                     <label class="info-label">M-Pesa Receipt / Transaction Code</label>
                     <input type="text" name="mpesa_receipt" placeholder="e.g. QK12ABC345" style="width:100%; padding:10px; margin-bottom:15px;">
-                    <small style="display:block; color:#6c757d; margin-top:-8px; margin-bottom:15px;">For M-Pesa, enter the receipt code to record the payment. STK Push is optional.</small>
+                    <small style="display:block; color:#6c757d; margin-top:-8px; margin-bottom:15px;">Phone and receipt are optional. Add them when available for reconciliation. STK Push is optional.</small>
                     <label class="info-label">Payment Mode</label>
                     <select name="method" style="width:100%; padding:10px; margin-bottom:15px;">
                         <option value="Cash">Cash Payment</option>
