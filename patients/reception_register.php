@@ -228,6 +228,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $numberStmt->close();
             }
 
+            // Create one visit/encounter container for this registration.
+            // The migration adds the visits table and visit_id links to appointments,
+            // vitals, patient_services and invoices. If the migration is not yet run,
+            // registration continues using the existing workflow.
+            $visitId = 0;
+            $visitTableCheck = $conn->query("SHOW TABLES LIKE 'visits'");
+            if ($visitTableCheck && $visitTableCheck->num_rows > 0) {
+                $visitNumber = 'V-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+                $visitType = $isWalkin ? 'Walk-in' : 'Outpatient';
+                $createdBy = (int)($_SESSION['user_id'] ?? 0);
+
+                $visitStmt = $conn->prepare(
+                    "INSERT INTO visits
+                        (visit_number, patient_id, visit_date, visit_time, visit_type, clinic_category, doctor_id, status, created_by, created_at)
+                     VALUES (?, ?, CURDATE(), CURTIME(), ?, ?, NULLIF(?, 0), 'Open', NULLIF(?, 0), NOW())"
+                );
+                if (!$visitStmt) {
+                    throw new Exception("Visit prepare failed: " . $conn->error);
+                }
+
+                $visitStmt->bind_param(
+                    'sissii',
+                    $visitNumber,
+                    $patientId,
+                    $visitType,
+                    $clinicalType,
+                    $doctorId,
+                    $createdBy
+                );
+
+                if (!$visitStmt->execute()) {
+                    throw new Exception("Visit creation failed: " . $visitStmt->error);
+                }
+
+                $visitId = (int)$visitStmt->insert_id;
+                $visitStmt->close();
+            }
+
             // Create appointment
             $appointmentDate = date('Y-m-d');
             $appointmentTime = date('H:i:s');
@@ -248,7 +286,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Appointment execute failed: " . $apptStmt->error);
             }
             
+            $appointmentId = (int)$apptStmt->insert_id;
             $apptStmt->close();
+
+            // Link the queue/appointment to the visit when the Visit migration is active.
+            if ($visitId > 0 && $appointmentId > 0) {
+                $linkAppt = $conn->prepare("UPDATE appointments SET visit_id = ? WHERE id = ?");
+                if ($linkAppt) {
+                    $linkAppt->bind_param('ii', $visitId, $appointmentId);
+                    if (!$linkAppt->execute()) {
+                        throw new Exception("Appointment visit link failed: " . $linkAppt->error);
+                    }
+                    $linkAppt->close();
+                }
+            }
 
             // Only record vitals for full registration patients
             if (!$isWalkin && ($temperature !== '' || $bp !== '' || $weight !== '' || $pulse !== '' || $respiration !== '')) {
@@ -267,7 +318,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception("Vitals execute failed: " . $vitalsStmt->error);
                 }
                 
+                $vitalsId = (int)$vitalsStmt->insert_id;
                 $vitalsStmt->close();
+
+                // Link triage vitals to the same visit.
+                if ($visitId > 0 && $vitalsId > 0) {
+                    $linkVitals = $conn->prepare("UPDATE vitals SET visit_id = ? WHERE id = ?");
+                    if ($linkVitals) {
+                        $linkVitals->bind_param('ii', $visitId, $vitalsId);
+                        if (!$linkVitals->execute()) {
+                            throw new Exception("Vitals visit link failed: " . $linkVitals->error);
+                        }
+                        $linkVitals->close();
+                    }
+                }
             }
 
             // Create maternity record if applicable
