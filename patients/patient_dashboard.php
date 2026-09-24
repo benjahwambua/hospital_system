@@ -476,7 +476,29 @@ if ($patient_id > 0) {
     }
 
 
-    // Billing Calculations
+    // Walk-in requested service
+// Prefer the actual service already attached to the walk-in (for example a lab test).
+// Reception walk-ins fall back to the selected clinic/service category stored on the patient.
+$walkinRequestedService = '';
+$walkinRequestedServiceId = 0;
+if (!empty($patient['is_walkin'])) {
+    $walkinServiceStmt = $conn->prepare("SELECT ps.service_id, sm.service_name FROM patient_services ps INNER JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = ? AND ps.status <> 'Cancelled' ORDER BY ps.created_at DESC, ps.id DESC LIMIT 1");
+    if ($walkinServiceStmt) {
+        $walkinServiceStmt->bind_param('i', $patient_id);
+        $walkinServiceStmt->execute();
+        $walkinServiceRow = $walkinServiceStmt->get_result()->fetch_assoc();
+        $walkinServiceStmt->close();
+        if ($walkinServiceRow) {
+            $walkinRequestedServiceId = (int)$walkinServiceRow['service_id'];
+            $walkinRequestedService = (string)$walkinServiceRow['service_name'];
+        }
+    }
+    if ($walkinRequestedService === '' && !empty($patient['clinic_category'])) {
+        $walkinRequestedService = (string)$patient['clinic_category'];
+    }
+}
+
+// Billing Calculations
     // ==============================================================================
     // 4. BILLING CALCULATIONS
     // ==============================================================================
@@ -833,6 +855,13 @@ function clearForm() {
 
     <div id="services" class="card" style="display:none;">
         <h3>Add Service / Procedure</h3>
+        <?php if (!empty($patient['is_walkin']) && $walkinRequestedService !== ''): ?>
+            <div style="margin-bottom:18px; padding:14px 16px; background:#fff8e1; border:1px solid #f0c36d; border-left:5px solid #f39c12; border-radius:7px;">
+                <div style="font-size:11px; font-weight:700; color:#8a6d1d; text-transform:uppercase; letter-spacing:.5px;">Walk-in Requested Service</div>
+                <div style="font-size:18px; font-weight:700; color:#5d4b12; margin-top:4px;"><?= htmlspecialchars($walkinRequestedService) ?></div>
+                <div style="font-size:12px; color:#7a6a2a; margin-top:4px;">Selected during walk-in registration and loaded automatically.</div>
+            </div>
+        <?php endif; ?>
         <form method="post" style="margin-bottom:30px; background:#f4f7f6; padding:20px; border-radius:8px;">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:15px;">
@@ -841,7 +870,7 @@ function clearForm() {
                     <select name="service_id" onchange="updatePrice(this, 'svc_p')" required style="width:100%; padding:10px;">
                         <option value="">Search Service...</option>
                         <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): ?>
-                        <option value="<?= $s['id'] ?>" data-price="<?= $s['price'] ?>"><?= htmlspecialchars($s['service_name']) ?> (<?= strtoupper(htmlspecialchars($s['category'])) ?>)</option>
+                        <option value="<?= $s['id'] ?>" data-price="<?= $s['price'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?> (<?= strtoupper(htmlspecialchars($s['category'])) ?>)</option>
                         <?php endwhile; ?>
                     </select>
                 </div>
@@ -860,7 +889,7 @@ function clearForm() {
                 <select name="service_id" required style="padding:10px;">
                     <option value="">Select Lab Test...</option>
                     <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): if($s['category'] == 'lab'): ?>
-                    <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['service_name']) ?></option>
+                    <option value="<?= $s['id'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
                     <?php endif; endwhile; ?>
                 </select>
                 <input type="number" name="price" placeholder="Price" step="0.01" style="padding:10px;">
