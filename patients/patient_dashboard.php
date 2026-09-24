@@ -875,26 +875,15 @@ function clearForm() {
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
             <div style="background:#fdfefe; border:1px solid #ddd; padding:25px; border-radius:10px;">
-                <h4>Process New Payment</h4>
-                <p style="color:#666; font-size:13px; margin-top:-8px;">Supports partial settlement. The remaining balance stays outstanding until fully cleared.</p>
-                <form method="post">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                    <label class="info-label">Amount to Pay</label>
-                    <input type="number" name="amount" value="<?= $amountToPayNow ?>" step="0.01" min="0.01" style="width:100%; padding:10px; margin-bottom:15px;">
-                    <label class="info-label">M-Pesa Phone (optional)</label>
-                    <input type="text" name="mpesa_phone" value="<?= htmlspecialchars($patient['phone'] ?? '') ?>" placeholder="07XXXXXXXX" style="width:100%; padding:10px; margin-bottom:15px;">
-                    <label class="info-label">M-Pesa Receipt / Transaction Code</label>
-                    <input type="text" name="mpesa_receipt" placeholder="e.g. QK12ABC345" style="width:100%; padding:10px; margin-bottom:15px;">
-                    <small style="display:block; color:#6c757d; margin-top:-8px; margin-bottom:15px;">Phone and receipt are optional. Add them when available for reconciliation. STK Push is optional.</small>
-                    <label class="info-label">Payment Mode</label>
-                    <select name="method" style="width:100%; padding:10px; margin-bottom:15px;">
-                        <option value="Cash">Cash Payment</option>
-                        <option value="Mpesa">M-Pesa Mobile Money</option>
-                        <option value="Bank">Bank Payment</option>
-                        <option value="Wire Transfer">Wire Transfer</option>
-                    </select>
-                    <button type="submit" name="register_payment" style="width:100%; background:#2e7d32; color:white; border:none; height:45px; border-radius:5px; cursor:pointer; font-weight:bold;">Finalize Payment</button>
-                </form>
+                <h4><i class="fas fa-cash-register"></i> Payment Collection</h4>
+                <p style="color:#666; font-size:13px;">All patient payments are collected through the Central Cashier. Clinical and patient-facing screens only display the balance.</p>
+                <div style="padding:18px; background:#eef7ff; border-radius:8px; margin-top:18px;">
+                    <strong>Outstanding balance: KSH <?= number_format($amountToPayNow, 2) ?></strong>
+                    <p style="margin:8px 0 15px; color:#555;">The cashier can accept Cash, M-Pesa and other configured payment methods, including partial payments.</p>
+                    <a href="/hospital_system/cashier/index.php" class="btn btn-success">
+                        <i class="fas fa-cash-register"></i> Open Central Cashier
+                    </a>
+                </div>
             </div>
 
             <div>
