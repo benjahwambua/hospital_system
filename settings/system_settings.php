@@ -17,6 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($submittedSettings as $key => $value) {
                 $fullKey = $category . '_' . trim((string)$key);
                 $value = trim((string)$value);
+
+                // Do not erase existing Daraja secrets when a password field is left blank.
+                if ($category === 'mpesa' && in_array($key, ['passkey', 'consumer_secret'], true) && $value === '') {
+                    continue;
+                }
+
                 if ($key === '') {
                     continue;
                 }
@@ -103,6 +109,19 @@ $tabs = [
             'low_stock_threshold' => ['label' => 'Low Stock Alert Threshold', 'type' => 'number'],
             'expiry_alert_days' => ['label' => 'Expiry Alert Days', 'type' => 'number'],
             'default_markup' => ['label' => 'Default Markup (%)', 'type' => 'number', 'step' => '0.01'],
+        ]
+    ],
+    'mpesa' => [
+        'title' => 'M-Pesa / Daraja',
+        'icon' => 'fas fa-mobile-alt',
+        'fields' => [
+            'environment' => ['label' => 'Environment', 'type' => 'select', 'options' => ['sandbox' => 'Sandbox / Testing', 'live' => 'Live / Production']],
+            'shortcode' => ['label' => 'Business Shortcode', 'type' => 'text'],
+            'passkey' => ['label' => 'Daraja Passkey', 'type' => 'password'],
+            'consumer_key' => ['label' => 'Consumer Key', 'type' => 'text'],
+            'consumer_secret' => ['label' => 'Consumer Secret', 'type' => 'password'],
+            'callback_url' => ['label' => 'Callback URL', 'type' => 'url'],
+            'account_reference' => ['label' => 'Account Reference', 'type' => 'text'],
         ]
     ],
     'users' => [
