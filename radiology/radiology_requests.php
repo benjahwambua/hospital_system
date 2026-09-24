@@ -18,7 +18,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         if($svc){$svc->bind_param('s',$procedure);$svc->execute();$service=$svc->get_result()->fetch_assoc();$svc->close();
             if($service && $visit_id>0){
                 $ps=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
-                if($ps){$pid=(int)$enc['patient_id'];$price=(float)$service['price'];$sid=(int)$service['id'];$ps->bind_param('iisdi',$pid,$sid,$cat='radiology',$price,$visit_id);$ps->execute();$ps->close();
+                if($ps){$pid=(int)$enc['patient_id'];$price=(float)$service['price'];$sid=(int)$service['id'];$cat = 'radiology';
+                $ps->bind_param('iisdi',$pid,$sid,$cat,$price,$visit_id);$ps->execute();$ps->close();
                     $invoice=get_or_create_visit_invoice($conn,$pid,$visit_id); add_invoice_item($conn,$invoice,'Radiology: '.$procedure,1,$price,'radiology',$sid); post_invoice_journal($conn,$invoice,$pid,$price,'Radiology order');
                 }
             }
