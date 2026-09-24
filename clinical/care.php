@@ -1,0 +1,268 @@
+<?php
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
+require_login();
+
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrfToken = $_SESSION['csrf_token'];
+
+$patientId = (int)($_GET['patient_id'] ?? $_POST['patient_id'] ?? 0);
+$visitId = (int)($_GET['visit_id'] ?? $_POST['visit_id'] ?? 0);
+$message = '';
+
+if ($patientId <= 0) {
+    header('Location: consultations.php');
+    exit;
+}
+
+$stmt = $conn->prepare("SELECT p.*, u.full_name AS doctor_name, u.specialization
+                        FROM patients p
+                        LEFT JOIN users u ON u.id=p.doctor_id
+                        WHERE p.id=? LIMIT 1");
+$stmt->bind_param('i', $patientId);
+$stmt->execute();
+$patient = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$patient) {
+    header('Location: consultations.php');
+    exit;
+}
+
+if ($visitId > 0) {
+    $stmt = $conn->prepare("SELECT * FROM visits WHERE id=? AND patient_id=? LIMIT 1");
+    $stmt->bind_param('ii', $visitId, $patientId);
+    $stmt->execute();
+    $visit = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$visit) $visitId = 0;
+}
+
+if ($visitId <= 0) {
+    $visitId = get_or_create_current_visit($conn, $patientId, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
+    if ($visitId > 0) {
+        $stmt = $conn->prepare("SELECT * FROM visits WHERE id=? LIMIT 1");
+        $stmt->bind_param('i', $visitId);
+        $stmt->execute();
+        $visit = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+    } else {
+        $visit = null;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_clinical_care'])) {
+    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
+        $message = "<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
+    } else {
+        $fields = [
+            trim($_POST['presenting_complaint'] ?? ''),
+            trim($_POST['hpc'] ?? ''),
+            trim($_POST['medical_history'] ?? ''),
+            trim($_POST['surgical_history'] ?? ''),
+            trim($_POST['family_history'] ?? ''),
+            trim($_POST['drug_history'] ?? ''),
+            trim($_POST['allergies'] ?? ''),
+            trim($_POST['social_history'] ?? ''),
+            trim($_POST['review_systems'] ?? ''),
+            trim($_POST['physical_exam'] ?? ''),
+            trim($_POST['diagnosis'] ?? ''),
+            trim($_POST['differential_diagnosis'] ?? ''),
+            trim($_POST['investigations'] ?? ''),
+            trim($_POST['management_plan'] ?? ''),
+            trim($_POST['prescription_instructions'] ?? ''),
+            trim($_POST['doctor_notes'] ?? '')
+        ];
+
+        if ($visitId > 0 && ensure_encounter_visit_column($conn)) {
+            $sql = "INSERT INTO encounters
+                (patient_id, visit_id, presenting_complaint, hpc, medical_history, surgical_history,
+                 family_history, drug_history, allergies, social_history, review_systems, physical_exam,
+                 diagnosis, differential_diagnosis, investigations, management_plan,
+                 prescription_instructions, doctor_notes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+            $stmt = $conn->prepare($sql);
+            if ($stmt) {
+                $params = [$patientId, $visitId, ...$fields];
+                $stmt->bind_param('iissssssssssssssss', ...$params);
+            }
+        } else {
+            $sql = "INSERT INTO encounters
+                (patient_id, presenting_complaint, hpc, medical_history, surgical_history,
+                 family_history, drug_history, allergies, social_history, review_systems, physical_exam,
+                 diagnosis, differential_diagnosis, investigations, management_plan,
+                 prescription_instructions, doctor_notes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+            $stmt = $conn->prepare($sql);
+            if ($stmt) {
+                $params = [$patientId, ...$fields];
+                $stmt->bind_param('isssssssssssssssss', ...$params);
+            }
+        }
+
+        if (!$stmt) {
+            $message = "<div class='alert alert-danger'>Unable to prepare clinical record: " . htmlspecialchars($conn->error) . "</div>";
+        } elseif (!$stmt->execute()) {
+            $message = "<div class='alert alert-danger'>Unable to save clinical record: " . htmlspecialchars($stmt->error) . "</div>";
+            $stmt->close();
+        } else {
+            $stmt->close();
+            if ($visitId > 0) {
+                $doctorId = (int)($patient['doctor_id'] ?? 0);
+                $v = $conn->prepare("UPDATE visits SET status='In Progress', doctor_id=COALESCE(NULLIF(?,0),doctor_id), updated_at=NOW() WHERE id=?");
+                if ($v) {
+                    $v->bind_param('ii', $doctorId, $visitId);
+                    $v->execute();
+                    $v->close();
+                }
+            }
+            header("Location: care.php?patient_id={$patientId}&visit_id={$visitId}&saved=1");
+            exit;
+        }
+    }
+}
+
+$hasVisitVitals = false;
+$vitalColumns = $conn->query("SHOW COLUMNS FROM vitals");
+if ($vitalColumns) {
+    while ($col = $vitalColumns->fetch_assoc()) {
+        if (($col['Field'] ?? '') === 'visit_id') { $hasVisitVitals = true; break; }
+    }
+}
+
+$tempColumn = 'NULL';
+$tempCheck = $conn->query("SHOW COLUMNS FROM vitals");
+if ($tempCheck) {
+    while ($col = $tempCheck->fetch_assoc()) {
+        if (($col['Field'] ?? '') === 'temp') { $tempColumn = 'v.temp'; break; }
+        if (($col['Field'] ?? '') === 'temperature') $tempColumn = 'v.temperature';
+    }
+}
+
+if ($hasVisitVitals && $visitId > 0) {
+    $sql = "SELECT v.*, {$tempColumn} AS temp_value
+            FROM vitals v WHERE v.visit_id=? ORDER BY v.id DESC LIMIT 1";
+    $vstmt = $conn->prepare($sql);
+    $vstmt->bind_param('i', $visitId);
+    $vstmt->execute();
+    $vitals = $vstmt->get_result()->fetch_assoc();
+    $vstmt->close();
+} else {
+    $vstmt = $conn->prepare("SELECT *, {$tempColumn} AS temp_value FROM vitals WHERE patient_id=? ORDER BY id DESC LIMIT 1");
+    $vstmt->bind_param('i', $patientId);
+    $vstmt->execute();
+    $vitals = $vstmt->get_result()->fetch_assoc();
+    $vstmt->close();
+}
+
+$encounters = null;
+if (ensure_encounter_visit_column($conn) && $visitId > 0) {
+    $stmt = $conn->prepare("SELECT * FROM encounters WHERE patient_id=? AND visit_id=? ORDER BY id DESC");
+    $stmt->bind_param('ii', $patientId, $visitId);
+} else {
+    $stmt = $conn->prepare("SELECT * FROM encounters WHERE patient_id=? ORDER BY id DESC LIMIT 10");
+    $stmt->bind_param('i', $patientId);
+}
+$stmt->execute();
+$encounters = $stmt->get_result();
+$stmt->close();
+
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
+?>
+<div class="main-content">
+<div class="container-fluid pt-4">
+    <?php if (isset($_GET['saved'])): ?><div class="alert alert-success"><i class="fas fa-check-circle"></i> Clinical encounter saved successfully.</div><?php endif; ?>
+    <?= $message ?>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="font-weight-bold text-gray-800 mb-1">Clinical Care</h4>
+            <div class="text-muted">Doctor workspace · <?= htmlspecialchars($visit['visit_number'] ?? 'Visit not assigned') ?></div>
+        </div>
+        <a href="consultations.php" class="btn btn-outline-primary"><i class="fas fa-arrow-left"></i> Consultation Queue</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4"><strong>Patient:</strong><br><?= htmlspecialchars($patient['full_name']) ?><br><small><?= htmlspecialchars($patient['patient_number'] ?? '') ?> · <?= htmlspecialchars($patient['gender'] ?? '') ?> · <?= (int)($patient['age'] ?? 0) ?> yrs</small></div>
+                <div class="col-md-4"><strong>Visit:</strong><br><?= htmlspecialchars($visit['visit_number'] ?? 'N/A') ?><br><small><?= htmlspecialchars($visit['visit_type'] ?? 'Outpatient') ?> · <?= htmlspecialchars($visit['clinic_category'] ?? 'General') ?></small></div>
+                <div class="col-md-4"><strong>Vitals:</strong><br>
+                    BP <?= htmlspecialchars($vitals['bp'] ?? '') ?> · Temp <?= htmlspecialchars($vitals['temp_value'] ?? '') ?> · Pulse <?= htmlspecialchars($vitals['pulse'] ?? '') ?> · Weight <?= htmlspecialchars($vitals['weight'] ?? '') ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+        <input type="hidden" name="patient_id" value="<?= $patientId ?>">
+        <input type="hidden" name="visit_id" value="<?= $visitId ?>">
+
+        <?php
+        $sections = [
+            ['History', [
+                'presenting_complaint'=>'Presenting Complaint',
+                'hpc'=>'History of Presenting Complaint',
+                'medical_history'=>'Medical History',
+                'surgical_history'=>'Surgical History',
+                'family_history'=>'Family History',
+                'drug_history'=>'Drug History / Current Medication',
+                'allergies'=>'Allergies',
+                'social_history'=>'Social History',
+                'review_systems'=>'Review of Systems'
+            ]],
+            ['Examination & Assessment', [
+                'physical_exam'=>'Physical Examination',
+                'diagnosis'=>'Diagnosis',
+                'differential_diagnosis'=>'Differential Diagnosis',
+                'investigations'=>'Investigations / Tests Required'
+            ]],
+            ['Plan', [
+                'management_plan'=>'Treatment / Management Plan',
+                'prescription_instructions'=>'Prescription Instructions',
+                'doctor_notes'=>'Doctor Notes'
+            ]]
+        ];
+        foreach ($sections as $section):
+        ?>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white"><h5 class="mb-0 font-weight-bold text-primary"><?= htmlspecialchars($section[0]) ?></h5></div>
+            <div class="card-body">
+                <div class="row">
+                <?php foreach ($section[1] as $name=>$label): ?>
+                    <div class="col-md-<?= in_array($name, ['presenting_complaint','diagnosis','differential_diagnosis','investigations','management_plan']) ? '12' : '6' ?> mb-3">
+                        <label class="small font-weight-bold"><?= htmlspecialchars($label) ?></label>
+                        <textarea name="<?= htmlspecialchars($name) ?>" class="form-control" rows="<?= in_array($name, ['presenting_complaint','diagnosis','management_plan','physical_exam']) ? '3' : '2' ?>"></textarea>
+                    </div>
+                <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+
+        <div class="text-right mb-5">
+            <button type="submit" name="save_clinical_care" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Clinical Encounter</button>
+        </div>
+    </form>
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-white"><h5 class="mb-0 font-weight-bold">This Visit's Clinical History</h5></div>
+        <div class="card-body">
+            <?php if ($encounters && $encounters->num_rows > 0): while ($e=$encounters->fetch_assoc()): ?>
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="small text-muted"><?= htmlspecialchars($e['created_at'] ?? '') ?></div>
+                    <strong>Diagnosis:</strong> <?= nl2br(htmlspecialchars($e['diagnosis'] ?? 'Not recorded')) ?><br>
+                    <strong>Plan:</strong> <?= nl2br(htmlspecialchars($e['management_plan'] ?? 'Not recorded')) ?><br>
+                    <strong>Notes:</strong> <?= nl2br(htmlspecialchars($e['doctor_notes'] ?? '')) ?>
+                </div>
+            <?php endwhile; else: ?>
+                <div class="text-muted">No previous clinical record for this visit.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+</div>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
