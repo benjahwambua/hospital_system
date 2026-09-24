@@ -1,14 +1,29 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
-    $enc_id = intval($_POST['encounter_id']);
-    $procedure = $conn->real_escape_string($_POST['procedure']);
-    $stmt = $conn->prepare("INSERT INTO procedures (encounter_id, procedure_name, requested_by, requested_at) VALUES (?, ?, ?, NOW())");
-    $stmt->bind_param("isi", $enc_id, $procedure, $_SESSION['user_id']);
-    $stmt->execute(); $stmt->close();
+    $enc_id = intval($_POST['encounter_id'] ?? 0);
+    $procedure = trim($_POST['procedure'] ?? '');
+    $stmt = $conn->prepare("SELECT patient_id, visit_id FROM encounters WHERE id=? LIMIT 1");
+    $stmt->bind_param('i',$enc_id); $stmt->execute(); $enc=$stmt->get_result()->fetch_assoc(); $stmt->close();
+    if ($enc && $procedure !== '') {
+        $visit_id=(int)($enc['visit_id'] ?? 0);
+        if($visit_id<=0) $visit_id=get_or_create_current_visit($conn,(int)$enc['patient_id'],'Outpatient','Radiology');
+        $stmt=$conn->prepare("INSERT INTO procedures (encounter_id, procedure_name, requested_by, requested_at) VALUES (?, ?, ?, NOW())");
+        $uid=(int)($_SESSION['user_id']??0); $stmt->bind_param('isi',$enc_id,$procedure,$uid); $stmt->execute(); $stmt->close();
+        $svc=$conn->prepare("SELECT id,price FROM services_master WHERE service_name=? AND category='radiology' AND active=1 LIMIT 1");
+        if($svc){$svc->bind_param('s',$procedure);$svc->execute();$service=$svc->get_result()->fetch_assoc();$svc->close();
+            if($service && $visit_id>0){
+                $ps=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
+                if($ps){$pid=(int)$enc['patient_id'];$price=(float)$service['price'];$sid=(int)$service['id'];$ps->bind_param('iisdi',$pid,$sid,$cat='radiology',$price,$visit_id);$ps->execute();$ps->close();
+                    $invoice=get_or_create_visit_invoice($conn,$pid,$visit_id); add_invoice_item($conn,$invoice,'Radiology: '.$procedure,1,$price,'radiology',$sid); post_invoice_journal($conn,$invoice,$pid,$price,'Radiology order');
+                }
+            }
+        }
+    }
 }
 
 $encounters = $conn->query("SELECT e.id, p.full_name FROM encounters e JOIN patients p ON p.id=e.patient_id ORDER BY e.created_at DESC");
