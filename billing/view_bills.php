@@ -45,12 +45,13 @@ $query = "
     LEFT JOIN patients p ON i.patient_id = p.id
     LEFT JOIN walkin_customers w ON i.walkin_id = w.id
     LEFT JOIN (
-        -- Aggregate payments per patient to calculate balance
-        -- Adjust 'patient_id' to 'invoice_id' if your billing table links directly to invoices
-        SELECT patient_id, SUM(amount) as total_paid 
-        FROM billing 
-        GROUP BY patient_id
-    ) pay ON i.patient_id = pay.patient_id
+        -- Payments belong to invoices, not patients. Aggregating by patient
+        -- caused one patient's old payments to reduce another invoice.
+        SELECT invoice_id, SUM(amount) AS total_paid
+        FROM payments
+        WHERE invoice_id IS NOT NULL
+        GROUP BY invoice_id
+    ) pay ON i.id = pay.invoice_id
     WHERE $where_sql
     ORDER BY i.created_at DESC";
 
