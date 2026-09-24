@@ -367,11 +367,17 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
     }
 
     $stmt->bind_param($types, ...$values);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new Exception('Unable to save invoice item: ' . $error);
+    }
     $stmt->close();
 
     if ($total !== 0) {
-        $conn->query("UPDATE invoices SET total = COALESCE(total, 0) + $total WHERE id = $invoice_id");
+        if (!$conn->query("UPDATE invoices SET total = COALESCE(total, 0) + " . (float)$total . " WHERE id = " . (int)$invoice_id)) {
+            throw new Exception('Unable to update invoice total: ' . $conn->error);
+        }
     }
 }
 
