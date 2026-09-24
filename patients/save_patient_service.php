@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -10,8 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $price = floatval($_POST['price'] ?? 0);
 
     if ($patient_id && $service_id && $category && $price >= 0) {
-        $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at) VALUES (?,?,?,?,NOW())");
-        $stmt->bind_param("iisd", $patient_id, $service_id, $category, $price);
+        $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', $category);
+        if ($visitId > 0) {
+            $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at) VALUES (?,?,?,?,?,NOW())");
+            $stmt->bind_param("iisdi", $patient_id, $service_id, $category, $price, $visitId);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at) VALUES (?,?,?,?,NOW())");
+            $stmt->bind_param("iisd", $patient_id, $service_id, $category, $price);
+        }
 
         if ($stmt->execute()) {
             $stmt->close();
