@@ -180,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
             } else {
                 // Full registration creates a new patient record.
-                $patientNumber = 'P-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+                $patientNumber = 'TEMP-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
 
                 $stmt = $conn->prepare(
                     'INSERT INTO patients (patient_number, full_name, gender, phone, date_of_birth, address, age, next_of_kin_name, next_of_kin_phone, doctor_id, clinic_category, is_walkin, created_at)
