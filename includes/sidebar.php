@@ -220,6 +220,13 @@ function isParentActive($paths) {
         </a>
 
         <div class="menu-title">Hospital Core</div>
+        <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier', 'receptionist'], true)): ?>
+        <div class="menu-title">Front Desk</div>
+        <a href="/hospital_system/patients/reception_register.php" class="<?= isActive('reception_register.php') ?>">
+            <i class="fas fa-concierge-bell icon-main"></i> Reception Desk
+        </a>
+        <?php endif; ?>
+
 
         <div class="has-submenu <?= isParentActive(['triage.php', 'consultations.php', 'ward_management.php']) ?>">
             <a href="#" class="menu-toggle">
@@ -301,6 +308,7 @@ function isParentActive($paths) {
                     <i class="fas fa-chevron-down caret"></i>
                 </a>
                 <div class="submenu">
+                    <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register"></i> Central Cashier</a>
                     <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
                     <a href="/hospital_system/billing/create_invoice.php" class="<?= isActive('create_invoice.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Generate Invoice</a>
                     <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-receipt"></i> View Bills</a>
