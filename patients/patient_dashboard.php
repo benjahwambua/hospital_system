@@ -131,13 +131,14 @@ if ($patient_id <= 0) {
         $invoice_total = $qty * $unit_price;
 
         $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Pharmacy');
-        $stmt = $conn->prepare($visitId > 0
-            ? "INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, visit_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())"
-            : "INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $invoiceLink = 0;
-        if ($visitId > 0) {
+        $hasPrescriptionVisit = ensure_prescription_visit_column($conn);
+        if ($hasPrescriptionVisit && $visitId > 0) {
+            $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, visit_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+            $invoiceLink = 0;
             $stmt->bind_param("iiidiis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $visitId, $instructions);
         } else {
+            $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+            $invoiceLink = 0;
             $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
         }
         $stmt->execute();
@@ -145,7 +146,7 @@ if ($patient_id <= 0) {
         $stmt->close();
 
         if ($invoice_total > 0) {
-            $invoice_id = get_or_create_invoice($conn, $patient_id);
+            $invoice_id = get_or_create_visit_invoice($conn, $patient_id, $visitId);
             add_invoice_item(
                 $conn,
                 $invoice_id,
@@ -192,7 +193,7 @@ if ($patient_id <= 0) {
             $stmt->execute();
             $stmt->close();
 
-            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            $invoice_id=get_or_create_visit_invoice($conn,$patient_id,$visitId);
             add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
@@ -276,9 +277,17 @@ if ($patient_id <= 0) {
             $_POST['prescription_instructions'] ?? '', $_POST['doctor_notes'] ?? ''
         ];
         $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
-        $stmt=$conn->prepare("INSERT INTO encounters (patient_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
-        $stmt->bind_param("isssssssssssssssss", ...$params);
+        $hasEncounterVisit = ensure_encounter_visit_column($conn);
+        if ($hasEncounterVisit && $visitId > 0) {
+            $stmt=$conn->prepare("INSERT INTO encounters (patient_id,visit_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
+            $paramsWithVisit = [$patient_id, $visitId, ...array_slice($params, 1)];
+            $stmt->bind_param("iissssssssssssssss", ...$paramsWithVisit);
+        } else {
+            $stmt=$conn->prepare("INSERT INTO encounters (patient_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
+            $stmt->bind_param("isssssssssssssssss", ...$params);
+        }
         if(!$stmt->execute()){ $error=$stmt->error; $stmt->close(); throw new Exception('Unable to save clinical record: '.$error); }
         $stmt->close();
 
@@ -297,162 +306,12 @@ if ($patient_id <= 0) {
         exit;
     }
 
-    // Unified payment handler
+    // Patient-facing pages no longer collect money. All payments are processed
+    // through the Central Cashier to keep financial control in one place.
     if(isset($_POST['register_payment'])){
-        $amount=round((float)($_POST['amount'] ?? 0),2);
-        $method=trim((string)($_POST['method'] ?? 'Cash'));
-        $phone=trim((string)($_POST['mpesa_phone'] ?? ''));
-        if($amount<=0) throw new Exception('Payment amount must be greater than zero.');
-
-        // Ensure the standard KES 200 consultation charge exists for registered
-        // patients before calculating what can be paid. Walk-ins remain exempt.
-        $invoice_id=ensure_registered_consultation_charge($conn,$patient_id,200.00);
-        $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
-        if(!$invoice) throw new Exception('Unable to load patient invoice.');
-
-        $invoiceTotal=(float)($invoice['total'] ?? 0);
-        $paid=max((float)($invoice['paid_amount'] ?? 0),(float)($invoice['amount_paid'] ?? 0));
-
-        // An empty/settled legacy invoice cannot receive a payment. Start a
-        // fresh invoice and populate it from today's actual billable records.
-        if($invoiceTotal <= $paid){
-            $invoice_id=create_invoice($conn,$patient_id);
-            $invoiceTotal=0.0;
-            $paid=0.0;
-        }
-
-        // First determine whether this invoice already has items.
-        $itemCount=0;
-        $itemCountRes=$conn->query("SELECT COUNT(*) AS c FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
-        if($itemCountRes) $itemCount=(int)($itemCountRes->fetch_assoc()['c'] ?? 0);
-
-        // If it is a new/empty invoice, synchronize today's services.
-        if($itemCount===0){
-            $svcRes=$conn->query("SELECT ps.id, sm.service_name, ps.price
-                FROM patient_services ps
-                INNER JOIN services_master sm ON sm.id=ps.service_id
-                WHERE ps.patient_id=".(int)$patient_id."
-                  AND ps.status <> 'Cancelled'
-                  AND DATE(ps.created_at)=CURDATE()
-                  AND COALESCE(ps.price,0)>0
-                ORDER BY ps.id ASC");
-            if($svcRes){
-                while($svc=$svcRes->fetch_assoc()){
-                    add_invoice_item(
-                        $conn,$invoice_id,'Service: '.$svc['service_name'],
-                        1,(float)$svc['price'],'service',(int)$svc['id']
-                    );
-                }
-            }
-
-            // Prescriptions are only added when they are not already linked.
-            $rxRes=$conn->query("SELECT p.id, COALESCE(s.drug_name,'Prescription') AS drug_name,
-                p.quantity, COALESCE(p.unit_price,s.selling_price,0) AS unit_price,
-                p.medicine_id
-                FROM prescriptions p
-                LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id
-                WHERE p.patient_id=".(int)$patient_id."
-                  AND DATE(p.created_at)=CURDATE()
-                  AND (p.invoice_id IS NULL OR p.invoice_id=0)
-                  AND p.quantity>0
-                  AND COALESCE(p.unit_price,s.selling_price,0)>0");
-            if($rxRes){
-                while($rx=$rxRes->fetch_assoc()){
-                    $qty=(int)$rx['quantity'];
-                    $unitPrice=(float)$rx['unit_price'];
-                    add_invoice_item(
-                        $conn,$invoice_id,'Medication: '.$rx['drug_name'],
-                        $qty,$unitPrice,'pharmacy',(int)($rx['medicine_id'] ?? 0)
-                    );
-                    $rxUpdate=$conn->prepare("UPDATE prescriptions SET invoice_id=? WHERE id=?");
-                    if($rxUpdate){
-                        $rxUpdate->bind_param('ii',$invoice_id,$rx['id']);
-                        $rxUpdate->execute();
-                        $rxUpdate->close();
-                    }
-                }
-            }
-        }
-
-        // Re-read authoritative invoice values after item synchronization.
-        $invoice=$conn->query("SELECT * FROM invoices WHERE id=".(int)$invoice_id)->fetch_assoc();
-        $invoiceTotal=(float)($invoice['total'] ?? 0);
-        $paid=max((float)($invoice['paid_amount'] ?? 0),(float)($invoice['amount_paid'] ?? 0));
-
-        if($invoiceTotal<=0){
-            $itemRes=$conn->query("SELECT COALESCE(SUM(total),0) AS total
-                FROM invoice_items WHERE invoice_id=".(int)$invoice_id);
-            $itemTotal=$itemRes?(float)($itemRes->fetch_assoc()['total'] ?? 0):0.0;
-            if($itemTotal>0){
-                update_invoice_total($conn,$invoice_id,$itemTotal);
-                $invoiceTotal=$itemTotal;
-            }
-        }
-
-        $balance=max($invoiceTotal-$paid,0);
-        $amount=min($amount,$balance);
-        if($amount<=0){
-            throw new Exception(
-                'No outstanding balance exists for the current invoice. Invoice total: KSH ' .
-                number_format($invoiceTotal,2) . ', paid: KSH ' .
-                number_format($paid,2) . '.'
-            );
-        }
-
-        if(strtolower($method)==='mpesa'){
-            // Manual M-Pesa recording is the normal workflow. STK Push is optional.
-            $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? '')));
-            // Receipt and phone are optional for manual M-Pesa record keeping.
-            $conn->begin_transaction();
-            try {
-                $payment = record_payment($conn, $invoice_id, $amount, 'Mpesa', $receipt);
-                record_manual_mpesa_transaction(
-                    $conn,
-                    $invoice_id,
-                    $patient_id,
-                    $payment['amount'],
-                    $phone,
-                    $receipt,
-                    'Manually recorded M-Pesa payment'
-                );
-                post_payment_journal($conn, $invoice_id, $payment['amount'], 'Mpesa');
-                $conn->commit();
-                header("Location: patient_dashboard.php?id=".$patient_id."&tab=billing&payment_success=1");
-                exit;
-            } catch (Throwable $e) {
-                $conn->rollback();
-                throw $e;
-            }
-        }
-
-        $conn->begin_transaction();
-        try{
-            $payment=record_payment($conn,$invoice_id,$amount,$method,null);
-            post_payment_journal($conn,$invoice_id,$payment['amount'],$method);
-            $conn->commit();
-            header("Location: billing/view_invoice.php?id=".$invoice_id."&paid=1");
-            exit;
-        }catch(Throwable $e){
-            $conn->rollback();
-            throw $e;
-        }
+        header("Location: /hospital_system/cashier/index.php");
+        exit;
     }
-
-// 3. DATA AGGREGATION (Queries for Display)
-// ==============================================================================
-if ($patient_id > 0) {
-    $vitals = $conn->query("SELECT * FROM vitals WHERE patient_id=$patient_id ORDER BY created_at DESC");
-    $latestVital = null;
-    if ($vitals && $vitals->num_rows > 0) {
-        $latestVital = $vitals->fetch_assoc();
-        $vitals->data_seek(0);
-    }
-    $encounter = $conn->query("SELECT * FROM encounters WHERE patient_id=$patient_id ORDER BY created_at DESC LIMIT 1")->fetch_assoc();
-    $prescriptions = $conn->query("SELECT p.*, s.drug_name, COALESCE(p.unit_price,s.selling_price) AS unit_price FROM prescriptions p LEFT JOIN pharmacy_stock s ON s.id=p.medicine_id WHERE p.patient_id=$patient_id ORDER BY p.created_at DESC");
-    $patient_services = $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id=ps.service_id WHERE ps.patient_id=$patient_id ORDER BY ps.created_at DESC");
-    $billing = $conn->query("SELECT * FROM billing WHERE patient_id=$patient_id ORDER BY created_at DESC");
-    $all_services = $conn->query("SELECT * FROM services_master ORDER BY category, service_name");
-    $stock = $conn->query("SELECT id, drug_name, selling_price, quantity FROM pharmacy_stock WHERE quantity > 0 ORDER BY drug_name");
 
     // NEW: Clinical History & Invoice Queries
     $clinical_history = $conn->query("SELECT * FROM encounters WHERE patient_id=$patient_id ORDER BY created_at DESC");
