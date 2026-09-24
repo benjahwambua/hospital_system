@@ -52,6 +52,47 @@ if ($visitId <= 0) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_visit'])) {
+    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
+        $message = "<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
+    } elseif ($visitId <= 0) {
+        $message = "<div class='alert alert-danger'>No valid visit was selected.</div>";
+    } else {
+        $pendingLab = 0;
+        $pendingRad = 0;
+        $pendingPharmacy = 0;
+
+        $q = $conn->prepare("SELECT COUNT(*) AS total FROM patient_services WHERE patient_id=? AND visit_id=? AND category='lab' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
+        if ($q) { $q->bind_param('ii',$patientId,$visitId); $q->execute(); $pendingLab=(int)($q->get_result()->fetch_assoc()['total']??0); $q->close(); }
+
+        $q = $conn->prepare("SELECT COUNT(*) AS total FROM patient_services WHERE patient_id=? AND visit_id=? AND category='radiology' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
+        if ($q) { $q->bind_param('ii',$patientId,$visitId); $q->execute(); $pendingRad=(int)($q->get_result()->fetch_assoc()['total']??0); $q->close(); }
+
+        $queueCheck = $conn->query("SHOW TABLES LIKE 'pharmacy_queue'");
+        if ($queueCheck && $queueCheck->num_rows > 0) {
+            $q = $conn->prepare("SELECT COUNT(*) AS total FROM pharmacy_queue WHERE patient_id=? AND visit_id=? AND status='pending'");
+            if ($q) { $q->bind_param('ii',$patientId,$visitId); $q->execute(); $pendingPharmacy=(int)($q->get_result()->fetch_assoc()['total']??0); $q->close(); }
+        }
+
+        $pendingTotal = $pendingLab + $pendingRad + $pendingPharmacy;
+        if ($pendingTotal > 0) {
+            $parts = [];
+            if ($pendingLab) $parts[] = $pendingLab . ' laboratory order(s)';
+            if ($pendingRad) $parts[] = $pendingRad . ' radiology order(s)';
+            if ($pendingPharmacy) $parts[] = $pendingPharmacy . ' pharmacy order(s)';
+            $message = "<div class='alert alert-warning'><strong>Visit cannot be completed yet.</strong> Pending: " . htmlspecialchars(implode(', ', $parts)) . ". Complete the outstanding department work first.</div>";
+        } else {
+            $stmt = $conn->prepare("UPDATE visits SET status='Completed', updated_at=NOW() WHERE id=? AND patient_id=? AND status <> 'Cancelled'");
+            if ($stmt && $stmt->bind_param('ii',$visitId,$patientId) && $stmt->execute()) {
+                $message = "<div class='alert alert-success'><i class='fas fa-check-circle'></i> Visit completed successfully. All department orders are closed.</div>";
+            } else {
+                $message = "<div class='alert alert-danger'>Unable to complete the visit.</div>";
+            }
+            if ($stmt) $stmt->close();
+        }
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_clinical_care'])) {
     if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
         $message = "<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
@@ -247,6 +288,42 @@ include __DIR__ . '/../includes/sidebar.php';
             <button type="submit" name="save_clinical_care" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Clinical Encounter</button>
         </div>
     </form>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white"><h5 class="mb-0 font-weight-bold text-primary">Visit Completion</h5></div>
+        <div class="card-body">
+            <?php
+            $pendingLabNow=0; $pendingRadNow=0; $pendingPharmacyNow=0;
+            if($visitId>0){
+                $q=$conn->prepare("SELECT COUNT(*) total FROM patient_services WHERE patient_id=? AND visit_id=? AND category='lab' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
+                if($q){$q->bind_param('ii',$patientId,$visitId);$q->execute();$pendingLabNow=(int)($q->get_result()->fetch_assoc()['total']??0);$q->close();}
+                $q=$conn->prepare("SELECT COUNT(*) total FROM patient_services WHERE patient_id=? AND visit_id=? AND category='radiology' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
+                if($q){$q->bind_param('ii',$patientId,$visitId);$q->execute();$pendingRadNow=(int)($q->get_result()->fetch_assoc()['total']??0);$q->close();}
+                $qc=$conn->query("SHOW TABLES LIKE 'pharmacy_queue'");
+                if($qc && $qc->num_rows){$q=$conn->prepare("SELECT COUNT(*) total FROM pharmacy_queue WHERE patient_id=? AND visit_id=? AND status='pending'");if($q){$q->bind_param('ii',$patientId,$visitId);$q->execute();$pendingPharmacyNow=(int)($q->get_result()->fetch_assoc()['total']??0);$q->close();}}
+            }
+            $canComplete=($pendingLabNow+$pendingRadNow+$pendingPharmacyNow)===0;
+            ?>
+            <div class="row">
+                <div class="col-md-4"><strong>Lab:</strong> <?= $pendingLabNow ? $pendingLabNow.' pending' : 'Complete' ?></div>
+                <div class="col-md-4"><strong>Radiology:</strong> <?= $pendingRadNow ? $pendingRadNow.' pending' : 'Complete' ?></div>
+                <div class="col-md-4"><strong>Pharmacy:</strong> <?= $pendingPharmacyNow ? $pendingPharmacyNow.' pending' : 'Complete' ?></div>
+            </div>
+            <hr>
+            <?php if (($visit['status'] ?? '') === 'Completed'): ?>
+                <div class="alert alert-success mb-0">This visit is completed.</div>
+            <?php elseif ($canComplete): ?>
+                <form method="post" class="mb-0" onsubmit="return confirm('Complete this visit? This will close the current visit.');">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="patient_id" value="<?= $patientId ?>">
+                    <input type="hidden" name="visit_id" value="<?= $visitId ?>">
+                    <button type="submit" name="complete_visit" class="btn btn-success"><i class="fas fa-check-circle"></i> Complete Visit</button>
+                </form>
+            <?php else: ?>
+                <div class="text-muted"><i class="fas fa-lock"></i> Complete the pending department orders before closing this visit.</div>
+            <?php endif; ?>
+        </div>
+    </div>
 
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-white"><h5 class="mb-0 font-weight-bold text-primary">Department Results — This Visit</h5></div>
