@@ -67,7 +67,7 @@ function get_invoice_number_column($conn) {
     return null;
 }
 
-function create_invoice($conn, $patient_id = null, $encounter_id = null, $walkin_id = null, $status = 'unpaid', $payment_mode = null, $paid_amount = 0.0, $invoice_number = null) {
+function create_invoice($conn, $patient_id = null, $encounter_id = null, $walkin_id = null, $status = 'unpaid', $payment_mode = null, $paid_amount = 0.0, $invoice_number = null, $visit_id = null) {
     $columns = [];
     $placeholders = [];
     $types = '';
@@ -84,6 +84,12 @@ function create_invoice($conn, $patient_id = null, $encounter_id = null, $walkin
         $placeholders[] = '?';
         $types .= 'i';
         $values[] = $encounter_id;
+    }
+    if ($visit_id !== null && invoice_column_exists($conn, 'visit_id')) {
+        $columns[] = 'visit_id';
+        $placeholders[] = '?';
+        $types .= 'i';
+        $values[] = $visit_id;
     }
     if ($walkin_id !== null && invoice_column_exists($conn, 'walkin_id')) {
         $columns[] = 'walkin_id';
@@ -151,10 +157,30 @@ function create_invoice($conn, $patient_id = null, $encounter_id = null, $walkin
     return $invoice_id;
 }
 
-function get_or_create_invoice($conn, $patient_id, $encounter_id = null) {
-    // Do not rely on invoices.status alone. Older records in this database
-    // contain status='paid' while paid_amount/amount_paid are still zero.
-    // The actual outstanding balance is total - paid_amount.
+function get_or_create_invoice($conn, $patient_id, $encounter_id = null, $visit_id = null) {
+    // Prefer an outstanding invoice belonging to this specific visit.
+    // Legacy invoices without visit_id remain available through the patient-wide fallback.
+    if ($visit_id !== null && (int)$visit_id > 0 && invoice_column_exists($conn, 'visit_id')) {
+        $q = $conn->prepare("
+            SELECT id
+            FROM invoices
+            WHERE patient_id = ?
+              AND visit_id = ?
+              AND COALESCE(total, 0) > GREATEST(COALESCE(paid_amount, 0), COALESCE(amount_paid, 0))
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        if ($q) {
+            $pid=(int)$patient_id; $vid=(int)$visit_id;
+            $q->bind_param('ii',$pid,$vid);
+            $q->execute();
+            $res=$q->get_result()->fetch_assoc();
+            $q->close();
+            if ($res) return (int)$res['id'];
+        }
+        return create_invoice($conn, $patient_id, $encounter_id, null, 'unpaid', null, 0.0, null, (int)$visit_id);
+    }
+
     $q = $conn->prepare("
         SELECT id
         FROM invoices
@@ -166,17 +192,36 @@ function get_or_create_invoice($conn, $patient_id, $encounter_id = null) {
     if (!$q) {
         throw new Exception('Unable to find open invoice: ' . $conn->error);
     }
-
     $q->bind_param("i", $patient_id);
     $q->execute();
     $res = $q->get_result()->fetch_assoc();
     $q->close();
 
-    if ($res) {
-        return (int)$res['id'];
+    if ($res) return (int)$res['id'];
+    return create_invoice($conn, $patient_id, $encounter_id);
+}
+
+function get_or_create_visit_invoice($conn, int $patient_id, int $visit_id = 0, ?int $encounter_id = null): int {
+    if ($patient_id <= 0) throw new Exception('Invalid patient for invoice.');
+
+    if ($visit_id <= 0) {
+        $visit_id = get_or_create_current_visit($conn, $patient_id);
     }
 
-    return create_invoice($conn, $patient_id, $encounter_id);
+    return $visit_id > 0
+        ? get_or_create_invoice($conn, $patient_id, $encounter_id, $visit_id)
+        : get_or_create_invoice($conn, $patient_id, $encounter_id);
+}
+
+function ensure_encounter_visit_column($conn): bool {
+    $check = $conn->query("SHOW COLUMNS FROM encounters LIKE 'visit_id'");
+    if ($check && $check->num_rows > 0) return true;
+    return false;
+}
+
+function ensure_prescription_visit_column($conn): bool {
+    $check = $conn->query("SHOW COLUMNS FROM prescriptions LIKE 'visit_id'");
+    return $check && $check->num_rows > 0;
 }
 
 function invoice_is_walkin(array $invoice): bool {
