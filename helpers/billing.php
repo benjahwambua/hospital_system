@@ -104,14 +104,28 @@ function create_invoice($conn, $patient_id = null, $encounter_id = null, $walkin
 }
 
 function get_or_create_invoice($conn, $patient_id, $encounter_id = null) {
-    $q = $conn->prepare("SELECT id FROM invoices WHERE patient_id = ? AND status = 'unpaid' ORDER BY id DESC LIMIT 1");
+    // Do not rely on invoices.status alone. Older records in this database
+    // contain status='paid' while paid_amount/amount_paid are still zero.
+    // The actual outstanding balance is total - paid_amount.
+    $q = $conn->prepare("
+        SELECT id
+        FROM invoices
+        WHERE patient_id = ?
+          AND COALESCE(total, 0) > COALESCE(paid_amount, 0)
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+    if (!$q) {
+        throw new Exception('Unable to find open invoice: ' . $conn->error);
+    }
+
     $q->bind_param("i", $patient_id);
     $q->execute();
     $res = $q->get_result()->fetch_assoc();
     $q->close();
 
     if ($res) {
-        return $res['id'];
+        return (int)$res['id'];
     }
 
     return create_invoice($conn, $patient_id, $encounter_id);
