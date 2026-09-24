@@ -290,7 +290,12 @@ function record_invoice_payment($conn, $invoice_id, $amount, $payment_mode = nul
 
 function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $item_type = null, $med_id = null) {
     $total = $qty * $unit_price;
-    $columns = ['invoice_id', 'description', 'qty', 'unit_price', 'total'];
+    // HMS has used both (qty, unit_price) and (quantity, price)
+    // across older invoice code. Detect the live schema before inserting.
+    $qtyColumn = invoice_item_column_exists($conn, 'qty') ? 'qty' : 'quantity';
+    $priceColumn = invoice_item_column_exists($conn, 'unit_price') ? 'unit_price' : 'price';
+
+    $columns = ['invoice_id', 'description', $qtyColumn, $priceColumn, 'total'];
     $placeholders = ['?', '?', '?', '?', '?'];
     $types = 'isidd';
     $values = [$invoice_id, $description, $qty, $unit_price, $total];
