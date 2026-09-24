@@ -40,8 +40,14 @@ $query = "
            p.full_name as patient_name, 
            p.is_walkin,
            w.full_name as walkin_name,
+           COALESCE(items.items_total, i.total, 0) as total,
            COALESCE(pay.total_paid, 0) as amount_paid
     FROM invoices i
+    LEFT JOIN (
+        SELECT invoice_id, SUM(total) AS items_total
+        FROM invoice_items
+        GROUP BY invoice_id
+    ) items ON i.id = items.invoice_id
     LEFT JOIN patients p ON i.patient_id = p.id
     LEFT JOIN walkin_customers w ON i.walkin_id = w.id
     LEFT JOIN (
