@@ -6,6 +6,8 @@ require_login();
 require_role(['admin','receptionist','nurse']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    $patient_id
     $patient_id = intval($_POST['patient_id']);
     $doctor_id = intval($_POST['doctor_id']);
     $date = $_POST['appointment_date'];
@@ -29,6 +31,7 @@ include __DIR__ . '/../includes/sidebar.php';
   <div class="page-title">Check-in / New Appointment</div>
   <div class="card" style="max-width:700px;">
     <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
       <label>Patient</label><select name="patient_id" class="form-control"><?php while($p=$patients->fetch_assoc()): ?><option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['full_name']) ?></option><?php endwhile; ?></select>
       <label>Doctor</label><select name="doctor_id" class="form-control"><?php while($d=$doctors->fetch_assoc()): ?><option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['full_name']) ?></option><?php endwhile; ?></select>
       <label>Date</label><input type="date" name="appointment_date" class="form-control" required>
