@@ -61,7 +61,7 @@ try{
         $paymentAmount = $amount>0 ? min($amount,$remaining) : $remaining;
         $payment=record_payment($conn,$id,$paymentAmount,'Mpesa',$receipt,(int)$shift['id']);
         record_manual_mpesa_transaction($conn,$id,(int)($invoice['patient_id'] ?? 0),$payment['amount'],$phone,$receipt,'Manually recorded M-Pesa payment');
-        post_payment_journal($conn,$id,$payment['amount'],'Mpesa');
+        post_payment_journal($conn,$id,$payment['amount'],'Mpesa',$payment['payment_id']);
         $conn->commit();
         if (($_POST['return_to'] ?? '') === 'cashier') {
             header("Location: /hospital_system/cashier/index.php?success=1");
@@ -73,7 +73,7 @@ try{
 
     if($mark_paid && $remaining>0){
         $payment=record_payment($conn,$id,$remaining,$mode,null,(int)$shift['id']);
-        post_payment_journal($conn,$id,$payment['amount'],$mode);
+        post_payment_journal($conn,$id,$payment['amount'],$mode,$payment['payment_id']);
     }elseif($amount>0 && $remaining>0){
         $payment=record_payment($conn,$id,min($amount,$remaining),$mode,null,(int)$shift['id']);
         post_payment_journal($conn,$id,$payment['amount'],$mode);
