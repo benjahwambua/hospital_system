@@ -4,10 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../config/mpesa.php';
 require_login();
 
-if (!isset($_SESSION['is_super']) || (int)$_SESSION['is_super'] !== 1) {
-    http_response_code(403);
-    exit('Access denied.');
-}
+require_role(['admin','cashier']);
 
 $mpesa_message = '';
 $mpesa_error = '';
@@ -32,9 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
         $stmt->close();
         if (!$invoice) throw new Exception('Invoice not found.');
 
-        $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE invoice_id=?");
+        $paidStmt = $conn->prepare("SELECT COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=?),0)-COALESCE((SELECT SUM(amount) FROM payment_refunds WHERE invoice_id=? AND status='Approved'),0) AS paid");
         if (!$paidStmt) throw new Exception('Unable to calculate invoice balance.');
-        $paidStmt->bind_param('i', $invoiceId);
+        $paidStmt->bind_param('ii', $invoiceId, $invoiceId);
         $paidStmt->execute();
         $paid = (float)($paidStmt->get_result()->fetch_assoc()['paid'] ?? 0);
         $paidStmt->close();
