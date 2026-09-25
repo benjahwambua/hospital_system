@@ -35,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pulse = trim($_POST['pulse'] ?? '');
         $complaints = trim($_POST['complaints'] ?? '');
         $clinic = trim($_POST['clinic_category'] ?? 'General');
+        $priority = trim($_POST['priority'] ?? 'Routine');
+        if (!in_array($priority, ['Routine','Urgent','Emergency'], true)) $priority = 'Routine';
 
         if ($patientId <= 0 || $postedVisitId <= 0) {
             $message = "<div class='alert alert-danger'>Select a patient from the active Triage Queue.</div>";
@@ -80,9 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$stmt || !$stmt->execute()) throw new Exception($stmt ? $stmt->error : $conn->error);
                     if ($stmt) $stmt->close();
 
-                    $v = $conn->prepare("UPDATE visits SET clinic_category=?, status='Open', updated_at=NOW() WHERE id=? AND patient_id=?");
+                    $v = $conn->prepare("UPDATE visits SET clinic_category=?, triage_priority=?, status='Open', updated_at=NOW() WHERE id=? AND patient_id=?");
                     if ($v) {
-                        $v->bind_param('sii', $clinic, $visitId, $patientId);
+                        $v->bind_param('ssii', $clinic, $priority, $visitId, $patientId);
                         $v->execute();
                         $v->close();
                     }
@@ -103,14 +105,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $waiting = [];
 $waitingSql = "SELECT v.id AS visit_id, v.visit_number, v.visit_time, v.visit_type,
                       v.clinic_category, p.id AS patient_id, p.full_name,
-                      p.patient_number, p.gender, p.age, p.phone
+                      p.patient_number, p.gender, p.age, p.phone,
+                      TIMESTAMPDIFF(MINUTE, TIMESTAMP(v.visit_date, v.visit_time), NOW()) AS waiting_minutes,
+                      COALESCE(v.triage_priority, 'Routine') AS triage_priority
                FROM visits v
                INNER JOIN patients p ON p.id=v.patient_id
                WHERE v.visit_date=CURDATE()
                  AND v.status IN ('Open','In Progress')
                  AND v.visit_type <> 'Walk-in'
                  AND NOT EXISTS (SELECT 1 FROM vitals vt WHERE vt.visit_id=v.id)
-               ORDER BY v.visit_time ASC, v.id ASC";
+               ORDER BY FIELD(COALESCE(v.triage_priority,'Routine'),'Emergency','Urgent','Routine'), v.visit_time ASC, v.id ASC";
 $waitingResult = $conn->query($waitingSql);
 if ($waitingResult) {
     while ($row = $waitingResult->fetch_assoc()) $waiting[] = $row;
@@ -142,6 +146,8 @@ include __DIR__ . '/../includes/sidebar.php';
 .vital-box{background:#f8fafc;border:1px solid #e9ecef;border-radius:12px;padding:16px}
 .vital-box label{font-size:12px;font-weight:700;color:#6c757d;text-transform:uppercase}
 .vital-box input{font-size:18px;font-weight:600}
+.priority-routine{background:#e9f7ef;color:#146c43}.priority-urgent{background:#fff3cd;color:#856404}.priority-emergency{background:#f8d7da;color:#842029}
+.waiting-emergency{border-left:4px solid #dc3545!important}.waiting-urgent{border-left:4px solid #ffc107!important}
 .section-label{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6c757d}
 </style>
 
@@ -192,13 +198,14 @@ include __DIR__ . '/../includes/sidebar.php';
                     <?php if ($waiting): ?>
                         <?php foreach ($waiting as $row): ?>
                             <a href="?patient_id=<?= (int)$row['patient_id'] ?>&visit_id=<?= (int)$row['visit_id'] ?>" class="text-decoration-none text-dark">
-                                <div class="patient-row <?= $selected && (int)$selected['visit_id']===(int)$row['visit_id'] ? 'active' : '' ?>">
+                                <div class="patient-row <?= strtolower($row['triage_priority']) === 'emergency' ? 'waiting-emergency' : (strtolower($row['triage_priority']) === 'urgent' ? 'waiting-urgent' : '') ?> <?= $selected && (int)$selected['visit_id']===(int)$row['visit_id'] ? 'active' : '' ?>">
                                     <div class="d-flex align-items-center">
                                         <div class="patient-avatar mr-3"><?= htmlspecialchars(strtoupper(substr($row['full_name'],0,1))) ?></div>
                                         <div class="flex-grow-1">
                                             <div class="font-weight-bold"><?= htmlspecialchars($row['full_name']) ?></div>
                                             <div class="small text-muted"><?= htmlspecialchars($row['patient_number']) ?> · <?= htmlspecialchars($row['visit_number']) ?></div>
                                             <div class="small text-muted"><?= htmlspecialchars($row['clinic_category'] ?? 'General') ?> · <?= htmlspecialchars($row['visit_time']) ?></div>
+                                            <div class="small mt-1"><span class="badge priority-<?= strtolower($row['triage_priority']) ?>"><?= htmlspecialchars($row['triage_priority']) ?></span> <span class="text-muted ml-1"><?= max(0,(int)$row['waiting_minutes']) ?> min waiting</span></div>
                                         </div>
                                         <i class="fas fa-chevron-right text-muted"></i>
                                     </div>
@@ -227,6 +234,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                 <div class="small text-muted"><?= htmlspecialchars($selected['patient_number']) ?> · <?= htmlspecialchars($selected['gender'] ?? '') ?> · <?= htmlspecialchars($selected['age'] ?? '') ?> yrs · Visit <?= htmlspecialchars($selected['visit_number']) ?></div>
                             </div>
                             <span class="badge badge-warning px-3 py-2">Waiting for Triage</span>
+                            <div class="small text-muted mt-2">Waiting <?= $selected ? max(0,(int)$selected['waiting_minutes']) : 0 ?> min</div>
                         </div>
                     <?php else: ?>
                         <h5 class="font-weight-bold mb-1">Record Triage</h5>
@@ -240,6 +248,13 @@ include __DIR__ . '/../includes/sidebar.php';
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                         <input type="hidden" name="patient_id" value="<?= (int)$selected['patient_id'] ?>">
                         <input type="hidden" name="visit_id" value="<?= (int)$selected['visit_id'] ?>">
+
+                        <div class="section-label mb-3">Triage Priority</div>
+                        <div class="row mb-3"><div class="col-md-8"><div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
+                            <label class="btn btn-outline-success flex-fill active"><input type="radio" name="priority" value="Routine" autocomplete="off" checked> Routine</label>
+                            <label class="btn btn-outline-warning flex-fill"><input type="radio" name="priority" value="Urgent" autocomplete="off"> Urgent</label>
+                            <label class="btn btn-outline-danger flex-fill"><input type="radio" name="priority" value="Emergency" autocomplete="off"> Emergency</label>
+                        </div><small class="text-muted">Use Emergency for patients needing immediate attention.</small></div></div>
 
                         <div class="section-label mb-3">Vital Signs</div>
                         <div class="row">
