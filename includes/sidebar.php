@@ -217,7 +217,7 @@ function isParentActive($paths) {
         </a>
         <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier', 'receptionist'], true)): ?>
         <div class="menu-title">Front Desk</div>
-        <div class="has-submenu <?= isParentActive(['reception/index.php', 'reception_register.php', 'patient_list.php', 'queue/index.php', 'appointments.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['reception/index.php', 'reception_register.php', 'patient_list.php', 'appointments.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-concierge-bell icon-main"></i> Reception
                 <i class="fas fa-chevron-down caret"></i>
@@ -225,25 +225,22 @@ function isParentActive($paths) {
             <div class="submenu">
                 <a href="/hospital_system/reception/index.php" class="<?= isActive('reception/index.php') ?>"><i class="fas fa-desktop"></i> Reception Desk</a>
                 <a href="/hospital_system/patients/reception_register.php" class="<?= isActive('reception_register.php') ?>"><i class="fas fa-user-plus"></i> Register Patient</a>
-                <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient Search</a>
-                <a href="/hospital_system/queue/index.php" class="<?= isActive('queue/index.php') ?>"><i class="fas fa-list-ol"></i> Patient Queue</a>
+                <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient List</a>
                 <a href="/hospital_system/patients/appointments.php" class="<?= isActive('appointments.php') ?>"><i class="fas fa-calendar-check"></i> Appointments</a>
             </div>
         </div>
         <?php endif; ?>
 
 
-        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'triage.php', 'consultations.php', 'care.php', 'orders.php', 'ward_management.php', 'admit_patient.php', 'discharge_patient.php', 'diagnostics.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'care.php', 'orders.php', 'ward_management.php', 'admit_patient.php', 'discharge_patient.php', 'diagnostics.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-stethoscope icon-main"></i> Clinical Care
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
                 <a href="/hospital_system/clinical/index.php" class="<?= isActive('clinical/index.php') ?>"><i class="fas fa-th-large"></i> Clinical Dashboard</a>
-                <a href="/hospital_system/clinical/triage.php" class="<?= isActive('triage.php') ?>"><i class="fas fa-heartbeat"></i> Triage & Vitals</a>
                 <a href="/hospital_system/clinical/care.php" class="<?= isActive('clinical/care.php') ?>"><i class="fas fa-user-md"></i> Clinical Care</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
-                    <a href="/hospital_system/clinical/consultations.php" class="<?= isActive('consultations.php') ?>"><i class="fas fa-user-md"></i> Doctor's Queue</a>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
                 <a href="/hospital_system/clinical/admit_patient.php" class="<?= isActive('admit_patient.php') ?>"><i class="fas fa-procedures"></i> Admissions</a>
                 <a href="/hospital_system/clinical/discharge_patient.php" class="<?= isActive('discharge_patient.php') ?>"><i class="fas fa-sign-out-alt"></i> Discharge</a>
