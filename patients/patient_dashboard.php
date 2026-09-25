@@ -86,6 +86,212 @@ if ($patient_id <= 0) {
     // Deletions are handled by the dedicated POST-only endpoint.
 
 
+    // Handle vitals retake / edit
+    if (isset($_POST['save_vitals'])) {
+        $vitalId = max(0, (int)($_POST['vital_id'] ?? 0));
+        $temperature = trim((string)($_POST['temperature'] ?? ''));
+        $bp = trim((string)($_POST['bp'] ?? ''));
+        $weight = trim((string)($_POST['weight'] ?? ''));
+        $pulse = trim((string)($_POST['pulse'] ?? ''));
+        $respiration = trim((string)($_POST['respiration'] ?? ''));
+        $spo2 = trim((string)($_POST['spo2'] ?? ''));
+
+        if ($vitalId > 0) {
+            if ($vitalsHasSpo2) {
+                $stmt = $conn->prepare("UPDATE vitals SET temperature = ?, bp = ?, weight = ?, pulse = ?, respiration = ?, spo2 = ? WHERE id = ? AND patient_id = ?");
+                $stmt->bind_param('ssssssii', $temperature, $bp, $weight, $pulse, $respiration, $spo2, $vitalId, $patient_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE vitals SET temperature = ?, bp = ?, weight = ?, pulse = ?, respiration = ? WHERE id = ? AND patient_id = ?");
+                $stmt->bind_param('sssssii', $temperature, $bp, $weight, $pulse, $respiration, $vitalId, $patient_id);
+            }
+        } else {
+            if ($vitalsHasSpo2) {
+                $stmt = $conn->prepare("INSERT INTO vitals (temperature, bp, weight, pulse, respiration, spo2, patient_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+                $stmt->bind_param('ssssssi', $temperature, $bp, $weight, $pulse, $respiration, $spo2, $patient_id);
+            } else {
+                $stmt = $conn->prepare("INSERT INTO vitals (temperature, bp, weight, pulse, respiration, patient_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                $stmt->bind_param('sssssi', $temperature, $bp, $weight, $pulse, $respiration, $patient_id);
+            }
+        }
+
+        $stmt->execute();
+        $stmt->close();
+
+        header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&vitals_saved=1");
+        exit;
+    }
+
+    // Handle Next Appointment Booking
+    if(isset($_POST['book_appointment'])) {
+        $app_date = $_POST['appointment_date'];
+        $app_time = $_POST['appointment_time'];
+        $reason = $_POST['reason'] ?? 'Follow-up';
+        $stmt = $conn->prepare("INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status) VALUES (?, ?, ?, ?, ?, 'Scheduled')");
+        $stmt->bind_param("iisss", $patient_id, $patient['doctor_id'], $app_date, $app_time, $reason);
+        if($stmt->execute()) {
+            echo "<script>alert('Appointment booked successfully');</script>";
+        }
+    }
+
+    // Handle Prescription with Price Override
+    if(isset($_POST['add_prescription_stock'])) {
+        $medicine_id = intval($_POST['medicine_id']);
+        $qty = intval($_POST['quantity']);
+        $price_override = floatval($_POST['selling_price']); 
+        $instructions = $_POST['dosage_instructions'] ?? '';
+
+        $stock = $conn->query("SELECT drug_name, selling_price FROM pharmacy_stock WHERE id = $medicine_id")->fetch_assoc();
+        $unit_price = max($price_override, 0);
+        if ($unit_price <= 0 && $stock) $unit_price = (float)$stock['selling_price'];
+        $invoice_total = $qty * $unit_price;
+
+        $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $invoiceLink = 0;
+        $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
+        $stmt->execute();
+        $prescription_id = $stmt->insert_id;
+        $stmt->close();
+
+        if ($invoice_total > 0) {
+            $invoice_id = get_or_create_invoice($conn, $patient_id);
+            add_invoice_item(
+                $conn,
+                $invoice_id,
+                'Medication: ' . ($stock['drug_name'] ?? 'Prescription'),
+                $qty,
+                $unit_price,
+                'pharmacy',
+                $medicine_id
+            );
+
+            $updatePrescription = $conn->prepare("UPDATE prescriptions SET invoice_id = ? WHERE id = ?");
+            if ($updatePrescription) {
+                $updatePrescription->bind_param('ii', $invoice_id, $prescription_id);
+                $updatePrescription->execute();
+                $updatePrescription->close();
+            }
+        }
+
+        header("Location: patient_dashboard.php?id=$patient_id&tab=prescriptions&success=1");
+        exit;
+    }
+
+    // Handle Service/Billing Item Add
+    if(isset($_POST['add_service'])){
+        $service_id=intval($_POST['service_id']);
+        $price=floatval($_POST['price']);
+        if($service_id>0 && $price>=0){
+            $serviceStmt=$conn->prepare("SELECT service_name, category FROM services_master WHERE id=? AND active=1 LIMIT 1");
+            $serviceStmt->bind_param('i',$service_id);
+            $serviceStmt->execute();
+            $service=$serviceStmt->get_result()->fetch_assoc();
+            $serviceStmt->close();
+
+            if(!$service) throw new Exception('Selected service is not active or does not exist.');
+
+            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
+            $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
+            $stmt->execute();
+            $stmt->close();
+
+            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
+
+            header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
+            exit;
+        }
+    }
+
+    // Handle Deletion Logic
+    if(isset($_GET['delete_item'])) {
+        $item_id = intval($_GET['item_id']);
+        $type = $_GET['type'];
+        if($type == 'service') {
+            $conn->query("DELETE FROM patient_services WHERE id = $item_id AND patient_id = $patient_id");
+        } elseif($type == 'prescription') {
+            $conn->query("DELETE FROM prescriptions WHERE id = $item_id AND patient_id = $patient_id");
+        }
+        header("Location: patient_dashboard.php?id=$patient_id&tab=billing&deleted=1");
+        exit;
+    }
+
+    // Existing Lab Request Handler
+    if(isset($_POST['add_lab_request'])){
+        $service_id=intval($_POST['service_id']);
+        $price=floatval($_POST['price']);
+        $instructions=$_POST['lab_instructions'] ?? '';
+        if($service_id>0 && $price>=0){
+            $stmt=$conn->prepare("SELECT service_name FROM services_master WHERE id=? AND active=1 AND category='lab' LIMIT 1");
+            $stmt->bind_param('i',$service_id);
+            $stmt->execute();
+            $labService=$stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if(!$labService) throw new Exception('Selected laboratory service is invalid.');
+
+            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
+            $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
+            $stmt->execute();
+            $stmt->close();
+
+            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
+
+            header("Location: patient_dashboard.php?id=$patient_id&tab=services&lab_success=1");
+            exit;
+        }
+    }
+
+    // Handle External Referral
+    if(isset($_POST['add_referral'])){
+        $referred_facility = $_POST['referred_facility'] ?? '';
+        $referred_doctor = $_POST['referred_doctor'] ?? '';
+        $specialty = $_POST['specialty'] ?? '';
+        $reason = $_POST['referral_reason'] ?? '';
+        $urgency = $_POST['urgency'] ?? 'Routine';
+        $notes = $_POST['referral_notes'] ?? '';
+
+        $stmt = $conn->prepare("INSERT INTO external_referrals (patient_id, referred_facility, referred_doctor, specialty, reason, urgency, notes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())");
+        $stmt->bind_param("issssss", $patient_id, $referred_facility, $referred_doctor, $specialty, $reason, $urgency, $notes);
+        if($stmt->execute()) {
+            $stmt->close();
+            header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&referral_success=1");
+            exit;
+        }
+    }
+
+    // Existing Save Clinical Handler
+    if(isset($_POST['save_clinical'])){
+        $params = [
+            $patient_id, $_POST['presenting_complaint'] ?? '', $_POST['hpc'] ?? '',
+            $_POST['medical_history'] ?? '', $_POST['surgical_history'] ?? '',
+            $_POST['family_history'] ?? '', $_POST['drug_history'] ?? '',
+            $_POST['allergies'] ?? '', $_POST['social_history'] ?? '',
+            $_POST['review_systems'] ?? '', $_POST['physical_exam'] ?? '',
+            $_POST['diagnosis'] ?? '', $_POST['differential_diagnosis'] ?? '',
+            $_POST['investigations'] ?? '', $_POST['management_plan'] ?? '',
+            $_POST['prescription_instructions'] ?? '', $_POST['doctor_notes'] ?? ''
+        ];
+        $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
+        $hasEncounterVisit = ensure_encounter_visit_column($conn);
+        if ($hasEncounterVisit && $visitId > 0) {
+            $stmt=$conn->prepare("INSERT INTO encounters (patient_id,visit_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
+            $paramsWithVisit = [$patient_id, $visitId, ...array_slice($params, 1)];
+            $stmt->bind_param("iissssssssssssssss", ...$paramsWithVisit);
+        } else {
+            $stmt=$conn->prepare("INSERT INTO encounters (patient_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
+            $stmt->bind_param("isssssssssssssssss", ...$params);
+        }
+        if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
+        $stmt->bind_param("isssssssssssssssss", ...$params);
+        if(!$stmt->execute()){ $error=$stmt->error; $stmt->close(); throw new Exception('Unable to save clinical record: '.$error); }
+        $stmt->close();
+        header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&success=1");
+        exit;
+    }
+
+
     // Handle External Referral
     if(isset($_POST['add_referral'])){
         $referred_facility = $_POST['referred_facility'] ?? '';
@@ -407,17 +613,42 @@ if ($patient_id <= 0) {
     <?php if (isset($_GET['vitals_saved'])): ?><div class="alert alert-success">Vitals saved successfully.</div><?php endif; ?>
     <?php if (isset($_GET['error']) && $_GET['error'] === 'csrf'): ?><div class="alert alert-danger">Security token mismatch. Please retry the action.</div><?php endif; ?>
 
-    <div class="sub-card" style="border-left:5px solid var(--primary-blue);"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><div><h3 style="margin:0;color:var(--primary-blue);">Current Clinical Assessment</h3><p style="margin:6px 0 0;color:#666;">Today's clinical work is recorded against the active Visit. This dashboard is for patient history and review.</p></div><a href="/hospital_system/clinical/care.php?patient_id=<?= (int)$patient_id ?><?= $activeVisit ? '&visit_id=' . (int)$activeVisit['id'] : '' ?>" class="btn-save" style="float:none; margin-top:0; text-decoration:none;">Open Clinical Care</a></div></div>
+    <div class="sub-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div>
+                <h3 style="margin:0; color:var(--primary-blue);">Vitals Retake / Edit</h3>
+                <p style="margin:6px 0 0; color:#666;">Doctors can record a new set of vitals or load any historical reading for correction.</p>
+            </div>
+            <?php if ($latestVital): ?>
+                <div class="badge-info">Latest vitals: <?= date('d M Y H:i', strtotime($latestVital['created_at'])) ?></div>
+            <?php endif; ?>
+        </div>
+        <form method="post" style="margin-top:18px;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <input type="hidden" name="vital_id" id="vital_id" value="">
+            <div class="vitals-form-grid">
+                <div><label class="info-label">Temperature</label><input type="number" step="0.1" name="temperature" id="vital_temperature" value="<?= htmlspecialchars($latestVital['temperature'] ?? '') ?>"></div>
+                <div><label class="info-label">Blood Pressure</label><input type="text" name="bp" id="vital_bp" value="<?= htmlspecialchars($latestVital['bp'] ?? '') ?>"></div>
+                <div><label class="info-label">Weight</label><input type="number" step="0.1" name="weight" id="vital_weight" value="<?= htmlspecialchars($latestVital['weight'] ?? '') ?>"></div>
+                <div><label class="info-label">Pulse</label><input type="number" name="pulse" id="vital_pulse" value="<?= htmlspecialchars($latestVital['pulse'] ?? '') ?>"></div>
+                <div><label class="info-label">Respiration</label><input type="number" name="respiration" id="vital_respiration" value="<?= htmlspecialchars($latestVital['respiration'] ?? '') ?>"></div>
+                <?php if ($vitalsHasSpo2): ?><div><label class="info-label">SPO2</label><input type="number" name="spo2" id="vital_spo2" value="<?= htmlspecialchars($latestVital['spo2'] ?? '') ?>"></div><?php endif; ?>
+            </div>
+            <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button type="submit" name="save_vitals" class="btn-save" style="float:none; margin-top:0;">Save Vitals</button>
+                <button type="button" class="btn-save" style="float:none; margin-top:0; background:#6c757d;" onclick="resetVitalsForm()">Record Fresh Set</button>
+            </div>
+        </form>
+    </div>
 
     <h3>Vital Signs History</h3>
-
     <table class="table-custom" style="margin-bottom: 30px;">
         <thead>
             <tr><th>BP</th><th>Temp</th><th>Pulse</th><th>SPO2</th><th>Weight</th><th>Timestamp</th></tr>
         </thead>
         <tbody>
             <?php while($v = $vitals->fetch_assoc()): ?>
-            <tr>
+            <tr onclick='loadVital(<?= htmlspecialchars(json_encode($v), ENT_QUOTES) ?>)' style="cursor:pointer;">
                 <td><strong><?= htmlspecialchars($v['bp']) ?></strong></td>
                 <td><?= htmlspecialchars($v['temperature']) ?>°C</td>
                 <td><?= htmlspecialchars($v['pulse']) ?></td>
@@ -456,11 +687,218 @@ if ($patient_id <= 0) {
         </table>
     </div>
 
-    <div class="sub-card"><h3 style="color:var(--primary-blue);margin:0;">Clinical History</h3><p style="color:#666;">Clinical notes, diagnoses, examination and management are recorded in the current Visit from Clinical Care. This dashboard does not create another encounter.</p><a href="/hospital_system/clinical/care.php?patient_id=<?= (int)$patient_id ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Clinical Care</a></div>
+    <form method="post" id="clinicalForm">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="color: var(--primary-blue);">Comprehensive Clinical Examination</h3>
+            <button type="button" onclick="clearForm()" class="btn-save" style="background:#6c757d; margin-top:0;">+ New Encounter</button>
+        </div>
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+        <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
+        
+        <div class="clinical-grid">
+            <div class="module-card"><h4>1. Presenting Complaints</h4><textarea name="presenting_complaint"><?= htmlspecialchars($encounter['presenting_complaint'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>2. HPC</h4><textarea name="hpc"><?= htmlspecialchars($encounter['hpc'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>3. Past Medical History</h4><textarea name="medical_history"><?= htmlspecialchars($encounter['medical_history'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>4. Past Surgical History</h4><textarea name="surgical_history"><?= htmlspecialchars($encounter['surgical_history'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>5. Family History</h4><textarea name="family_history"><?= htmlspecialchars($encounter['family_history'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>6. Drug History</h4><textarea name="drug_history"><?= htmlspecialchars($encounter['drug_history'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>7. Allergies</h4><textarea name="allergies"><?= htmlspecialchars($encounter['allergies'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>8. Social History</h4><textarea name="social_history"><?= htmlspecialchars($encounter['social_history'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>9. Review of Systems</h4><textarea name="review_systems"><?= htmlspecialchars($encounter['review_systems'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>10. Physical Examination</h4><textarea name="physical_exam"><?= htmlspecialchars($encounter['physical_exam'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>11. Diagnosis</h4><textarea name="diagnosis"><?= htmlspecialchars($encounter['diagnosis'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>12. Differential Diagnosis</h4><textarea name="differential_diagnosis"><?= htmlspecialchars($encounter['differential_diagnosis'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>13. Investigations</h4><textarea name="investigations"><?= htmlspecialchars($encounter['investigations'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>14. Management Plan</h4><textarea name="management_plan"><?= htmlspecialchars($encounter['management_plan'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>15. Prescription Instructions</h4><textarea name="prescription_instructions"><?= htmlspecialchars($encounter['prescription_instructions'] ?? '') ?></textarea></div>
+            <div class="module-card"><h4>16. Doctor's Notes</h4><textarea name="doctor_notes"><?= htmlspecialchars($encounter['doctor_notes'] ?? '') ?></textarea></div>
+        </div>
+        <button type="submit" name="save_clinical" class="btn-save">Save Clinical Notes</button>
+    </form>
 
-<div id="services" class="card" style="display:none;"><h3>Services & Laboratory</h3><p style="color:#666;">New services and laboratory requests are created from the active Visit in Clinical Care.</p><a href="/hospital_system/clinical/orders.php?patient_id=<?= (int)$patient_id ?><?= $activeVisit ? '&visit_id=' . (int)$activeVisit['id'] : '' ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Orders & Referrals</a></div>
+    <h3 style="margin-top:60px;">Clinical History Archive (Click to Review)</h3>
+    <table class="table-custom">
+        <thead><tr><th>Date</th><th>Diagnosis</th><th>Notes Snippet</th></tr></thead>
+        <tbody>
+            <?php 
+            $clinical_history->data_seek(0); 
+            while($h = $clinical_history->fetch_assoc()): 
+            ?>
+            <tr onclick="loadEncounter(<?= htmlspecialchars(json_encode($h)) ?>)" style="cursor:pointer;" onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='transparent'">
+                <td><strong><?= date('d M Y', strtotime($h['created_at'])) ?></strong></td>
+                <td><?= htmlspecialchars($h['diagnosis'] ?? 'N/A') ?></td>
+                <td><?= htmlspecialchars(substr($h['doctor_notes'], 0, 80)) ?>...</td>
+            </tr>
+            <?php endwhile; ?>
+        </tbody>
+    </table>
+        <div style="clear:both; margin-top:50px; border-top: 2px solid #eee; padding-top:20px;">
+            <h3 style="color: #e67e22;">Book Next Appointment</h3>
+            <form method="post" style="display:flex; gap:10px; align-items: flex-end; background:#fff9f0; padding:20px; border-radius:8px;">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <div style="flex:1;">
+                    <label class="info-label">Follow-up Date</label>
+                    <input type="date" name="appointment_date" required style="width:100%; padding:10px;">
+                </div>
+                <div style="flex:1;">
+                    <label class="info-label">Time</label>
+                    <input type="time" name="appointment_time" required style="width:100%; padding:10px;">
+                </div>
+                <div style="flex:2;">
+                    <label class="info-label">Reason</label>
+                    <input type="text" name="reason" placeholder="e.g. Lab Review" style="width:100%; padding:10px;">
+                </div>
+                <button type="submit" name="book_appointment" style="background:#e67e22; color:white; height:42px; border:none; padding: 0 20px; border-radius:5px; cursor:pointer;">Book Appointment</button>
+            </form>
+        </div>
+    </div>
 
-<div id="prescriptions" class="card" style="display:none;"><h3>Medication History</h3><p style="color:#666;">Prescriptions are created from the active Visit by authorized clinical staff and dispensed through Pharmacy.</p><a href="/hospital_system/clinical/orders.php?patient_id=<?= (int)$patient_id ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Clinical Orders</a></div>
+<script>
+function loadEncounter(data) {
+    document.getElementById('clinical').scrollIntoView({behavior: 'smooth'});
+    for (const key in data) {
+        const field = document.querySelector(`[name="${key}"]`);
+        if (field) field.value = data[key];
+    }
+}
+function loadVital(data) {
+    document.getElementById('vital_id').value = data.id || '';
+    document.getElementById('vital_temperature').value = data.temperature || '';
+    document.getElementById('vital_bp').value = data.bp || '';
+    document.getElementById('vital_weight').value = data.weight || '';
+    document.getElementById('vital_pulse').value = data.pulse || '';
+    document.getElementById('vital_respiration').value = data.respiration || '';
+    const spo2Field = document.getElementById('vital_spo2');
+    if (spo2Field) spo2Field.value = data.spo2 || '';
+    document.getElementById('clinical').scrollIntoView({behavior: 'smooth'});
+}
+function resetVitalsForm() {
+    document.getElementById('vital_id').value = '';
+    document.getElementById('vital_temperature').value = '';
+    document.getElementById('vital_bp').value = '';
+    document.getElementById('vital_weight').value = '';
+    document.getElementById('vital_pulse').value = '';
+    document.getElementById('vital_respiration').value = '';
+    const spo2Field = document.getElementById('vital_spo2');
+    if (spo2Field) spo2Field.value = '';
+}
+function clearForm() {
+    document.getElementById("clinicalForm").reset();
+    // Also clear textareas specifically if reset doesn't catch them
+    document.querySelectorAll("textarea").forEach(t => t.value = "");
+}
+</script>
+
+
+
+    <div id="services" class="card" style="display:none;">
+        <h3>Add Service / Procedure</h3>
+        <?php if (!empty($patient['is_walkin']) && $walkinRequestedService !== ''): ?>
+            <div style="margin-bottom:18px; padding:14px 16px; background:#fff8e1; border:1px solid #f0c36d; border-left:5px solid #f39c12; border-radius:7px;">
+                <div style="font-size:11px; font-weight:700; color:#8a6d1d; text-transform:uppercase; letter-spacing:.5px;">Walk-in Requested Service</div>
+                <div style="font-size:18px; font-weight:700; color:#5d4b12; margin-top:4px;"><?= htmlspecialchars($walkinRequestedService) ?></div>
+                <div style="font-size:12px; color:#7a6a2a; margin-top:4px;">Selected during walk-in registration and loaded automatically.</div>
+            </div>
+        <?php endif; ?>
+        <form method="post" style="margin-bottom:30px; background:#f4f7f6; padding:20px; border-radius:8px;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:15px;">
+                <div>
+                    <label class="info-label">Service Description</label>
+                    <select name="service_id" onchange="updatePrice(this, 'svc_p')" required style="width:100%; padding:10px;">
+                        <option value="">Search Service...</option>
+                        <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): ?>
+                        <option value="<?= $s['id'] ?>" data-price="<?= $s['price'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?> (<?= strtoupper(htmlspecialchars($s['category'])) ?>)</option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="info-label">Fee (KSH)</label>
+                    <input type="number" id="svc_p" name="price" step="0.01" style="width:100%; padding:10px;">
+                </div>
+                <button type="submit" name="add_service" style="background:var(--primary-blue); color:white; border:none; border-radius:5px; margin-top:22px;">Bill Item</button>
+            </div>
+        </form>
+
+        <div class="lab-order-box">
+            <h4>Request Laboratory Test</h4>
+            <form method="post" style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px;">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <select name="service_id" required style="padding:10px;">
+                    <option value="">Select Lab Test...</option>
+                    <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): if($s['category'] == 'lab'): ?>
+                    <option value="<?= $s['id'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
+                    <?php endif; endwhile; ?>
+                </select>
+                <input type="number" name="price" placeholder="Price" step="0.01" style="padding:10px;">
+                <input type="text" name="lab_instructions" placeholder="Notes..." style="padding:10px;">
+                <button type="submit" name="add_lab_request" style="background:#2980b9; color:white; border:none; padding:10px; border-radius:5px;">Request Lab</button>
+            </form>
+        </div>
+
+        <table class="table-custom">
+            <tr><th>Service Name</th><th>Category</th><th>Cost</th><th>Action</th></tr>
+            <?php $patient_services->data_seek(0); while($s=$patient_services->fetch_assoc()): ?>
+            <tr>
+                <td><?= htmlspecialchars($s['service_name']) ?></td>
+                <td><span class="badge-info"><?= htmlspecialchars($s['svc_category']) ?></span></td>
+                <td>KSH <?= number_format($s['price'], 2) ?></td>
+                <td><a href="?id=<?= $patient_id ?>&delete_item=1&item_id=<?= $s['id'] ?>&type=service" style="color:red;">&times; Remove</a></td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+    </div>
+
+    <div id="prescriptions" class="card" style="display:none;">
+        <h3>Prescribe from Pharmacy Stock</h3>
+        <form method="post" style="margin-bottom:30px; background: #f0f4ff; padding:20px; border-radius:8px; border-left: 5px solid #0056b3;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 2fr 1fr; gap:10px;">
+                <div>
+                    <label class="info-label">Available Stock</label>
+                    <select name="medicine_id" onchange="updatePrice(this, 'stock_p')" required style="width:100%; padding:10px;">
+                        <option value="">-- Select Drug --</option>
+                        <?php $stock->data_seek(0); while($item = $stock->fetch_assoc()): ?>
+                            <option value="<?= $item['id'] ?>" data-price="<?= $item['selling_price'] ?>"><?= htmlspecialchars($item['drug_name']) ?> (Avail: <?= $item['quantity'] ?>)</option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="info-label">Qty</label>
+                    <input type="number" name="quantity" value="1" style="width:100%; padding:10px;">
+                </div>
+                <div>
+                    <label class="info-label">Price Override</label>
+                    <input type="number" id="stock_p" name="selling_price" step="0.01" style="width:100%; padding:10px;">
+                </div>
+                <div>
+                    <label class="info-label">Dosage Instructions</label>
+                    <input type="text" name="dosage_instructions" placeholder="1x3 for 5 days" style="width:100%; padding:10px;">
+                </div>
+                <button type="submit" name="add_prescription_stock" style="background:#2ecc71; color:white; border:none; border-radius:5px; margin-top:22px; cursor:pointer;">Prescribe</button>
+            </div>
+        </form>
+
+        <h3>Medication History</h3>
+        <table class="table-custom">
+            <tr><th>Drug Name</th><th>Quantity</th><th>Unit Price</th><th>Total</th><th>Date</th><th>Action</th></tr>
+            <?php $prescriptions->data_seek(0); while($p=$prescriptions->fetch_assoc()): ?>
+            <tr>
+                <td><strong><?= htmlspecialchars($p['drug_name']) ?></strong></td>
+                <td><?= htmlspecialchars($p['quantity']) ?></td>
+                <td>KSH <?= number_format((float)($p['unit_price'] ?? 0), 2) ?></td>
+                <td>KSH <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
+                <td><?= date('d/m/y', strtotime($p['created_at'])) ?></td>
+                <td>
+                    <a href="?id=<?= $patient_id ?>&delete_item=1&item_id=<?= $p['id'] ?>&type=prescription" 
+                       style="color:red;" onclick="return confirm('Remove this medication?')">&times; Remove</a>
+                </td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+    </div>
+
+
 
 <div id="billing" class="card" style="display:none;">
         <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
