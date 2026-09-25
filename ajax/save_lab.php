@@ -1,5 +1,9 @@
 <?php
 require_once '../config/config.php';
+require_once '../includes/session.php';
+require_once '../includes/auth.php';
+require_login();
+require_role(['admin','doctor','nurse']);
 
 $patient_id = intval($_POST['patient_id']);
 $lab_id = intval($_POST['lab_id']);
