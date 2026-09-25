@@ -3,13 +3,14 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_once __DIR__ . '/../includes/auth.php';
+require_role(['admin','doctor','nurse']);
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
-    $maternity_id
     $maternity_id = intval($_POST['maternity_id']);
     $bp = $conn->real_escape_string($_POST['bp'] ?? '');
     $temp = $conn->real_escape_string($_POST['temp'] ?? '');
