@@ -511,11 +511,12 @@ if (!empty($patient['is_walkin'])) {
 
     // Payments are invoice-specific, matching billing/view_invoice.php.
     $total_paid = 0.0;
+    $paymentVisitCondition = ($activeVisitId > 0 && $hasVisitInvoices) ? " AND i.visit_id = ?" : "";
     $paidStmt = $conn->prepare("
         SELECT COALESCE(SUM(p.amount), 0) AS total_paid
         FROM payments p
         INNER JOIN invoices i ON i.id = p.invoice_id
-        WHERE i.patient_id = ?
+        WHERE i.patient_id = ?" . $paymentVisitCondition . "
     ");
 
     if ($paidStmt) {
