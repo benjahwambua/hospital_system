@@ -149,7 +149,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         <table class="table table-bordered table-hover">
                             <thead class="thead-light">
                                 <tr>
-                                    <th>Date</th><th>Receipt / Ref</th><th>Invoice</th><th>Patient</th><th>Visit</th><th>Method</th><th>Amount</th><th>Cashier</th><th>Receipt</th>
+                                    <th>Date</th><th>Receipt / Ref</th><th>Invoice</th><th>Patient</th><th>Visit</th><th>Method</th><th>Amount</th><th>Cashier</th><th>Invoice / Receipt</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -166,7 +166,12 @@ include __DIR__ . '/../includes/sidebar.php';
                                     <td><span class="badge badge-<?= stripos((string)$payment['method'], 'mpesa') !== false ? 'info' : 'success' ?>"><?= htmlspecialchars($payment['method']) ?></span></td>
                                     <td class="font-weight-bold">KSH <?= number_format((float)$payment['amount'], 2) ?></td>
                                     <td><?= htmlspecialchars($payment['cashier_name'] ?: 'Legacy / Unassigned') ?></td>
-                                    <td><a class="btn btn-sm btn-outline-primary" target="_blank" href="/hospital_system/cashier/receipt.php?id=<?= (int)$payment['id'] ?>"><i class="fas fa-print"></i> Print</a></td>
+                                    <td>
+    <a class="btn btn-sm btn-outline-primary" target="_blank"
+       href="/hospital_system/billing/view_invoice.php?id=<?= (int)$payment['invoice_id'] ?>&print=1">
+        <i class="fas fa-print"></i> View & Print Invoice
+    </a>
+</td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
