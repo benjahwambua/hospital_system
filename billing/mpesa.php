@@ -13,6 +13,7 @@ $mpesa_message = '';
 $mpesa_error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     $invoiceId = (int)($_POST['invoice_id'] ?? 0);
     $amount = round((float)($_POST['amount'] ?? 0), 2);
     $phone = trim((string)($_POST['phone'] ?? ''));
@@ -60,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     $invoiceId = (int)($_POST['invoice_id'] ?? 0);
     $stkAmount = round((float)($_POST['amount'] ?? 0), 2);
     $phone = trim((string)($_POST['phone'] ?? ''));
@@ -149,6 +151,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="card-body">
                 <p class="text-muted">M-Pesa recording does not require Daraja/STK configuration. Phone number and receipt are optional and can be added when available.</p>
                 <form method="POST" class="row align-items-end">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, "UTF-8") ?>">
                     <div class="col-md-3">
                         <label class="small font-weight-bold">Invoice ID</label>
                         <input type="number" name="invoice_id" class="form-control" min="1" required>
