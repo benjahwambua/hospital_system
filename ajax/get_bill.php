@@ -3,10 +3,13 @@ require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../session.php';
 require_login();
 
-$patient_id = intval($_GET['patient_id']);
+$patient_id = intval($_GET['patient_id'] ?? 0);
 if(!$patient_id) exit;
 
-$billings = $conn->query("SELECT description, amount, created_at FROM billing WHERE patient_id=$patient_id ORDER BY created_at DESC");
+$billStmt = $conn->prepare("SELECT description, amount, created_at FROM billing WHERE patient_id=? ORDER BY created_at DESC");
+$billStmt->bind_param('i', $patient_id);
+$billStmt->execute();
+$billings = $billStmt->get_result();
 ?>
 <table class="table table-sm table-bordered">
     <thead>
