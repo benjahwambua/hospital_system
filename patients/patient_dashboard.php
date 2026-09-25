@@ -515,7 +515,7 @@ if (!empty($patient['is_walkin'])) {
         SELECT COALESCE(SUM(p.amount), 0) AS total_paid
         FROM payments p
         INNER JOIN invoices i ON i.id = p.invoice_id
-        WHERE i.patient_id = ?($activeVisitId > 0 && $hasVisitInvoices ? " AND i.visit_id = ?" : "")
+        WHERE i.patient_id = ?
     ");
 
     if ($paidStmt) {
