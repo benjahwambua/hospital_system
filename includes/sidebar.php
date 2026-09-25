@@ -219,7 +219,6 @@ function isParentActive($paths) {
             <i class="fas fa-calendar-check icon-main"></i> Appointments
         </a>
 
-        <div class="menu-title">Hospital Core</div>
         <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier', 'receptionist'], true)): ?>
         <div class="menu-title">Front Desk</div>
         <a href="/hospital_system/reception/index.php" class="<?= isActive('reception/index.php') ?>">
@@ -317,7 +316,6 @@ function isParentActive($paths) {
                 <div class="submenu">
                     <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
                     <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
-                    <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-receipt"></i> View Bills</a>
                     <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
                     <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
                     <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
