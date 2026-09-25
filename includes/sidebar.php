@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/session.php';
+require_once __DIR__ . '/permissions.php';
 
 /** * Check for Super User status
  */
@@ -243,6 +244,7 @@ function isParentActive($paths) {
             </div>
         </div>
 
+        <?php if (can_access_module($conn, 'clinical')): ?>
         <div class="has-submenu <?= isParentActive(['lab_requests.php', 'lab_results.php', 'lab/inventory/']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-microscope icon-main"></i> Laboratory
@@ -254,7 +256,9 @@ function isParentActive($paths) {
                 <a href="/hospital_system/lab/inventory/index.php" class="<?= isActive('lab/inventory/') ?>"><i class="fas fa-boxes"></i> Lab Inventory</a>
             </div>
         </div>
+        <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'laboratory')): ?>
         <div class="has-submenu <?= isParentActive(['radiology_requests.php', 'radiology_results.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-x-ray icon-main"></i> Radiology
@@ -265,7 +269,9 @@ function isParentActive($paths) {
                 <a href="/hospital_system/radiology/radiology_results.php" class="<?= isActive('radiology_results.php') ?>"><i class="fas fa-images"></i> Radiology Results</a>
             </div>
         </div>
+        <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'radiology')): ?>
         <div class="has-submenu <?= isParentActive(['dispensing_queue.php', 'sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-pills icon-main"></i> Pharmacy
@@ -278,7 +284,9 @@ function isParentActive($paths) {
                 <a href="/hospital_system/pharmacy/view_stock.php" class="<?= isActive('view_stock.php') ?>"><i class="fas fa-capsules"></i> View Stock</a>
             </div>
         </div>
+        <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'pharmacy')): ?>
         <div class="has-submenu <?= isParentActive(['maternity/add.php', 'deliveries.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-baby icon-main"></i> Maternity
@@ -289,67 +297,56 @@ function isParentActive($paths) {
                 <a href="/hospital_system/maternity/deliveries.php" class="<?= isActive('deliveries.php') ?>"><i class="fas fa-child"></i> Deliveries</a>
             </div>
         </div>
-
-        <?php if ($isSuperUser): ?>
-            <div class="menu-title">Administration</div>
-
-            <div class="has-submenu <?= isParentActive(['create_invoice.php', 'view_bills.php', 'ledger.php', 'add_expense.php', 'view_expenses.php']) ?>">
-                <a href="#" class="menu-toggle">
-                    <i class="fas fa-coins icon-main"></i> Finance & Billing
-                    <i class="fas fa-chevron-down caret"></i>
-                </a>
-                <div class="submenu">
-                    <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
-                    <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
-                    <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
-                    <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
-                    <a href="/hospital_system/accounting/reconciliation.php" class="<?= isActive('reconciliation.php') ?>"><i class="fas fa-balance-scale"></i> Financial Reconciliation</a>
-                    <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
-                    <a href="/hospital_system/expenses/view_expenses.php" class="<?= isActive('view_expenses.php') ?>"><i class="fas fa-file-contract"></i> Expense History</a>
-                </div>
-            </div>
-
-            <div class="has-submenu <?= isParentActive(['manage_suppliers.php', 'purchase_orders.php', 'receive_inventory.php', 'supplier_payables.php']) ?>">
-                <a href="#" class="menu-toggle">
-                    <i class="fas fa-boxes icon-main"></i> Procurement
-                    <i class="fas fa-chevron-down caret"></i>
-                </a>
-                <div class="submenu">
-                    <a href="/hospital_system/procurement/manage_suppliers.php" class="<?= isActive('manage_suppliers.php') ?>"><i class="fas fa-truck"></i> Suppliers</a>
-                    <a href="/hospital_system/procurement/purchase_orders.php" class="<?= isActive('purchase_orders.php') ?>"><i class="fas fa-shopping-basket"></i> Purchase Orders</a>
-                    <a href="/hospital_system/procurement/receive_inventory.php" class="<?= isActive('receive_inventory.php') ?>"><i class="fas fa-warehouse"></i> Receive Inventory</a>
-                    <a href="/hospital_system/procurement/supplier_payables.php" class="<?= isActive('supplier_payables.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Supplier Payables</a>
-                    <a href="/hospital_system/procurement/supplier_statement.php" class="<?= isActive('supplier_statement.php') ?>"><i class="fas fa-file-alt"></i> Supplier Statement</a>
-                </div>
-            </div>
-
-            <div class="has-submenu <?= isParentActive(['add_user.php', 'view_users.php', 'sales_report.php', 'system_settings.php']) ?>">
-                <a href="#" class="menu-toggle">
-                    <i class="fas fa-cogs icon-main"></i> System & Reports
-                    <i class="fas fa-chevron-down caret"></i>
-                </a>
-                <div class="submenu">
-                    <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('sales_report.php') ?>"><i class="fas fa-chart-line"></i> Financial Reports</a>
-                    <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
-                    <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
-                </div>
-            </div>
         <?php endif; ?>
-        
-        <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier'], true)): ?>
+
+        <?php if (can_access_module($conn, 'finance_admin')): ?>
+        <div class="menu-title">Finance & Billing Administration</div>
+        <div class="has-submenu <?= isParentActive(['accounting/', 'billing/', 'expenses/']) ?>">
+            <a href="#" class="menu-toggle"><i class="fas fa-coins icon-main"></i> Finance & Billing <i class="fas fa-chevron-down caret"></i></a>
+            <div class="submenu">
+                <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
+                <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
+                <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
+                <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('accounting/ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
+                <a href="/hospital_system/accounting/reconciliation.php" class="<?= isActive('reconciliation.php') ?>"><i class="fas fa-balance-scale"></i> Financial Reconciliation</a>
+                <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
+                <a href="/hospital_system/expenses/view_expenses.php" class="<?= isActive('view_expenses.php') ?>"><i class="fas fa-file-contract"></i> Expense History</a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (can_access_module($conn, 'procurement')): ?>
+        <div class="has-submenu <?= isParentActive(['procurement/']) ?>">
+            <a href="#" class="menu-toggle"><i class="fas fa-boxes icon-main"></i> Procurement <i class="fas fa-chevron-down caret"></i></a>
+            <div class="submenu">
+                <a href="/hospital_system/procurement/manage_suppliers.php" class="<?= isActive('manage_suppliers.php') ?>"><i class="fas fa-truck"></i> Suppliers</a>
+                <a href="/hospital_system/procurement/purchase_orders.php" class="<?= isActive('purchase_orders.php') ?>"><i class="fas fa-shopping-basket"></i> Purchase Orders</a>
+                <a href="/hospital_system/procurement/receive_inventory.php" class="<?= isActive('receive_inventory.php') ?>"><i class="fas fa-warehouse"></i> Receive Inventory</a>
+                <a href="/hospital_system/procurement/supplier_payables.php" class="<?= isActive('supplier_payables.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Supplier Payables</a>
+                <a href="/hospital_system/procurement/supplier_statement.php" class="<?= isActive('supplier_statement.php') ?>"><i class="fas fa-file-alt"></i> Supplier Statement</a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (can_access_module($conn, 'administration')): ?>
+        <div class="menu-title">Administration</div>
+        <div class="has-submenu <?= isParentActive(['users/', 'settings/']) ?>">
+            <a href="#" class="menu-toggle"><i class="fas fa-cogs icon-main"></i> Administration <i class="fas fa-chevron-down caret"></i></a>
+            <div class="submenu">
+                <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
+                <a href="/hospital_system/users/access_rights.php" class="<?= isActive('access_rights.php') ?>"><i class="fas fa-user-shield"></i> Access Rights</a>
+                <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
+                <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('sales_report.php') ?>"><i class="fas fa-chart-line"></i> System Reports</a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (can_access_module($conn, 'finance')): ?>
         <div class="menu-title">Finance</div>
-        <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>">
-            <i class="fas fa-cash-register icon-main"></i> Central Cashier
-        </a>
-        <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>">
-            <i class="fas fa-clock icon-main"></i> Cashier Shift
-        </a>
-        <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>">
-            <i class="fas fa-user-clock icon-main"></i> Aged Receivables
-        </a>
-        <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>">
-            <i class="fas fa-receipt icon-main"></i> Payment History
-        </a>
+        <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register icon-main"></i> Central Cashier</a>
+        <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>"><i class="fas fa-clock icon-main"></i> Cashier Shift</a>
+        <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock icon-main"></i> Aged Receivables</a>
+        <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
         <?php endif; ?>
 
         <div class="menu-title">Exit</div>
