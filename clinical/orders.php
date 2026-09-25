@@ -76,10 +76,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                         $pq->bind_param('iiii',$prescriptionId,$patientId,$medicineId,$quantity); $pq->execute(); $pq->close();
                     }
                 }
-                $total=$quantity*$unit; $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
-                $invoiceItemId=add_invoice_item($conn,$invoiceId,'Pharmacy: '.$medicine['drug_name'],$quantity,$unit,'pharmacy',$medicineId);
-                post_invoice_journal($conn,$invoiceId,$patientId,$total,'Pharmacy order',$invoiceItemId);
-                $message='Prescription sent to Pharmacy for dispensing. Stock is deducted only when dispensed. Invoice #'.$invoiceId.' sent to Central Cashier.';
+                $message='Prescription sent to Pharmacy for dispensing. Stock and the pharmacy charge are posted when Pharmacy dispenses. Payment is collected only by Central Cashier.';
             } else throw new Exception('Select a department.');
         } catch (Throwable $e) { $message=$e->getMessage(); }
     }
