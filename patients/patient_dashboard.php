@@ -445,15 +445,20 @@ if (!empty($patient['is_walkin'])) {
 
     // Payments are invoice-specific, matching billing/view_invoice.php.
     $total_paid = 0.0;
-    $paidRes = $conn->query("
+    $paidStmt = $conn->prepare("
         SELECT COALESCE(SUM(p.amount), 0) AS total_paid
         FROM payments p
         INNER JOIN invoices i ON i.id = p.invoice_id
-        WHERE i.patient_id = " . (int)$patient_id
+        WHERE i.patient_id = ?
     );
+    if ($paidStmt) {
+        $paidStmt->bind_param('i', $patient_id);
+        $paidStmt->execute();
+        $paidRes = $paidStmt->get_result();
     if ($paidRes) {
         $total_paid = (float)($paidRes->fetch_assoc()['total_paid'] ?? 0);
     }
+    if (isset($paidStmt) && $paidStmt) $paidStmt->close();
 
     // Logic to prevent negative balance.
     $balance_due = max($total_charges - $total_paid, 0.0);
