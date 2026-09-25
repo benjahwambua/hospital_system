@@ -1,16 +1,22 @@
 <?php
-include '../config/config.php';
-session_start();
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_login();
 
-$patient_id = $_GET['id'];
+$patient_id = (int)($_GET['id'] ?? 0);
+if ($patient_id <= 0) { http_response_code(400); exit('Invalid patient.'); }
 
-$patient = $conn->query("SELECT * FROM patients WHERE id = $patient_id")->fetch_assoc();
+$patientStmt = $conn->prepare("SELECT * FROM patients WHERE id = ? LIMIT 1");
+$patientStmt->bind_param('i', $patient_id);
+$patientStmt->execute();
+$patient = $patientStmt->get_result()->fetch_assoc();
+$patientStmt->close();
 
-$history = $conn->query("
-    SELECT * FROM patient_history
-    WHERE patient_id = $patient_id
-    ORDER BY id DESC
-");
+$historyStmt = $conn->prepare("SELECT * FROM patient_history WHERE patient_id = ? ORDER BY id DESC");
+$historyStmt->bind_param('i', $patient_id);
+$historyStmt->execute();
+$history = $historyStmt->get_result();
 ?>
 
 <h2>Patient History: <?= $patient['fullname'] ?></h2>
