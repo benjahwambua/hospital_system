@@ -6,6 +6,7 @@ include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sid
 
 $msg='';
 if ($_SERVER['REQUEST_METHOD']==='POST') {
+  if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
   $name=$conn->real_escape_string($_POST['name']); $desc=$conn->real_escape_string($_POST['description']);
   $buy=floatval($_POST['buy_price']); $sell=floatval($_POST['sell_price']); $qty=intval($_POST['quantity']);
   $stmt=$conn->prepare("INSERT INTO medications (name,description,buy_price,sell_price,quantity) VALUES (?,?,?,?,?)");
