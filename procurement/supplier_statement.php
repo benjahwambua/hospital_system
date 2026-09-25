@@ -19,7 +19,7 @@ if($supplierId>0){
  $s=$conn->prepare("SELECT id,name,phone,email FROM suppliers WHERE id=? LIMIT 1");
  $s->bind_param('i',$supplierId);$s->execute();$supplier=$s->get_result()->fetch_assoc();$s->close();
  if($supplier){
-  $s=$conn->prepare("SELECT COALESCE(SUM(amount),0) opening FROM supplier_payables WHERE supplier_id=? AND DATE(created_at) < ?");
+  $s=$conn->prepare("SELECT COALESCE(SUM(amount),0) opening FROM supplier_payables WHERE supplier_id=? AND status<>'Cancelled' AND DATE(created_at) < ?");
   $s->bind_param('is',$supplierId,$from);$s->execute();$opening+=(float)($s->get_result()->fetch_assoc()['opening']??0);$s->close();
   $s=$conn->prepare("SELECT COALESCE(SUM(amount),0) opening FROM supplier_payments WHERE supplier_id=? AND DATE(paid_at) < ?");
   $s->bind_param('is',$supplierId,$from);$s->execute();$opening-=(float)($s->get_result()->fetch_assoc()['opening']??0);$s->close();
@@ -29,7 +29,7 @@ if($supplierId>0){
                sp.supplier_invoice_no description,sp.amount debit,0.00 credit
         FROM supplier_payables sp
         LEFT JOIN inventory_receipts ir ON ir.id=sp.receipt_id
-        WHERE sp.supplier_id=? AND DATE(sp.created_at) BETWEEN ? AND ?
+        WHERE sp.supplier_id=? AND sp.status<>'Cancelled' AND DATE(sp.created_at) BETWEEN ? AND ?
         UNION ALL
         SELECT spp.paid_at txn_date,'Supplier Payment' txn_type,
                COALESCE(NULLIF(spp.reference,''),CONCAT('PAY-',spp.id)) reference_no,
