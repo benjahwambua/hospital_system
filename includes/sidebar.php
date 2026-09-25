@@ -325,7 +325,7 @@ function isParentActive($paths) {
                 </div>
             </div>
 
-            <div class="has-submenu <?= isParentActive(['manage_suppliers.php', 'purchase_orders.php', 'receive_inventory.php']) ?>">
+            <div class="has-submenu <?= isParentActive(['manage_suppliers.php', 'purchase_orders.php', 'receive_inventory.php', 'supplier_payables.php']) ?>">
                 <a href="#" class="menu-toggle">
                     <i class="fas fa-boxes icon-main"></i> Procurement
                     <i class="fas fa-chevron-down caret"></i>
@@ -334,6 +334,7 @@ function isParentActive($paths) {
                     <a href="/hospital_system/procurement/manage_suppliers.php" class="<?= isActive('manage_suppliers.php') ?>"><i class="fas fa-truck"></i> Suppliers</a>
                     <a href="/hospital_system/procurement/purchase_orders.php" class="<?= isActive('purchase_orders.php') ?>"><i class="fas fa-shopping-basket"></i> Purchase Orders</a>
                     <a href="/hospital_system/procurement/receive_inventory.php" class="<?= isActive('receive_inventory.php') ?>"><i class="fas fa-warehouse"></i> Receive Inventory</a>
+                    <a href="/hospital_system/procurement/supplier_payables.php" class="<?= isActive('supplier_payables.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Supplier Payables</a>
                 </div>
             </div>
 
