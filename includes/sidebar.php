@@ -259,7 +259,7 @@ function isParentActive($paths) {
             </div>
         </div>
 
-        <div class="has-submenu <?= isParentActive(['lab_requests.php', 'lab_results.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['lab_requests.php', 'lab_results.php', 'lab/inventory/']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-microscope icon-main"></i> Laboratory
                 <i class="fas fa-chevron-down caret"></i>
@@ -267,6 +267,7 @@ function isParentActive($paths) {
             <div class="submenu">
                 <a href="/hospital_system/lab/lab_requests.php" class="<?= isActive('lab_requests.php') ?>"><i class="fas fa-vial"></i> Lab Requests</a>
                 <a href="/hospital_system/lab/lab_results.php" class="<?= isActive('lab_results.php') ?>"><i class="fas fa-poll-h"></i> Lab Results</a>
+                <a href="/hospital_system/lab/inventory/index.php" class="<?= isActive('lab/inventory/') ?>"><i class="fas fa-boxes"></i> Lab Inventory</a>
             </div>
         </div>
 
