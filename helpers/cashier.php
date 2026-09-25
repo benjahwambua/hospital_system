@@ -41,7 +41,11 @@ function cashier_shift_totals($conn, int $shiftId): array {
     $totals = ['cash'=>0.0, 'mpesa'=>0.0, 'other'=>0.0, 'total'=>0.0];
     if ($shiftId <= 0) return $totals;
 
-    $stmt=$conn->prepare("SELECT method, COALESCE(SUM(amount),0) AS total FROM payments WHERE cashier_shift_id=? GROUP BY method");
+    $stmt=$conn->prepare("SELECT method,
+        COALESCE(SUM(amount),0) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r
+            JOIN payments rp ON rp.id=r.payment_id
+            WHERE rp.cashier_shift_id=p.cashier_shift_id AND r.status='Approved'),0) AS total
+        FROM payments p WHERE cashier_shift_id=? GROUP BY method");
     if ($stmt) {
         $stmt->bind_param('i',$shiftId);
         $stmt->execute();
@@ -63,7 +67,7 @@ function close_cashier_shift($conn, int $shiftId, int $cashierId, float $closing
     if ($shiftId <= 0 || $cashierId <= 0) throw new Exception('Invalid cashier shift.');
     if ($closingCash < 0) throw new Exception('Closing cash cannot be negative.');
 
-    $stmt=$conn->prepare("SELECT * FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1");
+    $stmt=$conn->prepare("SELECT * FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1 FOR UPDATE");
     if(!$stmt) throw new Exception('Unable to load cashier shift: '.$conn->error);
     $stmt->bind_param('ii',$shiftId,$cashierId);
     $stmt->execute();
