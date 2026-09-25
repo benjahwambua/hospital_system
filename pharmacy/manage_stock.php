@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 require_login();
 require_role('pharmacist');
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
 /* GET ID */
 $id = intval($_GET['id'] ?? 0);
@@ -33,9 +34,13 @@ if (!$med) {
 
 /* PROCESS POST BEFORE ANY HTML */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
+        $error = 'Invalid security token.';
+    }
     $change = intval($_POST['change']);
     $note   = trim($_POST['note']);
 
+    if (!isset($error)) {
     $newQty = max(0, $med['quantity'] + $change);
     $type   = ($change >= 0) ? 'in' : 'out';
 
@@ -78,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->rollback();
         $error = "Failed to update stock";
     }
-}
+    }
 
 /* NOW SAFE TO OUTPUT HTML */
 include __DIR__ . '/../includes/header.php';
@@ -96,6 +101,7 @@ include __DIR__ . '/../includes/sidebar.php';
     <?php endif; ?>
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
         <label>Change Quantity (+ add / − deduct)</label>
         <input type="number" name="change" required class="form-control">
 
