@@ -21,10 +21,10 @@ $searchEsc = $conn->real_escape_string($search);
 
 $bucketSql = '';
 switch ($bucket) {
-    case '0-30':  $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(COALESCE(v.visit_date, i.created_at))) BETWEEN 1 AND 30'; break;
-    case '31-60': $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(COALESCE(v.visit_date, i.created_at))) BETWEEN 31 AND 60'; break;
-    case '61-90': $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(COALESCE(v.visit_date, i.created_at))) BETWEEN 61 AND 90'; break;
-    case '90+':   $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(COALESCE(v.visit_date, i.created_at))) > 90'; break;
+    case '0-30':  $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(i.created_at)) BETWEEN 1 AND 30'; break;
+    case '31-60': $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(i.created_at)) BETWEEN 31 AND 60'; break;
+    case '61-90': $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(i.created_at)) BETWEEN 61 AND 90'; break;
+    case '90+':   $bucketSql = ' AND DATEDIFF(CURDATE(), DATE(i.created_at)) > 90'; break;
 }
 
 $whereSearch = '';
@@ -72,7 +72,7 @@ $sql = "
            v.visit_number, v.visit_type, v.clinic_category,
            COALESCE(items.total, i.total, 0) AS bill_total,
            COALESCE(pay.paid, 0) AS paid_total,
-           DATEDIFF(CURDATE(), DATE(COALESCE(v.visit_date, i.created_at))) AS age_days
+           DATEDIFF(CURDATE(), DATE(i.created_at)) AS age_days
     {$baseFrom}
     ORDER BY age_days DESC, i.created_at ASC, i.id ASC
     LIMIT {$perPage} OFFSET {$offset}
@@ -114,7 +114,7 @@ $summaryResult = $conn->query("
         COALESCE(SUM(CASE WHEN age_days BETWEEN 61 AND 90 THEN 1 ELSE 0 END),0) AS c2,
         COALESCE(SUM(CASE WHEN age_days > 90 THEN 1 ELSE 0 END),0) AS c3
     FROM (
-        SELECT DATEDIFF(CURDATE(), DATE(COALESCE(v.visit_date, i.created_at))) AS age_days,
+        SELECT DATEDIFF(CURDATE(), DATE(i.created_at)) AS age_days,
                GREATEST(COALESCE(items.total, i.total, 0) - COALESCE(pay.paid,0), 0) AS balance
         {$baseFrom}
     ) x
