@@ -183,3 +183,4 @@ include __DIR__ . '/../includes/sidebar.php';
     </div>
 </div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+<!-- Refund links are provided by cashier/refund.php from the payment action column. -->
