@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/../config/config.php'; require_once __DIR__ . '/../includes/session.php'; require_login();
 $id=intval($_GET['id']??0);
-$inv = $conn->query("SELECT i.*, p.full_name FROM invoices i LEFT JOIN patients p ON p.id=i.patient_id WHERE i.id=$id")->fetch_assoc();
+$invStmt = $conn->prepare("SELECT i.*, p.full_name FROM invoices i LEFT JOIN patients p ON p.id=i.patient_id WHERE i.id=? LIMIT 1");
+$invStmt->bind_param('i', $id);
+$invStmt->execute();
+$inv = $invStmt->get_result()->fetch_assoc();
+$invStmt->close();
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="card" style="max-width:800px;margin:20px auto">
