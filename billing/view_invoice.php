@@ -33,11 +33,13 @@ if ($invoiceTotal <= 0 && $items) {
 }
 
 $totalPaid = 0.0;
+$totalRefunded = 0.0;
 $paymentHistory = [];
+$refundHistory = [];
 
 // The payment ledger is invoice-specific. Never use all payments belonging to
 // the patient because that makes one invoice consume another invoice's money.
-$stmt = $conn->prepare('SELECT amount, method, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC');
+$stmt = $conn->prepare('SELECT id, amount, method, reference, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC');
 if ($stmt) {
     $stmt->bind_param('i', $invoiceId);
     $stmt->execute();
@@ -50,7 +52,17 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Legacy billing entries are used only when explicitly linked to this invoice.
+$refundStmt = $conn->prepare("SELECT r.*, u.full_name AS refunded_by_name FROM payment_refunds r LEFT JOIN users u ON u.id=r.refunded_by WHERE r.invoice_id=? AND r.status='Approved' ORDER BY r.created_at DESC");
+if ($refundStmt) {
+    $refundStmt->bind_param('i',$invoiceId);
+    $refundStmt->execute();
+    $rr=$refundStmt->get_result();
+    while($row=$rr->fetch_assoc()){ $refundHistory[]=$row; $totalRefunded+=(float)$row['amount']; }
+    $refundStmt->close();
+}
+$totalPaid = max(0,$totalPaid-$totalRefunded);
+
+// Legacy billing entries are read-only compatibility data and are not used when modern payments exist.
 if (!$paymentHistory) {
     $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE invoice_id = ? ORDER BY created_at DESC');
     if ($stmt) {
