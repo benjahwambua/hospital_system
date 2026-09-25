@@ -16,6 +16,7 @@ $med = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     $name = $conn->real_escape_string($_POST['name']);
     $desc = $conn->real_escape_string($_POST['description']);
     $buy = floatval($_POST['buy_price']);
