@@ -27,7 +27,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    if(!$patient) $message="<div class='alert alert-danger'>Patient not found.</div>";
    else{
     try{
-     $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient',$clinic);
+     $visitId=$postedVisitId;
+     if($visitId>0){
+      $vs=$conn->prepare("SELECT id FROM visits WHERE id=? AND patient_id=? AND visit_date=CURDATE() AND status IN ('Open','In Progress') LIMIT 1");
+      if($vs){$vs->bind_param('ii',$visitId,$patientId);$vs->execute();$validVisit=$vs->get_result()->fetch_assoc();$vs->close();}
+      if(empty($validVisit)) $visitId=0;
+     }
+     if($visitId<=0) $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient',$clinic);
      if($hasVisitColumn && $vitalsHasStatus){
       $status='pending'; $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
       $stmt->bind_param('isssssiis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId,$status);
@@ -43,7 +49,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
      }
      if(!$stmt || !$stmt->execute()) throw new Exception($stmt?$stmt->error:$conn->error);
      if($stmt)$stmt->close();
-     if($visitId>0){$v=$conn->prepare("UPDATE visits SET clinic_category=?,status='Open',updated_at=NOW() WHERE id=? AND patient_id=?");if($v){$v->bind_param('sii',$clinic,$visitId,$patientId);$v->execute();$v->close();}}
+     if($visitId>0){
+      $v=$conn->prepare("UPDATE visits SET clinic_category=?,status='Open',updated_at=NOW() WHERE id=? AND patient_id=? AND status IN ('Open','In Progress')");
+      if($v){$v->bind_param('sii',$clinic,$visitId,$patientId);$v->execute();$v->close();}
+     }
      header("Location: consultations.php?triage=success"); exit;
     }catch(Throwable $e){$message="<div class='alert alert-danger'>Unable to record triage: ".htmlspecialchars($e->getMessage())."</div>";}
    }
@@ -57,6 +66,7 @@ include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sid
 <div class="card shadow-sm border-0"><div class="card-header bg-white py-3 d-flex justify-content-between"><h5 class="m-0 font-weight-bold text-primary"><i class="fas fa-heartbeat mr-2"></i>Patient Triage & Vitals</h5><a href="consultations.php" class="btn btn-sm btn-outline-primary">Doctor Queue</a></div>
 <div class="card-body p-4"><?=$message?>
 <form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
+<input type="hidden" name="visit_id" value="<?= (int)($_GET['visit_id'] ?? 0) ?>">
 <div class="row"><div class="col-md-8 mb-3"><label class="small font-weight-bold">PATIENT</label><select name="patient_id" class="form-control select2" required><option value="">-- Search patient --</option><?php if($patients)while($p=$patients->fetch_assoc()): ?><option value="<?=$p['id']?>" <?=((int)($_GET['patient_id'] ?? 0)===(int)$p['id'])?'selected':''?>><?=htmlspecialchars($p['full_name'])?> — <?=htmlspecialchars($p['patient_number']??'')?> · <?=htmlspecialchars($p['gender']??'')?> · <?=htmlspecialchars($p['age']??'')?> yrs</option><?php endwhile; ?></select></div>
 <div class="col-md-4 mb-3"><label class="small font-weight-bold">CLINIC / DEPARTMENT</label><select name="clinic_category" class="form-control"><option>General</option><option>Outpatient</option><option>Dental</option><option>Maternal</option><option>Pediatric</option><option>Emergency</option><option>Specialist</option></select></div></div>
 <div class="row">
