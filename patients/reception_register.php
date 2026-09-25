@@ -354,7 +354,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
         <div class="form-card">
             <div class="form-header">
                 <h2>Reception Desk</h2>
-                <p>Register a patient and create one clinical visit. The patient then moves to the Queue and Triage before Doctor assessment.</p>
+                <p>Register a patient and create one clinical visit. The patient is routed according to the visit pathway. Walk-in treatment does not require Triage unless clinical assessment is requested.</p>
             </div>
 
             <div class="form-body">
