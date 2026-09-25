@@ -80,7 +80,7 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <?php if (isset($_GET['success'])): ?>
-            <div class="alert alert-success"><i class="fas fa-check-circle"></i> Payment received successfully. Patient balance updated.</div>
+            <div class="alert alert-success"><i class="fas fa-check-circle"></i> Payment received successfully. Patient balance updated. <?php if (!empty($_GET['paid_invoice'])): ?><a class="btn btn-sm btn-success ml-2" target="_blank" href="/hospital_system/billing/view_invoice.php?id=<?= (int)$_GET['paid_invoice'] ?>&print=1"><i class="fas fa-print"></i> View & Print Invoice</a><?php endif; ?></div>
         <?php endif; ?>
 
         <div class="row mb-4">
@@ -116,7 +116,7 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover">
                             <thead class="thead-light"><tr>
-                                <th>Visit</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Receive</th>
+                                <th>Visit</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Receive / Invoice</th>
                             </tr></thead>
                             <tbody>
                             <?php foreach ($pending as $row): ?>
@@ -155,6 +155,9 @@ include __DIR__ . '/../includes/sidebar.php';
                                                 </div>
                                             </div>
                                         </form>
+                                        <a class="btn btn-sm btn-outline-primary btn-block" target="_blank" href="/hospital_system/billing/view_invoice.php?id=<?= (int)$row['id'] ?>">
+                                            <i class="fas fa-file-invoice"></i> View Invoice
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
