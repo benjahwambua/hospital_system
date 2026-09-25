@@ -158,7 +158,7 @@ function mpesa_initiate_stk($conn, int $invoiceId, int $patientId, float $amount
         "INSERT INTO mpesa_transactions
         (invoice_id, patient_id, cashier_shift_id, amount, phone, merchant_request_id, checkout_request_id,
          result_code, result_desc, status, raw_response, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())"
     );
 
     if (!$stmt) {
