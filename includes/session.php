@@ -6,6 +6,46 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 function require_login(): void {
     if (empty($_SESSION['user_id'])) { header('Location: /hospital_system/auth/login.php'); exit; }
+
+    // Central Odoo-style module guard. Page-level scripts that call require_login()
+    // are denied before any page logic/POST action runs when their module is disabled.
+    global $conn;
+    if (isset($conn) && $conn instanceof mysqli) {
+        require_once __DIR__ . '/permissions.php';
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+        $relative = ltrim((string)preg_replace('#^/hospital_system/?#', '', $path), '/');
+
+        $module = null;
+        $moduleMap = [
+            'patients/reception_register.php' => ['front_desk','create'],
+            'reception/' => ['front_desk','view'],
+            'patients/' => ['clinical','view'],
+            'clinical/' => ['clinical','view'],
+            'lab/' => ['laboratory','view'],
+            'radiology/' => ['radiology','view'],
+            'pharmacy/' => ['pharmacy','view'],
+            'maternity/' => ['maternity','view'],
+            'cashier/' => ['finance','view'],
+            'procurement/' => ['procurement','view'],
+            'billing/' => ['finance_admin','view'],
+            'accounting/' => ['finance_admin','view'],
+            'expenses/' => ['finance_admin','view'],
+            'users/' => ['administration','view'],
+            'settings/' => ['administration','view'],
+            'reports/' => ['administration','view']
+        ];
+
+        foreach ($moduleMap as $prefix => $rule) {
+            if ($prefix === $relative || str_ends_with($prefix, '/') && str_starts_with($relative, $prefix)) {
+                $module = $rule;
+                break;
+            }
+        }
+
+        if ($module) {
+            require_module_access($conn, $module[0], $module[1]);
+        }
+    }
 }
 function csrf_token(): string {
     if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
