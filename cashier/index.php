@@ -32,9 +32,9 @@ $sql = "
         FROM invoice_items GROUP BY invoice_id
     ) items ON items.invoice_id = i.id
     LEFT JOIN (
-        SELECT invoice_id, SUM(amount) AS paid
-        FROM payments WHERE invoice_id IS NOT NULL
-        GROUP BY invoice_id
+        SELECT p.invoice_id, SUM(p.amount) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.invoice_id=p.invoice_id AND r.status='Approved'),0) AS paid
+        FROM payments p WHERE p.invoice_id IS NOT NULL
+        GROUP BY p.invoice_id
     ) pay ON pay.invoice_id = i.id
     WHERE (i.visit_id IS NOT NULL OR i.walkin_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
       AND COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
@@ -56,7 +56,7 @@ if ($result) {
     }
 }
 
-$todayPayments = $conn->query("SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE DATE(created_at)=CURDATE()");
+$todayPayments = $conn->query("SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) AS total FROM payments p WHERE DATE(p.created_at)=CURDATE()");
 $collectedToday = $todayPayments ? (float)($todayPayments->fetch_assoc()['total'] ?? 0) : 0.0;
 
 include __DIR__ . '/../includes/header.php';
