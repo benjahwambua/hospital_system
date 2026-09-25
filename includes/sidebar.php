@@ -245,16 +245,15 @@ function isParentActive($paths) {
             </div>
         </div>
 
-        <div class="has-submenu <?= isParentActive(['reception_register.php', 'patient_list.php', 'add_service.php', 'view_services.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['reception_register.php', 'patient_list.php', 'patient_management.php']) ?>">
             <a href="#" class="menu-toggle">
-                <i class="fas fa-users icon-main"></i> Patients & Services
+                <i class="fas fa-users icon-main"></i> Patients
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
-                <a href="/hospital_system/patients/reception_register.php" class="<?= isActive('reception_register.php') ?>"><i class="fas fa-user-plus"></i> New Patient</a>
+                <a href="/hospital_system/patients/reception_register.php" class="<?= isActive('reception_register.php') ?>"><i class="fas fa-user-plus"></i> Register Patient</a>
                 <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient List</a>
-                <a href="/hospital_system/patients/add_service.php" class="<?= isActive('add_service.php') ?>"><i class="fas fa-hand-holding-medical"></i> Add Service</a>
-                <a href="/hospital_system/patients/view_services.php" class="<?= isActive('view_services.php') ?>"><i class="fas fa-briefcase-medical"></i> View Services</a>
+                <a href="/hospital_system/patients/patient_management.php" class="<?= isActive('patient_management.php') ?>"><i class="fas fa-user-cog"></i> Patient Management</a>
             </div>
         </div>
 
