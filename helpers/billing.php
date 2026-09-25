@@ -597,6 +597,7 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
     // Receipt and phone are optional for manual record keeping. Check for
     // duplicates only when a receipt has actually been supplied.
     $receiptValue = $receipt !== '' ? $receipt : null;
+    $patientValue = $patient_id > 0 ? $patient_id : null;
 
     if ($receiptValue !== null) {
         $check = $conn->prepare("SELECT id FROM mpesa_transactions WHERE mpesa_receipt = ? LIMIT 1");
