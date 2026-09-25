@@ -55,20 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $doctorId = max(0, (int)($_POST['doctor_id'] ?? 0));
     $clinicalType = trim((string)($_POST['clinic_category'] ?? 'General'));
 
-    // Vitals only for full registration
-    $temperature = '';
-    $bp = '';
-    $weight = '';
-    $pulse = '';
-    $respiration = '';
-    
-    if (!$isWalkin) {
-        $temperature = trim((string)($_POST['temperature'] ?? ''));
-        $bp = trim((string)($_POST['bp'] ?? ''));
-        $weight = trim((string)($_POST['weight'] ?? ''));
-        $pulse = trim((string)($_POST['pulse'] ?? ''));
-        $respiration = trim((string)($_POST['respiration'] ?? ''));
-    }
+    // Clinical observations are captured once, authoritatively in Clinical Care → Triage & Vitals.
+    // Reception only handles demographics, registration and visit/queue creation.
 
     // Walk-in: Only clinical type required, name & phone optional
     if ($isWalkin) {
@@ -129,22 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Selected doctor was not found.';
             }
             $doctorCheck->close();
-        }
-    }
-
-    // Only validate vitals for full registration
-    if (!$isWalkin) {
-        if ($temperature !== '' && !is_numeric($temperature)) {
-            $errors[] = 'Temperature must be numeric.';
-        }
-        if ($weight !== '' && !is_numeric($weight)) {
-            $errors[] = 'Weight must be numeric.';
-        }
-        if ($pulse !== '' && !ctype_digit($pulse)) {
-            $errors[] = 'Pulse must be a whole number.';
-        }
-        if ($respiration !== '' && !ctype_digit($respiration)) {
-            $errors[] = 'Respiration must be a whole number.';
         }
     }
 
@@ -301,38 +273,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Only record vitals for full registration patients
-            if (!$isWalkin && ($temperature !== '' || $bp !== '' || $weight !== '' || $pulse !== '' || $respiration !== '')) {
-                $vitalsStmt = $conn->prepare(
-                    'INSERT INTO vitals (patient_id, temperature, bp, weight, pulse, respiration, created_at)
-                     VALUES (?, ?, ?, ?, ?, ?, NOW())'
-                );
-                
-                if (!$vitalsStmt) {
-                    throw new Exception("Vitals prepare failed: " . $conn->error);
-                }
-                
-                $vitalsStmt->bind_param('isssss', $patientId, $temperature, $bp, $weight, $pulse, $respiration);
-                
-                if (!$vitalsStmt->execute()) {
-                    throw new Exception("Vitals execute failed: " . $vitalsStmt->error);
-                }
-                
-                $vitalsId = (int)$vitalsStmt->insert_id;
-                $vitalsStmt->close();
-
-                // Link triage vitals to the same visit.
-                if ($visitId > 0 && $vitalsId > 0) {
-                    $linkVitals = $conn->prepare("UPDATE vitals SET visit_id = ? WHERE id = ?");
-                    if ($linkVitals) {
-                        $linkVitals->bind_param('ii', $visitId, $vitalsId);
-                        if (!$linkVitals->execute()) {
-                            throw new Exception("Vitals visit link failed: " . $linkVitals->error);
-                        }
-                        $linkVitals->close();
-                    }
-                }
-            }
+            // Vitals are recorded by clinical staff in the Triage & Vitals workflow.
+            // This prevents reception and triage from creating competing clinical records.
 
             // Create maternity record if applicable
             if (in_array($clinicalType, ['Maternity', 'ANC', 'PNC'], true)) {
@@ -527,33 +469,11 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                         </div>
                     </div>
 
-                    <div id="vitalsSection" class="form-section" style="background-color: #fcfcfc; padding: 20px; border: 1px solid #eee; border-radius: 8px; display: grid;">
-                        <div class="section-title">Initial Vitals (Triage)</div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="temperature">Temperature (°C)</label>
-                                <input id="temperature" name="temperature" type="number" step="0.1" class="form-control" placeholder="36.5" value="<?= add_patient_old('temperature') ?>">
-                            </div>
-                            <div class="form-group">
-                                <label for="bp">Blood Pressure (BP)</label>
-                                <input id="bp" name="bp" class="form-control" placeholder="120/80" value="<?= add_patient_old('bp') ?>">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="weight">Weight (kg)</label>
-                                <input id="weight" name="weight" type="number" step="0.1" class="form-control" placeholder="70" value="<?= add_patient_old('weight') ?>">
-                            </div>
-                            <div class="form-group">
-                                <label for="pulse">Pulse (bpm)</label>
-                                <input id="pulse" name="pulse" type="number" class="form-control" placeholder="72" value="<?= add_patient_old('pulse') ?>">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="respiration">Respiration (breaths/min)</label>
-                                <input id="respiration" name="respiration" type="number" class="form-control" placeholder="16" value="<?= add_patient_old('respiration') ?>">
-                            </div>
+                    <div class="form-section" style="background-color:#f7fbff;border:1px solid #dbeafe;border-radius:8px;">
+                        <div class="section-title">Next Step: Triage & Vitals</div>
+                        <div style="color:#475569;">
+                            Reception completes registration and check-in only. Clinical staff record the authoritative
+                            blood pressure, temperature, pulse, weight and triage notes in <strong>Clinical Care → Triage & Vitals</strong>.
                         </div>
                     </div>
 
@@ -624,7 +544,6 @@ function toggleMode(mode) {
     const nokSection = document.getElementById('fullRegistrationFields');
     const idExtraFields = document.getElementById('idExtraFields');
     const genderField = document.getElementById('genderField');
-    const vitalsSection = document.getElementById('vitalsSection');
     const nokInput = document.getElementById('nokInput');
     const nokLabel = document.getElementById('nokLabel');
     const nameLabel = document.getElementById('nameLabel');
@@ -638,7 +557,6 @@ function toggleMode(mode) {
         nokSection.style.display = 'none';
         idExtraFields.style.display = 'none';
         genderField.style.display = 'none';
-        vitalsSection.style.display = 'none';
         nokInput.required = false;
         nokLabel.classList.remove('label-required');
         
@@ -651,11 +569,10 @@ function toggleMode(mode) {
         walkinBadge.style.display = 'inline-block';
         walkinInfoBox.style.display = 'block';
     } else {
-        // Full registration: Show all fields, require name, show vitals
+        // Full registration: Show the complete demographic and next-of-kin fields
         nokSection.style.display = 'block';
         idExtraFields.style.display = 'grid';
         genderField.style.display = 'grid';
-        vitalsSection.style.display = 'grid';
         nokInput.required = true;
         nokLabel.classList.add('label-required');
         
