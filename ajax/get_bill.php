@@ -8,7 +8,7 @@ require_login();
 $patient_id=(int)($_GET['patient_id']??0);
 if($patient_id<=0){ http_response_code(400); exit('Invalid patient.'); }
 
-$stmt=$conn->prepare("SELECT id,total,paid_amount,amount_paid,balance,status,invoice_number FROM invoices WHERE patient_id=? ORDER BY id DESC");
+$stmt=$conn->prepare("SELECT id,total,paid_amount,amount_paid,balance,status,invoice_number,created_at FROM invoices WHERE patient_id=? ORDER BY id DESC");
 $stmt->bind_param('i',$patient_id); $stmt->execute(); $invoices=$stmt->get_result();
 ?>
 <table class="table table-sm table-bordered">
