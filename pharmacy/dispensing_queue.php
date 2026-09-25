@@ -37,6 +37,27 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['dispense_id'])){
             $balanceRow=$balanceStmt->get_result()->fetch_assoc(); $balanceStmt->close();
             $balanceAfter=(int)($balanceRow['quantity'] ?? 0);
 
+            // Pharmacy is the fulfillment point. Create the visit-linked invoice charge
+            // exactly once at dispensing; payment remains with Central Cashier.
+            $visitId = (int)($row['visit_id'] ?? 0);
+            $invoiceId = 0;
+            if ($visitId > 0) {
+                $invoiceId = get_or_create_visit_invoice($conn, (int)$row['patient_id'], $visitId);
+            } else {
+                $invoiceId = get_or_create_invoice($conn, (int)$row['patient_id']);
+            }
+            $invoiceItemId = add_invoice_item(
+                $conn,
+                $invoiceId,
+                'Pharmacy: ' . $row['drug_name'],
+                $qty,
+                (float)($row['unit_price'] ?? 0),
+                'pharmacy',
+                $mid
+            );
+            $lineTotal = $qty * (float)($row['unit_price'] ?? 0);
+            post_invoice_journal($conn, $invoiceId, (int)$row['patient_id'], $lineTotal, 'Pharmacy dispensing', $invoiceItemId);
+
             // Keep a stock movement trail for every dispensing transaction.
             $move=$conn->prepare("INSERT INTO stock_movements (stock_id,movement_type,quantity_change,balance_after,note,user_id,created_at) VALUES (?,?,?,?,?,?,NOW())");
             if($move){
@@ -56,9 +77,9 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['dispense_id'])){
 
 $hasVisit=$conn->query("SHOW COLUMNS FROM pharmacy_queue LIKE 'visit_id'");
 if($hasVisit && $hasVisit->num_rows){
-    $sql="SELECT q.id,q.quantity,q.status,q.created_at,q.completed_at,q.visit_id,p.full_name,p.patient_number,s.drug_name,v.visit_number FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id LEFT JOIN visits v ON v.id=q.visit_id WHERE q.status='pending' ORDER BY q.created_at ASC";
+    $sql="SELECT q.id,q.quantity,q.status,q.created_at,q.completed_at,q.visit_id,p.full_name,p.patient_number,s.drug_name,s.selling_price AS unit_price,v.visit_number FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id LEFT JOIN visits v ON v.id=q.visit_id WHERE q.status='pending' ORDER BY q.created_at ASC";
 }else{
-    $sql="SELECT q.id,q.quantity,q.status,q.created_at,q.completed_at,NULL AS visit_id,p.full_name,p.patient_number,s.drug_name,NULL AS visit_number FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id WHERE q.status='pending' ORDER BY q.created_at ASC";
+    $sql="SELECT q.id,q.quantity,q.status,q.created_at,q.completed_at,NULL AS visit_id,p.full_name,p.patient_number,s.drug_name,s.selling_price AS unit_price,NULL AS visit_number FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id WHERE q.status='pending' ORDER BY q.created_at ASC";
 }
 $rows=$conn->query($sql);
 
