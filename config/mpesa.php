@@ -113,7 +113,7 @@ function mpesa_normalize_phone(string $phone): string {
     throw new Exception('Enter a valid Kenyan M-Pesa phone number.');
 }
 
-function mpesa_initiate_stk($conn, int $invoiceId, int $patientId, float $amount, string $phone): array {
+function mpesa_initiate_stk($conn, int $invoiceId, int $patientId, float $amount, string $phone, int $cashierShiftId=0): array {
     $shortcode = mpesa_setting('mpesa_shortcode');
     $passkey = mpesa_setting('mpesa_passkey');
     $callback = mpesa_setting('mpesa_callback_url');
@@ -156,7 +156,7 @@ function mpesa_initiate_stk($conn, int $invoiceId, int $patientId, float $amount
 
     $stmt = $conn->prepare(
         "INSERT INTO mpesa_transactions
-        (invoice_id, patient_id, amount, phone, merchant_request_id, checkout_request_id,
+        (invoice_id, patient_id, cashier_shift_id, amount, phone, merchant_request_id, checkout_request_id,
          result_code, result_desc, status, raw_response, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())"
     );
@@ -172,8 +172,8 @@ function mpesa_initiate_stk($conn, int $invoiceId, int $patientId, float $amount
     $raw = json_encode($response);
 
     $stmt->bind_param(
-        'iidssssss',
-        $invoiceId, $patientId, $amount, $phone,
+        'iiidssssss',
+        $invoiceId, $patientId, $cashierShiftId, $amount, $phone,
         $merchant, $checkout, $resultCode, $resultDesc, $raw
     );
 
