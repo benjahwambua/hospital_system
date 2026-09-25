@@ -99,8 +99,8 @@ try {
         $patient_id,
         null,
         $walkin_id,
-        'paid',
-        $payment_mode,
+        'unpaid',
+        null,
         0.0,
         null
     );
@@ -156,40 +156,19 @@ try {
         $update_stmt->execute();
         $update_stmt->close();
 
-        add_invoice_item(
+        $itemId=add_invoice_item(
             $conn,
             $invoice_id,
-            $med['drug_name'],
+            'Pharmacy: '.$med['drug_name'],
             $qty,
             $unit_price,
             'pharmacy',
             $med_id
         );
+        post_invoice_journal($conn,$invoice_id,$patient_id,$total,'Pharmacy sale',$itemId);
     }
 
-    $update_inv = $conn->prepare('UPDATE invoices SET total = ? WHERE id = ?');
-    if (!$update_inv) {
-        throw new Exception($conn->error);
-    }
-
-    $update_inv->bind_param('di', $grand_total, $invoice_id);
-    $update_inv->execute();
-    $update_inv->close();
-
-    $note = "Invoice #{$invoice_id} ({$payment_mode})";
-
-    $acc_stmt = $conn->prepare(
-        "INSERT INTO accounting_entries (account, debit, credit, note, created_at)
-         VALUES ('Pharmacy Sales', ?, 0, ?, NOW())"
-    );
-    if (!$acc_stmt) {
-        throw new Exception($conn->error);
-    }
-
-    $acc_stmt->bind_param('ds', $grand_total, $note);
-    $acc_stmt->execute();
-    $acc_stmt->close();
-
+    // add_invoice_item() already maintains the authoritative invoice total.
     $conn->commit();
     $transactionStarted = false;
 
