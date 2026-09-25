@@ -12,6 +12,9 @@ if (empty($_SESSION['csrf_token'])) {
 $csrfToken = $_SESSION['csrf_token'];
 
 $patient_id = intval($_GET['id'] ?? 0);
+$appointment_id = intval($_GET['appointment_id'] ?? 0);
+$activeAppointment = null;
+$activeVisitId = 0;
 $status_message = '';
 $status_type = 'success';
 
@@ -25,6 +28,32 @@ $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+if ($patient_id > 0 && $appointment_id > 0) {
+    $apptStmt = $conn->prepare("SELECT a.*, u.full_name AS doctor_name FROM appointments a LEFT JOIN users u ON u.id = a.doctor_id WHERE a.id = ? AND a.patient_id = ? LIMIT 1");
+    if ($apptStmt) {
+        $apptStmt->bind_param('ii', $appointment_id, $patient_id);
+        $apptStmt->execute();
+        $activeAppointment = $apptStmt->get_result()->fetch_assoc();
+        $apptStmt->close();
+    }
+    if ($activeAppointment && hms_visits_available($conn)) {
+        $hasAppointmentVisit = false;
+        $cols = $conn->query("SHOW COLUMNS FROM appointments");
+        if ($cols) while ($col = $cols->fetch_assoc()) {
+            if (($col['Field'] ?? '') === 'visit_id') { $hasAppointmentVisit = true; break; }
+        }
+        if ($hasAppointmentVisit && !empty($activeAppointment['visit_id'])) {
+            $activeVisitId = (int)$activeAppointment['visit_id'];
+        } else {
+            $activeVisitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', $activeAppointment['clinic_category'] ?? 'General', (int)($activeAppointment['doctor_id'] ?? 0));
+            if ($hasAppointmentVisit && $activeVisitId > 0) {
+                $linkStmt = $conn->prepare("UPDATE appointments SET visit_id = ? WHERE id = ? AND patient_id = ?");
+                if ($linkStmt) { $linkStmt->bind_param('iii', $activeVisitId, $appointment_id, $patient_id); $linkStmt->execute(); $linkStmt->close(); }
+            }
+        }
+    }
+}
 
 if ($patient_id <= 0) {
     // We handle the error later in the HTML section to keep the UI consistent
@@ -284,7 +313,6 @@ if ($patient_id <= 0) {
             $stmt->bind_param("isssssssssssssssss", ...$params);
         }
         if(!$stmt) throw new Exception('Unable to prepare clinical record: '.$conn->error);
-        $stmt->bind_param("isssssssssssssssss", ...$params);
         if(!$stmt->execute()){ $error=$stmt->error; $stmt->close(); throw new Exception('Unable to save clinical record: '.$error); }
         $stmt->close();
         header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&success=1");
