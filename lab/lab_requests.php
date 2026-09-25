@@ -147,6 +147,7 @@ if (isset($_POST['save_lab_result'])) {
 
 // Laboratory requests are submitted here and processed in the Lab Results worklist.
 $created = isset($_GET['created']);
+$walkin_lab_services = $conn->query("SELECT id, service_name, price FROM services_master WHERE active = 1 AND category = 'lab' ORDER BY service_name ASC");
 ?>
 
 <style>
