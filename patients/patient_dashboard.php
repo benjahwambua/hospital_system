@@ -147,7 +147,7 @@ if ($patient_id <= 0) {
 
         if ($invoice_total > 0) {
             $invoice_id = get_or_create_visit_invoice($conn, $patient_id, $visitId);
-            add_invoice_item(
+            $invoiceItemId = add_invoice_item(
                 $conn,
                 $invoice_id,
                 'Medication: ' . ($stock['drug_name'] ?? 'Prescription'),
@@ -156,6 +156,7 @@ if ($patient_id <= 0) {
                 'pharmacy',
                 $medicine_id
             );
+            post_invoice_journal($conn, $invoice_id, $patient_id, $qty * $unit_price, 'Prescription', $invoiceItemId);
 
             $updatePrescription = $conn->prepare("UPDATE prescriptions SET invoice_id = ? WHERE id = ?");
             if ($updatePrescription) {
@@ -194,7 +195,8 @@ if ($patient_id <= 0) {
             $stmt->close();
 
             $invoice_id=get_or_create_visit_invoice($conn,$patient_id,$visitId);
-            add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
+            $invoiceItemId=add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
+            post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Service',$invoiceItemId);
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
             exit;
