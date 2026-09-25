@@ -19,6 +19,8 @@ $meds = $conn->query("SELECT id, name, quantity, selling_price FROM medications 
 
 $msg = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    $med_id
     $med_id = intval($_POST['med_id']);
     $qty = intval($_POST['qty']);
     $notes = $conn->real_escape_string($_POST['notes']);
@@ -40,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php endif; ?>
 
 <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Medicine</label>
     <select name="med_id" class="form-control" required>
         <?php while($m = $meds->fetch_assoc()): ?>
