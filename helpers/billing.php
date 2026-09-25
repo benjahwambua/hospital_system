@@ -415,8 +415,8 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
         $itemCheck->close();
     }
     if(!$hasItem){
-        add_invoice_item($conn,$invoiceId,'Service: Consultation',1,$fee,'service',$service ? (int)$service['id'] : null);
-        post_invoice_journal($conn,$invoiceId,$patient_id,$fee,'Consultation');
+        $invoiceItemId=add_invoice_item($conn,$invoiceId,'Service: Consultation',1,$fee,'service',$service ? (int)$service['id'] : null);
+        post_invoice_journal($conn,$invoiceId,$patient_id,$fee,'Consultation',$invoiceItemId);
     }
 
     return $invoiceId;
