@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $receiptTotal=round($qty*$unitCost,2);
                 $uid=(int)$_SESSION['user_id'];
                 $receipt=$conn->prepare("INSERT INTO inventory_receipts (po_id,po_item_id,inventory_type,supplier_invoice_no,batch_no,expiry_date,store_name,remarks,qty_received,unit_cost,total_cost,payment_method,received_by,received_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
-                $receipt->bind_param('iiisssssdddsii',$poId,$poItemId,$inventoryType,$supplierInvoice,$batchNo,$expiryDate,$storeName,$remarks,$qty,$unitCost,$receiptTotal,$paymentMethod,$uid);
+                $receipt->bind_param('iissssssdddsi',$poId,$poItemId,$inventoryType,$supplierInvoice,$batchNo,$expiryDate,$storeName,$remarks,$qty,$unitCost,$receiptTotal,$paymentMethod,$uid);
                 if(!$receipt->execute()) throw new Exception('Unable to create GRN: '.$receipt->error);
                 $printId=(int)$receipt->insert_id; $receipt->close();
 
