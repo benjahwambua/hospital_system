@@ -44,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 if (!$ins->execute()) throw new Exception($ins->error);
                 $ins->close();
                 $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
-                add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$service['service_name'],1,$price,$type,$serviceId);
-                post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order');
+                $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$service['service_name'],1,$price,$type,$serviceId);
+                post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
                 $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.' sent to Central Cashier.';
             } elseif ($type==='pharmacy') {
                 $medicineId=(int)($_POST['medicine_id'] ?? 0);
@@ -77,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                     }
                 }
                 $total=$quantity*$unit; $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
-                add_invoice_item($conn,$invoiceId,'Pharmacy: '.$medicine['drug_name'],$quantity,$unit,'pharmacy',$medicineId);
-                post_invoice_journal($conn,$invoiceId,$patientId,$total,'Pharmacy order');
+                $invoiceItemId=add_invoice_item($conn,$invoiceId,'Pharmacy: '.$medicine['drug_name'],$quantity,$unit,'pharmacy',$medicineId);
+                post_invoice_journal($conn,$invoiceId,$patientId,$total,'Pharmacy order',$invoiceItemId);
                 $message='Prescription sent to Pharmacy for dispensing. Stock is deducted only when dispensed. Invoice #'.$invoiceId.' sent to Central Cashier.';
             } else throw new Exception('Select a department.');
         } catch (Throwable $e) { $message=$e->getMessage(); }
