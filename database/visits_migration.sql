@@ -31,3 +31,8 @@ CREATE INDEX idx_appointments_visit ON appointments(visit_id);
 CREATE INDEX idx_vitals_visit ON vitals(visit_id);
 CREATE INDEX idx_patient_services_visit ON patient_services(visit_id);
 CREATE INDEX idx_invoices_visit ON invoices(visit_id);
+
+
+-- Triage workflow extension
+ALTER TABLE visits ADD COLUMN triage_priority ENUM('Routine','Urgent','Emergency') NOT NULL DEFAULT 'Routine' AFTER clinic_category;
+CREATE INDEX idx_visits_triage_priority ON visits(triage_priority);
