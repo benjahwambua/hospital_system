@@ -1,17 +1,23 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_role(['admin']);
 
 // --- 1. ADMIN CORRECTION HANDLER (With Basic CSRF/Role Protection) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id'])) {
-    // Recommendation: Add if($_SESSION['role'] !== 'admin') check here
-    $del_id = intval($_POST['delete_invoice_id']);
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+
+    $del_id = (int)$_POST['delete_invoice_id'];
     
     $conn->begin_transaction();
     try {
-        $conn->query("DELETE FROM invoice_items WHERE invoice_id = $del_id");
-        $conn->query("DELETE FROM invoices WHERE id = $del_id");
+        if ($del_id <= 0) throw new Exception('Invalid invoice.');
+        $stmt = $conn->prepare("DELETE FROM invoice_items WHERE invoice_id = ?");
+        $stmt->bind_param('i', $del_id); $stmt->execute(); $stmt->close();
+        $stmt = $conn->prepare("DELETE FROM invoices WHERE id = ?");
+        $stmt->bind_param('i', $del_id); $stmt->execute(); $stmt->close();
         
         $conn->commit();
         $_SESSION['success'] = "Invoice #$del_id deleted successfully.";
