@@ -6,31 +6,52 @@ require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 require_role(['admin','doctor','nurse']);
 
-$patient_id=(int)($_POST['patient_id']??0);
-$lab_id=(int)($_POST['lab_id']??0);
-$lab_price=(float)($_POST['lab_price']??0);
-if($patient_id<=0 || $lab_id<=0 || $lab_price<0){ echo json_encode(['success'=>false,'message'=>'Invalid laboratory request.']); exit; }
+header('Content-Type: application/json');
 
-$stmt=$conn->prepare("SELECT id,test_name FROM lab_tests_master WHERE id=? LIMIT 1");
-$stmt->bind_param('i',$lab_id); $stmt->execute(); $lab=$stmt->get_result()->fetch_assoc(); $stmt->close();
-if(!$lab){ echo json_encode(['success'=>false,'message'=>'Invalid Lab']); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf_token($_POST['csrf_token'] ?? null)) {
+    http_response_code(419);
+    echo json_encode(['success'=>false,'message'=>'Invalid security token.']);
+    exit;
+}
+
+$patientId=(int)($_POST['patient_id']??0);
+$serviceId=(int)($_POST['lab_id']??0);
+if($patientId<=0 || $serviceId<=0){
+    echo json_encode(['success'=>false,'message'=>'Invalid laboratory request.']);
+    exit;
+}
+
+$stmt=$conn->prepare("SELECT id,service_name,price FROM services_master WHERE id=? AND active=1 AND category='lab' LIMIT 1");
+$stmt->bind_param('i',$serviceId);
+$stmt->execute();
+$service=$stmt->get_result()->fetch_assoc();
+$stmt->close();
+if(!$service){
+    echo json_encode(['success'=>false,'message'=>'Invalid laboratory service.']);
+    exit;
+}
+
+$visitId=(int)($_POST['visit_id']??0);
+if($visitId<=0) $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient','Laboratory');
 
 $conn->begin_transaction();
 try{
-    $visitId=get_or_create_current_visit($conn,$patient_id,'Outpatient','Laboratory');
-    $stmt=$conn->prepare("INSERT INTO lab_requests (patient_id,lab_test,created_at) VALUES (?,?,NOW())");
-    if(!$stmt) throw new Exception('Unable to create laboratory request.');
-    $stmt->bind_param('is',$patient_id,$lab['test_name']);
-    if(!$stmt->execute()) throw new Exception('Unable to save laboratory request.');
-    $stmt->close();
+    $price=(float)$service['price'];
+    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
+    if(!$ins) throw new Exception($conn->error);
+    $ins->bind_param('iisdi',$patientId,$serviceId,$type='lab',$price,$visitId);
+    if(!$ins->execute()) throw new Exception($ins->error);
+    $serviceRecordId=(int)$ins->insert_id;
+    $ins->close();
 
-    $invoiceId=get_or_create_visit_invoice($conn,$patient_id,$visitId);
-    $itemId=add_invoice_item($conn,$invoiceId,'Lab: '.$lab['test_name'],1,$lab_price,'lab',$lab_id);
-    post_invoice_journal($conn,$invoiceId,$patient_id,$lab_price,'Laboratory',$itemId);
+    $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
+    $itemId=add_invoice_item($conn,$invoiceId,'Lab: '.$service['service_name'],1,$price,'lab',$serviceId);
+    post_invoice_journal($conn,$invoiceId,$patientId,$price,'Laboratory order',$itemId);
     $conn->commit();
-    echo json_encode(['success'=>true,'message'=>'Lab added and charged to the central invoice.','invoice_id'=>$invoiceId]);
+
+    echo json_encode(['success'=>true,'message'=>'Laboratory order sent to the Lab worklist and charge added to the central invoice.','visit_id'=>$visitId,'service_id'=>$serviceRecordId,'invoice_id'=>$invoiceId]);
 }catch(Throwable $e){
     $conn->rollback();
-    error_log('HMS lab billing error: '.$e->getMessage());
-    echo json_encode(['success'=>false,'message'=>'Unable to add laboratory charge.']);
+    error_log('HMS lab order error: '.$e->getMessage());
+    echo json_encode(['success'=>false,'message'=>'Unable to create laboratory order.']);
 }
