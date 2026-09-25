@@ -34,7 +34,7 @@ $sql = "
         FROM payments WHERE invoice_id IS NOT NULL
         GROUP BY invoice_id
     ) pay ON pay.invoice_id = i.id
-    WHERE i.visit_id IS NOT NULL
+    WHERE (i.visit_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
       AND COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
     ORDER BY COALESCE(v.visit_date, DATE(i.created_at)) DESC, i.id DESC
 ";
@@ -135,7 +135,8 @@ include __DIR__ . '/../includes/sidebar.php';
                                     <td class="text-danger font-weight-bold">KSH <?= number_format($row['balance'], 2) ?></td>
                                     <td style="min-width:320px">
                                         <form method="post" action="/hospital_system/billing/pay_invoice.php" class="cashier-payment-form">
-                                            <input type="hidden" name="invoice_id" value="<?= (int)$row['id'] ?>">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                                        <input type="hidden" name="invoice_id" value="<?= (int)$row['id'] ?>">
                                             <input type="hidden" name="return_to" value="cashier">
                                             <div class="input-group input-group-sm mb-2">
                                                 <input type="number" name="amount" class="form-control" min="0.01"
