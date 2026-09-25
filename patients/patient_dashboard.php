@@ -676,6 +676,21 @@ if ($patient_id <= 0) {
     .coverage-form textarea { min-height:100px; resize:vertical; }
     .coverage-form .full-width { grid-column:1 / -1; }
     .coverage-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+    .service-print-area { display:none; }
+    .service-print-card { max-width:980px; margin:0 auto; background:#fff; padding:30px; box-sizing:border-box; }
+    .service-print-table { width:100%; border-collapse:collapse; }
+    .service-print-table th { background:#007bff; color:#fff; padding:11px; text-align:left; }
+    .service-print-table td { padding:10px; border-bottom:1px solid #eee; }
+    @media print {
+        header, footer, nav, aside, .sidebar, .navbar, .dashboard-tabs,
+        .header-section, #clinical, #services, #prescriptions, #billing, #coverage,
+        .main-footer, .service-screen { display:none !important; }
+        body { background:#fff !important; }
+        .service-print-area { display:block !important; }
+        .service-print-card { max-width:none !important; width:100% !important; padding:0 !important; margin:0 !important; }
+        .service-print-table th { background:#007bff !important; color:#fff !important;
+            -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    }
 
     @media (max-width: 992px) {
         .header-content { grid-template-columns: 1fr; }
@@ -1031,7 +1046,12 @@ function clearForm() {
         <div style="background:#fdfefe; border:1px solid #ddd; padding:22px; border-radius:10px; margin-bottom:24px;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
                 <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                     <h4 style="margin:0; color:var(--secondary-blue);"><i class="fas fa-list"></i> Services & Charges</h4>
+                    <button type="button" onclick="printServiceList()" class="btn-save" style="float:none; margin:0; padding:10px 18px;">
+                        <i class="fas fa-print"></i> Print Service List
+                    </button>
+                </div>
                     <p style="margin:6px 0 0; color:#666; font-size:13px;">
                         Read-only history of services, investigations and medicines billed during this visit.
                         Payments are collected centrally by the Cashier.
@@ -1117,6 +1137,44 @@ function clearForm() {
     </div>
 
 
+    <div class="service-print-area">
+        <div class="service-print-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:20px; border-bottom:2px solid #007bff; padding-bottom:18px; margin-bottom:20px;">
+                <div><img src="/hospital_system/assets/img/logo.png" alt="Hospital Logo" style="max-height:65px;" onerror="this.style.display='none'"></div>
+                <div style="text-align:right;">
+                    <h2 style="margin:0; font-size:22px; text-transform:uppercase;">Emaqure Medical Centre</h2>
+                    <p style="margin:3px 0; font-size:12px; color:#555;">Biashara Street, Opposite Old Naiwe School, Mlolongo</p>
+                    <p style="margin:3px 0; font-size:12px; color:#555;">+254793069565 | emaquremedicalcentre@gmail.com</p>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <div><h1 style="margin:0; color:#007bff; font-size:25px;">Service Statement</h1><div style="font-size:12px; color:#666; margin-top:5px;">Services and charges presented for payment</div></div>
+                <div style="text-align:right; font-size:13px;"><strong>Printed:</strong> <?= date('d-m-Y H:i') ?><br><strong>Visit:</strong> <?= htmlspecialchars($activeVisit['visit_number'] ?? '—') ?></div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px; background:#f8f9fa; border-radius:8px; margin-bottom:22px;">
+                <div><div style="font-size:11px; font-weight:700; color:#666; text-transform:uppercase;">Patient Name</div><div style="font-size:15px; font-weight:600;"><?= htmlspecialchars($patient['full_name']) ?></div></div>
+                <div><div style="font-size:11px; font-weight:700; color:#666; text-transform:uppercase;">Patient Number</div><div style="font-size:15px; font-weight:600;"><?= htmlspecialchars($patient['patient_number']) ?></div></div>
+            </div>
+            <table class="service-print-table">
+                <thead><tr><th>#</th><th>Description</th><th>Source</th><th>Qty</th><th style="text-align:right;">Price (KSH)</th><th style="text-align:right;">Amount (KSH)</th></tr></thead>
+                <tbody>
+                    <?php $printNo=0; $printTotal=0.0; if($billingItems){ $billingItems->data_seek(0); while($printRow=$billingItems->fetch_assoc()){ $printNo++; $printTotal+=(float)($printRow['total']??0); $printType=ucfirst(strtolower(trim((string)($printRow['item_type']??'service')))); ?>
+                    <tr><td><?= $printNo ?></td><td><?= htmlspecialchars($printRow['description']??'Billed Item') ?></td><td><?= htmlspecialchars($printType) ?></td><td><?= number_format((float)($printRow['quantity']??1),0) ?></td><td style="text-align:right;"><?= number_format((float)($printRow['unit_price']??0),2) ?></td><td style="text-align:right;"><strong><?= number_format((float)($printRow['total']??0),2) ?></strong></td></tr>
+                    <?php } } ?>
+                    <?php if($printNo===0): ?><tr><td colspan="6" style="text-align:center;">No billed services recorded.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
+            <div style="display:flex; justify-content:flex-end; margin-top:22px;">
+                <div style="width:340px; padding:18px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>Total Bill</strong><strong>KSH <?= number_format($printTotal,2) ?></strong></div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;color:#28a745;"><span>Amount Paid</span><span>KSH <?= number_format($total_paid,2) ?></span></div>
+                    <div style="border-top:2px solid #007bff;padding-top:10px;display:flex;justify-content:space-between;font-size:19px;color:#007bff;"><strong>Amount to Pay</strong><strong>KSH <?= number_format(max($printTotal-$total_paid,0),2) ?></strong></div>
+                </div>
+            </div>
+            <div style="margin-top:35px;padding-top:15px;border-top:1px dashed #ccc;font-size:11px;color:#777;display:flex;justify-content:space-between;"><span>Generated By: <strong><?= htmlspecialchars($_SESSION['full_name']??'System Administrator') ?></strong></span><span>For payment processing — not a receipt.</span></div>
+        </div>
+    </div>
+
     <div id="coverage" class="card" style="display:none;">
         <h3>Insurance & SHA</h3>
         <p style="color:#666; margin-top:-8px; margin-bottom:20px;">Starter coverage module for payer setup, SHA details, insurer capture, pre-authorization and co-pay workflow.</p>
@@ -1189,6 +1247,8 @@ function clearForm() {
 </div>
 
 <script>
+function printServiceList() { window.print(); }
+
 function showTab(tabId) {
     document.querySelectorAll('.card').forEach(c => c.style.display = 'none');
     document.querySelectorAll('.dashboard-tabs li').forEach(l => l.classList.remove('active'));
