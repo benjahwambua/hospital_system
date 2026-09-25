@@ -34,7 +34,7 @@ $from_date = $_GET['from_date'] ?? date('Y-m-d', strtotime('-30 days'));
 $to_date   = $_GET['to_date'] ?? date('Y-m-d');
 $status    = $_GET['status'] ?? 'All';
 
-$where_clauses = ["DATE(i.created_at) BETWEEN '$from_date' AND '$to_date'"];
+$where_clauses = ["DATE(i.created_at) BETWEEN ? AND ?"];
 $where_sql = implode(' AND ', $where_clauses);
 
 // --- 3. THE MASTER QUERY (Optimized with aggregated payments & walk-in exclusion) ---
@@ -64,7 +64,15 @@ $query = "
     WHERE $where_sql
     ORDER BY i.created_at DESC";
 
-$result = $conn->query($query);
+$queryStmt = $conn->prepare($query);
+if (!$queryStmt) {
+    error_log('HMS billing report query failed: ' . $conn->error);
+    http_response_code(500);
+    exit('Unable to load billing records.');
+}
+$queryStmt->bind_param('ss', $from_date, $to_date);
+$queryStmt->execute();
+$result = $queryStmt->get_result();
 $invoices_data = [];
 $total_invoices = 0;
 $total_revenue = 0;
@@ -104,6 +112,8 @@ while ($row = $result->fetch_assoc()) {
         $unpaid_count++;
     }
 }
+
+if ($queryStmt) $queryStmt->close();
 
 // --- 4. CSV EXPORT LOGIC ---
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
