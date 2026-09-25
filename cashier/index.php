@@ -18,7 +18,7 @@ $searchEsc = $conn->real_escape_string($search);
 
 $whereSearch = '';
 if ($search !== '') {
-    $whereSearch = " AND (i.invoice_number LIKE '%{$searchEsc}%' OR p.full_name LIKE '%{$searchEsc}%' OR p.patient_number LIKE '%{$searchEsc}%' OR wc.full_name LIKE '%{$searchEsc}%' OR wc.phone LIKE '%{$searchEsc}%' OR v.visit_number LIKE '%{$searchEsc}%')";
+    $whereSearch = " AND (i.invoice_number LIKE '%{$searchEsc}%' OR p.full_name LIKE '%{$searchEsc}%' OR p.patient_number LIKE '%{$searchEsc}%' OR wc.full_name LIKE '%{$searchEsc}%' OR wc.phone LIKE '%{$searchEsc}%')";
 }
 
 /*
@@ -142,7 +142,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Today's Payment Queue <span class="text-muted font-weight-normal">(<?= htmlspecialchars($today) ?>)</span></h6></div>
             <div class="card-body">
                 <form method="get" class="form-row mb-3">
-                    <div class="col-md-8 mb-2"><input type="search" name="q" value="<?= htmlspecialchars($search) ?>" class="form-control" placeholder="Search invoice, patient, patient number, phone or visit number"></div>
+                    <div class="col-md-8 mb-2"><input type="search" name="q" value="<?= htmlspecialchars($search) ?>" class="form-control" placeholder="Search invoice, patient, patient number or phone"></div>
                     <div class="col-md-4 mb-2"><button class="btn btn-outline-primary mr-2"><i class="fas fa-search"></i> Search Today's Queue</button><a href="/hospital_system/cashier/index.php" class="btn btn-outline-secondary">Clear</a></div>
                 </form>
                 <?php if (!$pending): ?>
@@ -155,14 +155,13 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover">
                             <thead class="thead-light"><tr>
-                                <th>Visit</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Receive / Invoice</th>
+                                <th>Patient Number</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Receive / Invoice</th>
                             </tr></thead>
                             <tbody>
                             <?php foreach ($pending as $row): ?>
                                 <tr>
                                     <td>
-                                        <strong><?= htmlspecialchars($row['visit_number'] ?: 'Legacy / Unassigned') ?></strong><br>
-                                        <small class="text-muted"><?= htmlspecialchars($row['visit_type'] ?: 'Legacy') ?> · <?= htmlspecialchars($row['clinic_category'] ?: 'General') ?></small>
+                                        <strong><?= htmlspecialchars($row['patient_number'] ?: 'N/A') ?></strong>
                                     </td>
                                     <td>
                                         <strong><?= htmlspecialchars($row['patient_name'] ?: 'Unknown') ?></strong><br>
