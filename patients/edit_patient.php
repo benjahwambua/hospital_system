@@ -14,7 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $conn->prepare("UPDATE patients SET full_name=?, gender=?, phone=?, address=? WHERE id=?");
     $stmt->bind_param("ssssi",$full,$gender,$phone,$addr,$id); $stmt->execute(); header("Location: /hospital_system/patients/view_patients.php"); exit;
 }
-$pat = $conn->query("SELECT * FROM patients WHERE id=$id")->fetch_assoc();
+$patStmt = $conn->prepare("SELECT * FROM patients WHERE id=? LIMIT 1");
+$patStmt->bind_param('i', $id);
+$patStmt->execute();
+$pat = $patStmt->get_result()->fetch_assoc();
+$patStmt->close();
 include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sidebar.php';
 ?>
 <div class="card"><h3>Edit Patient</h3>
