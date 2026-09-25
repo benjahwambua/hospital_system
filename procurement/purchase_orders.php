@@ -44,6 +44,16 @@ if (!in_array('payment_method', $expenseColumns, true)) {
     $conn->query("ALTER TABLE expenses ADD COLUMN payment_method VARCHAR(50) DEFAULT NULL AFTER expense_date");
 }
 
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
+$csrfToken=$_SESSION['csrf_token'];
+if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['approve_po'])) {
+    if (!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))) die('Invalid security token.');
+    $approveId=(int)($_POST['po_id']??0);
+    $stmt=$conn->prepare("UPDATE purchase_orders SET status='Approved' WHERE id=? AND status='Pending'");
+    $stmt->bind_param('i',$approveId); $stmt->execute(); $stmt->close();
+    header('Location: purchase_orders.php?view_id='.$approveId.'&approved=1'); exit;
+}
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
@@ -317,7 +327,11 @@ $listRes = $listStmt->get_result();
                             <td>KES <?= number_format((float)$row['total_amount'], 2) ?></td>
                             <td>
                                 <a href="purchase_orders.php?view_id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
-                                <a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a>
+                                <a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a> <form method="post" class="d-inline">
+<input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
+<input type="hidden" name="po_id" value="<?= (int)$row['id']?>">
+<button name="approve_po" class="btn btn-success btn-sm mt-1" <?=($row['status']??'')!=='Pending'?'disabled':''?>>Approve</button>
+</form>
                             </td>
                         </tr>
                     <?php endwhile; else: ?>
