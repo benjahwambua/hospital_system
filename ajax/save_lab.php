@@ -39,7 +39,8 @@ try{
     $price=(float)$service['price'];
     $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
     if(!$ins) throw new Exception($conn->error);
-    $ins->bind_param('iisdi',$patientId,$serviceId,$type='lab',$price,$visitId);
+    $category='lab';
+    $ins->bind_param('iisdi',$patientId,$serviceId,$category,$price,$visitId);
     if(!$ins->execute()) throw new Exception($ins->error);
     $serviceRecordId=(int)$ins->insert_id;
     $ins->close();
