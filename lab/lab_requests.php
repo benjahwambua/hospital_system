@@ -90,7 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
 
                         // No payment is recorded here. Central Cashier is the single collection point.
                         $conn->commit();
-                        $walkin_message = 'Walk-in laboratory request created successfully. Invoice #' . $invoiceId . '.';
+                        header('Location: lab_results.php?created=1&patient_id=' . $walkinPatientId . '&service_id=' . $service_id);
+                        exit;
                     } catch (Throwable $e) {
                         $conn->rollback();
                         $walkin_error = $e->getMessage();
@@ -107,13 +108,16 @@ $end_date = $_GET['end_date'] ?? date('Y-m-d');
 
 // --- 2. HANDLE DELETE ACTION ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        http_response_code(419);
+        exit('Invalid security token.');
+    }
     $delete_id = (int)$_POST['delete_id'];
-    $stmt = $conn->prepare("DELETE FROM patient_services WHERE id = ? AND category = 'lab'");
+    $stmt = $conn->prepare("DELETE FROM patient_services WHERE id = ? AND category = 'lab' AND status = 'Pending'");
     $stmt->bind_param("i", $delete_id);
     $stmt->execute();
     $stmt->close();
-    header('Location: lab_requests.php?start_date=' . urlencode($start_date) . '&end_date=' . urlencode($end_date) . '&deleted=1');
+    header('Location: lab_requests.php?deleted=1');
     exit;
 }
 
@@ -141,30 +145,8 @@ if (isset($_POST['save_lab_result'])) {
     $stmt->close();
 }
 
-// --- 4. FETCH LAB WORKLIST ---
-$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name, sm.price 
-          FROM patient_services ps 
-          JOIN patients p ON ps.patient_id = p.id 
-          JOIN services_master sm ON ps.service_id = sm.id 
-          WHERE ps.category = 'lab' 
-          AND DATE(ps.created_at) BETWEEN ? AND ?
-          ORDER BY (ps.status = 'Pending') DESC, ps.created_at DESC";
-
-$stmt = $conn->prepare($query);
-$stmt->bind_param("ss", $start_date, $end_date);
-$stmt->execute();
-$lab_jobs = $stmt->get_result();
-
-$walkin_lab_services = $conn->query("SELECT id, service_name, price FROM services_master WHERE active = 1 AND category = 'lab' ORDER BY service_name ASC");
-
-$total_revenue = 0;
-$total_count = 0;
-$rows = [];
-while($row = $lab_jobs->fetch_assoc()) {
-    $total_revenue += floatval($row['price']);
-    $total_count++;
-    $rows[] = $row;
-}
+// Laboratory requests are submitted here and processed in the Lab Results worklist.
+$created = isset($_GET['created']);
 ?>
 
 <style>
@@ -227,157 +209,49 @@ while($row = $lab_jobs->fetch_assoc()) {
 </style>
 
 <div class="container">
-    <div class="worklist-card" style="margin-bottom:20px; border-left:5px solid #f39c12;">
+    <div class="worklist-card" style="max-width:900px;margin:0 auto;border-left:5px solid #f39c12;">
         <div class="header-flex" style="margin-bottom:15px;">
-            <h2 class="page-title" style="font-size:20px;">🚶 Walk-in Laboratory</h2>
-            <span style="font-size:12px;color:#7f8c8d;">No consultation fee</span>
+            <h2 class="page-title" style="font-size:20px;">🔬 Laboratory Request</h2>
+            <span style="font-size:12px;color:#7f8c8d;">Request only</span>
         </div>
-        <?php if ($walkin_message): ?>
-            <div style="background:#d4edda;color:#155724;padding:12px;border-radius:6px;margin-bottom:15px;"><?= htmlspecialchars($walkin_message) ?></div>
+        <?php if ($created): ?>
+            <div style="background:#d4edda;color:#155724;padding:12px;border-radius:6px;margin-bottom:15px;">
+                Laboratory request submitted and moved to Lab Results.
+            </div>
         <?php endif; ?>
         <?php if ($walkin_error): ?>
             <div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px;margin-bottom:15px;"><?= htmlspecialchars($walkin_error) ?></div>
         <?php endif; ?>
-        <form method="post" style="display:grid;grid-template-columns:1.3fr 1fr 1.5fr 1fr 1fr auto;gap:10px;align-items:end;">
+        <p style="color:#666;font-size:14px;margin-top:0;">
+            Create a laboratory request here. Once submitted, it is handled from <strong>Lab Results</strong>.
+        </p>
+        <form method="post" style="display:grid;grid-template-columns:1fr 1fr;gap:15px;align-items:end;">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <div>
                 <label style="font-size:12px;font-weight:600;">Patient Name</label>
-                <input type="text" name="walkin_name" class="form-control" placeholder="Optional" />
+                <input type="text" name="walkin_name" class="form-control" placeholder="Optional">
             </div>
             <div>
                 <label style="font-size:12px;font-weight:600;">Phone</label>
-                <input type="text" name="walkin_phone" class="form-control" placeholder="Optional" />
+                <input type="text" name="walkin_phone" class="form-control" placeholder="Optional">
             </div>
             <div>
                 <label style="font-size:12px;font-weight:600;">Laboratory Test</label>
                 <select name="walkin_service_id" class="form-control" required>
                     <option value="">Select test...</option>
                     <?php if ($walkin_lab_services): while ($ws = $walkin_lab_services->fetch_assoc()): ?>
-                        <option value="<?= (int)$ws['id'] ?>" data-price="<?= (float)$ws['price'] ?>">
+                        <option value="<?= (int)$ws['id'] ?>">
                             <?= htmlspecialchars($ws['service_name']) ?> (KES <?= number_format((float)$ws['price'], 2) ?>)
                         </option>
                     <?php endwhile; endif; ?>
                 </select>
             </div>
-            <div style="grid-column:span 2;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:12px;">
-                <strong>Payment:</strong> No payment is collected in Laboratory. The charge is sent to Central Cashier after the request is created.
+            <div style="padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:12px;">
+                <strong>Payment:</strong> Laboratory does not collect payment. Charges go to Central Cashier.
             </div>
-            <button type="submit" name="create_walkin_lab" class="btn-filter" style="background:#f39c12;">Create Request</button>
+            <button type="submit" name="create_walkin_lab" class="btn-filter" style="background:#f39c12;grid-column:1 / -1;">Submit Laboratory Request</button>
         </form>
-    </div>
-
-    <div class="filter-bar">
-        <form method="GET" class="filter-form">
-            <label style="font-weight: 600; color: #2c3e50;">From:</label>
-            <input type="date" name="start_date" class="input-date" value="<?= $start_date ?>">
-            <label style="font-weight: 600; color: #2c3e50;">To:</label>
-            <input type="date" name="end_date" class="input-date" value="<?= $end_date ?>">
-            <button type="submit" class="btn-filter">Filter Range</button>
-        </form>
-
-        <input type="text" id="patientSearch" class="search-input" placeholder="🔍 Search Patient Name or ID...">
-        
-        <div style="display: flex; gap: 10px;">
-            <button onclick="window.print()" class="btn-filter" style="background:#7f8c8d;">Print List</button>
-            <a href="export_lab.php?start=<?= $start_date ?>&end=<?= $end_date ?>" class="btn-filter" style="background:#27ae60; text-decoration:none;">Download Excel</a>
-        </div>
-    </div>
-
-    <div class="stats-flex">
-        <div class="stat-card">
-            <div class="stat-label">Total Revenue (Selected Range)</div>
-            <div class="stat-value">KES <?= number_format($total_revenue, 2) ?></div>
-        </div>
-        <div class="stat-card" style="border-left-color: #3498db;">
-            <div class="stat-label">Total Tests</div>
-            <div class="stat-value"><?= $total_count ?></div>
-        </div>
-    </div>
-
-    <div class="worklist-card">
-        <div class="header-flex">
-            <h2 class="page-title">🔬 Laboratory Worklist</h2>
-            <div style="font-size: 13px; color: #95a5a6;">Period: <?= date('d M Y', strtotime($start_date)) ?> - <?= date('d M Y', strtotime($end_date)) ?></div>
-        </div>
-
-        <table class="lab-table" id="labTable">
-            <thead>
-                <tr>
-                    <th width="12%">Date/Time</th>
-                    <th width="18%">Patient</th>
-                    <th width="18%">Investigation</th>
-                    <th width="10%">Cost</th>
-                    <th width="27%">Findings / Results</th>
-                    <th width="15%">Manage</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if(count($rows) > 0): ?>
-                    <?php foreach($rows as $job): ?>
-                    <tr class="lab-row" <?php if($job['status'] == 'Completed') echo 'style="background:#fafafa;"'; ?>>
-                        <td>
-                            <strong style="font-size:13px;"><?= date('d-M-y', strtotime($job['created_at'])) ?></strong><br>
-                            <span style="color:#999; font-size:11px;"><?= date('H:i A', strtotime($job['created_at'])) ?></span>
-                        </td>
-                        <td class="patient-cell">
-                            <span class="patient-info"><?= htmlspecialchars($job['full_name']) ?></span>
-                            <span class="patient-no">ID: <?= htmlspecialchars($job['patient_number']) ?></span>
-                        </td>
-                        <td>
-                            <span class="test-name"><?= htmlspecialchars($job['service_name']) ?></span><br>
-                            <span class="status-badge <?= ($job['status'] == 'Completed') ? 'badge-completed' : 'badge-pending' ?>">
-                                <?= $job['status'] ?? 'Pending' ?>
-                            </span>
-                        </td>
-                        <td><span class="test-cost">KES <?= number_format($job['price'], 2) ?></span></td>
-                        
-                        <form method="post">
-                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                            <td>
-                                <textarea name="findings" rows="2" placeholder="Enter findings..."><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
-                            </td>
-                            <td>
-                                <div class="action-group">
-                                    <input type="hidden" name="record_id" value="<?= $job['id'] ?>">
-                                    <button type="submit" name="save_lab_result" class="btn-save" style="padding: 5px;">
-                                        <?= ($job['status'] == 'Completed') ? 'Update' : 'Submit' ?>
-                                    </button>
-                                    <?php if($job['status'] == 'Completed'): ?>
-                                        <a href="lab_results.php?id=<?= $job['id'] ?>" target="_blank" class="btn-view">View Report</a>
-                                    <?php endif; ?>
-                                    <a href="lab_receipt.php?id=<?= $job['id'] ?>" target="_blank" class="btn-receipt">Receipt</a>
-                                    <button type="submit" name="delete_id" value="<?= (int)$job['id'] ?>" class="btn-delete" onclick="return confirm('Are you sure you want to delete this laboratory request?')">Delete</button>
-                                </div>
-                            </td>
-                        </form>
-                    </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr id="noResultsRow">
-                        <td colspan="6" style="text-align:center; padding:60px; color:#bdc3c7;">No laboratory requests found.</td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
     </div>
 </div>
-
-<script>
-document.getElementById('patientSearch').addEventListener('keyup', function() {
-    let filter = this.value.toLowerCase();
-    let rows = document.querySelectorAll('.lab-row');
-    
-    rows.forEach(row => {
-        // Search within the patient cell (Name and ID)
-        let patientData = row.querySelector('.patient-cell').textContent.toLowerCase();
-        
-        if (patientData.indexOf(filter) > -1) {
-            row.style.display = ""; // Show
-        } else {
-            row.style.display = "none"; // Hide
-        }
-    });
-});
-</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
