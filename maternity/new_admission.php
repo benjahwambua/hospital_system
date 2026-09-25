@@ -1,58 +1,49 @@
 <?php
-require_once "../includes/config.php";
-require_once "../includes/header.php";
-require_once "../includes/sidebar.php";
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_login();
+require_role(['admin','doctor','nurse']);
 
-// Handle submit
+$error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $patient_id = $_POST['patient_id'];
-    $ward = $_POST['ward'];
-    $notes = $_POST['note'];
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        http_response_code(419);
+        exit('Invalid security token.');
+    }
+    $patient_id = (int)($_POST['patient_id'] ?? 0);
+    $ward = trim((string)($_POST['ward'] ?? ''));
+    $notes = trim((string)($_POST['note'] ?? ''));
 
-    $sql = "INSERT INTO maternity_admissions(patient_id, admission_date, ward, note)
-            VALUES (?, NOW(), ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iss", $patient_id, $ward, $notes);
-
-    if ($stmt->execute()) {
-        header("Location: admissions.php?success=1");
-        exit;
+    if ($patient_id <= 0 || $ward === '') {
+        $error = 'Patient and ward are required.';
     } else {
-        $error = "Error: " . $conn->error;
+        $stmt = $conn->prepare("INSERT INTO maternity_admissions(patient_id, admission_date, ward, note) VALUES (?, NOW(), ?, ?)");
+        $stmt->bind_param("iss", $patient_id, $ward, $notes);
+        if ($stmt->execute()) {
+            $stmt->close();
+            header("Location: admissions.php?success=1");
+            exit;
+        }
+        $error = 'Unable to save admission.';
+        $stmt->close();
     }
 }
-
-// Load patients
 $patients = $conn->query("SELECT id, full_name FROM patients ORDER BY full_name ASC");
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
 ?>
-
 <div class="page-header"><h1>New Maternity Admission</h1></div>
-
-<?php if (!empty($error)): ?>
-<div class="alert alert-danger"><?= $error ?></div>
-<?php endif; ?>
-
+<?php if (!empty($error)): ?><div class="alert alert-danger"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 <form method="POST">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Patient</label>
-    <select name="patient_id" required>
-        <option value="">Select patient</option>
-        <?php while ($p = $patients->fetch_assoc()): ?>
-        <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['full_name']) ?></option>
-        <?php endwhile; ?>
+    <select name="patient_id" required><option value="">Select patient</option>
+        <?php while ($p = $patients->fetch_assoc()): ?><option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['full_name']) ?></option><?php endwhile; ?>
     </select>
-
     <label>Ward</label>
-    <select name="ward" required>
-        <option value="">Select ward</option>
-        <option>Maternity Ward A</option>
-        <option>Maternity Ward B</option>
-        <option>Labour Ward</option>
-    </select>
-
-    <label>Notes</label>
-    <textarea name="note"></textarea>
-
+    <select name="ward" required><option value="">Select ward</option><option>Maternity Ward A</option><option>Maternity Ward B</option><option>Labour Ward</option></select>
+    <label>Notes</label><textarea name="note"></textarea>
     <button class="btn btn-primary">Save Admission</button>
 </form>
-
-<?php require_once "../includes/footer.php"; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
