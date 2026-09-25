@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_role(['admin']);
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -93,10 +94,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $conn->begin_transaction();
             try {
-                $stockStmt = $conn->prepare('UPDATE pharmacy_stock SET quantity = quantity + ? WHERE drug_name = ?');
-                $stockStmt->bind_param('is', $incomingQty, $drugName);
+                // Lock the PO line and enforce the remaining quantity server-side.
+                $lineStmt = $conn->prepare('SELECT item_name, quantity, COALESCE(received_qty,0) AS received_qty, unit_price FROM purchase_order_items WHERE id=? AND purchase_order_id=? FOR UPDATE');
+                $lineStmt->bind_param('ii', $poItemId, $poId);
+                $lineStmt->execute();
+                $line = $lineStmt->get_result()->fetch_assoc();
+                $lineStmt->close();
+                if (!$line) {
+                    throw new Exception('Purchase order item not found.');
+                }
+                $remaining = (int)$line['quantity'] - (int)$line['received_qty'];
+                if ($incomingQty > $remaining) {
+                    throw new Exception('Received quantity exceeds the remaining PO balance of ' . $remaining . '.');
+                }
+
+                // Match an existing pharmacy item by name; create it when the PO item is new.
+                $stockStmt = $conn->prepare('SELECT id FROM pharmacy_stock WHERE drug_name=? LIMIT 1 FOR UPDATE');
+                $stockStmt->bind_param('s', $drugName);
                 $stockStmt->execute();
+                $stockRow = $stockStmt->get_result()->fetch_assoc();
                 $stockStmt->close();
+
+                if ($stockRow) {
+                    $stockUpdate = $conn->prepare('UPDATE pharmacy_stock SET quantity = quantity + ? WHERE id=?');
+                    $stockUpdate->bind_param('ii', $incomingQty, $stockRow['id']);
+                    $stockUpdate->execute();
+                    $stockUpdate->close();
+                } else {
+                    $insertStock = $conn->prepare("INSERT INTO pharmacy_stock (drug_name, quantity, selling_price) VALUES (?, ?, ?)");
+                    $sellingPrice = (float)$unitCost;
+                    $insertStock->bind_param('sid', $drugName, $incomingQty, $sellingPrice);
+                    if (!$insertStock->execute()) {
+                        throw new Exception('Unable to create new pharmacy stock item: ' . $insertStock->error);
+                    }
+                    $insertStock->close();
+                }
 
                 $itemStmt = $conn->prepare('UPDATE purchase_order_items SET received_qty = received_qty + ? WHERE id = ?');
                 $itemStmt->bind_param('ii', $incomingQty, $poItemId);
