@@ -238,41 +238,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $visitStmt->close();
             }
 
-            // Create appointment
-            $appointmentDate = date('Y-m-d');
-            $appointmentTime = date('H:i:s');
-            $reason = 'Clinical Service: ' . $clinicalType;
-            
-            $apptStmt = $conn->prepare(
-                "INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status, created_at)
-                 VALUES (?, ?, ?, ?, ?, 'Pending', NOW())"
-            );
-            
-            if (!$apptStmt) {
-                throw new Exception("Appointment prepare failed: " . $conn->error);
-            }
-            
-            $apptStmt->bind_param('iisss', $patientId, $doctorId, $appointmentDate, $appointmentTime, $reason);
-            
-            if (!$apptStmt->execute()) {
-                throw new Exception("Appointment execute failed: " . $apptStmt->error);
-            }
-            
-            $appointmentId = (int)$apptStmt->insert_id;
-            $apptStmt->close();
-
-            // Link the queue/appointment to the visit when the Visit migration is active.
-            if ($visitId > 0 && $appointmentId > 0) {
-                $linkAppt = $conn->prepare("UPDATE appointments SET visit_id = ? WHERE id = ?");
-                if ($linkAppt) {
-                    $linkAppt->bind_param('ii', $visitId, $appointmentId);
-                    if (!$linkAppt->execute()) {
-                        throw new Exception("Appointment visit link failed: " . $linkAppt->error);
-                    }
-                    $linkAppt->close();
-                }
-            }
-
+            // Reception creates exactly one Visit. Appointments are kept as a
+            // separate scheduling workflow and are not duplicated into the clinical queue.
             // Vitals are recorded by clinical staff in the Triage & Vitals workflow.
             // This prevents reception and triage from creating competing clinical records.
 
