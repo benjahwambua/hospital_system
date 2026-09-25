@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_once __DIR__ . '/../includes/auth.php';
+require_role(['admin','cashier','accountant']);
 
 $maternity_id = intval($_GET['id'] ?? 0);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
