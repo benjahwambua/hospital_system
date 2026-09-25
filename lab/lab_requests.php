@@ -1,8 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+require_role(['admin','lab_tech']);
 
 // Ensure walk-in registrations work even if the migration has not yet been run.
 ensure_walkin_column($conn);
@@ -107,14 +109,15 @@ $start_date = $_GET['start_date'] ?? date('Y-m-d');
 $end_date = $_GET['end_date'] ?? date('Y-m-d');
 
 // --- 2. HANDLE DELETE ACTION ---
-if (isset($_GET['delete_id'])) {
-    $delete_id = intval($_GET['delete_id']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    $delete_id = (int)$_POST['delete_id'];
     $stmt = $conn->prepare("DELETE FROM patient_services WHERE id = ? AND category = 'lab'");
     $stmt->bind_param("i", $delete_id);
-    if ($stmt->execute()) {
-        echo "<script>alert('Record deleted successfully'); window.location.href='lab_requests.php?start_date=$start_date&end_date=$end_date';</script>";
-    }
+    $stmt->execute();
     $stmt->close();
+    header('Location: lab_requests.php?start_date=' . urlencode($start_date) . '&end_date=' . urlencode($end_date) . '&deleted=1');
+    exit;
 }
 
 // --- 3. HANDLE LAB RESULT SUBMISSION ---
@@ -337,7 +340,7 @@ while($row = $lab_jobs->fetch_assoc()) {
                                         <a href="lab_results.php?id=<?= $job['id'] ?>" target="_blank" class="btn-view">View Report</a>
                                     <?php endif; ?>
                                     <a href="lab_receipt.php?id=<?= $job['id'] ?>" target="_blank" class="btn-receipt">Receipt</a>
-                                    <a href="lab_requests.php?delete_id=<?= $job['id'] ?>&start_date=<?= $start_date ?>&end_date=<?= $end_date ?>" 
+                                    <a href="javascript:void(0)" 
                                        class="btn-delete" 
                                        onclick="return confirm('Are you sure?')">Delete</a>
                                 </div>
