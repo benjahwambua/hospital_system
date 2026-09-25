@@ -241,7 +241,7 @@ $patients = $conn->query("
         <h3>Patient List</h3>
         
         <div class="add-btn">
-            <a href="/hospital_system/patients/add_patient.php">+ Add New Patient</a>
+            <a href="/hospital_system/patients/reception_register.php">+ Add New Patient</a>
         </div>
 
         <!-- Search Box -->
@@ -332,7 +332,7 @@ $patients = $conn->query("
                         <a href="/hospital_system/patients/patient_list.php" style="color:#007bff;text-decoration:none;">View all patients</a>
                     <?php else: ?>
                         No patients registered yet.<br>
-                        <a href="/hospital_system/patients/add_patient.php" style="color:#28a745;text-decoration:none;">Register a new patient</a>
+                        <a href="/hospital_system/patients/reception_register.php" style="color:#28a745;text-decoration:none;">Register a new patient</a>
                     <?php endif; ?>
                 </p>
             </div>
