@@ -5,6 +5,8 @@ require_once __DIR__.'/../helpers/billing.php';
 require_once __DIR__.'/../helpers/cashier.php';
 require_once __DIR__.'/../config/mpesa.php';
 require_login();
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) die('Invalid security token.');
 
 // Centralize all patient collections through the Cashier module.
 $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
