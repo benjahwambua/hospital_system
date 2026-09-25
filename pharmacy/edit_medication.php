@@ -39,6 +39,7 @@ include __DIR__ . '/../includes/sidebar.php';
   <div class="page-title">Edit Medication</div>
   <div class="card" style="max-width:700px;">
     <form method="post">
+<input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
       <label>Name</label><input class="form-control" name="name" required value="<?php echo htmlspecialchars($med['name']); ?>">
       <label>Description</label><textarea class="form-control" name="description"><?php echo htmlspecialchars($med['description']); ?></textarea>
       <label>Buy price</label><input class="form-control" name="buy_price" type="number" step="0.01" value="<?php echo htmlspecialchars($med['buy_price']); ?>">
