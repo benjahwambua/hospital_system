@@ -98,11 +98,14 @@ include __DIR__ . '/../includes/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-cash-register"></i> Central Cashier</h2>
-                <p class="text-muted mb-0">All patient payments are collected here.</p>
+                <p class="text-muted mb-0">Today's collection queue for the current operational day.</p>
             </div>
             <div>
                 <a href="/hospital_system/cashier/payment_history.php" class="btn btn-outline-primary mr-2">
                     <i class="fas fa-receipt"></i> Payment History
+                </a>
+                <a href="/hospital_system/cashier/aged_receivables.php" class="btn btn-outline-warning mr-2">
+                    <i class="fas fa-user-clock"></i> Aged Receivables
                 </a>
                 <a href="/hospital_system/billing/view_bills.php" class="btn btn-outline-secondary">
                     <i class="fas fa-history"></i> Billing History
@@ -117,13 +120,13 @@ include __DIR__ . '/../includes/sidebar.php';
         <div class="row mb-4">
             <div class="col-md-4 mb-3">
                 <div class="card border-left-warning shadow h-100 py-2"><div class="card-body">
-                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Outstanding</div>
+                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Today's Outstanding</div>
                     <div class="h4 mb-0 font-weight-bold">KSH <?= number_format($pendingTotal, 2) ?></div>
                 </div></div>
             </div>
             <div class="col-md-4 mb-3">
                 <div class="card border-left-primary shadow h-100 py-2"><div class="card-body">
-                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Patients Waiting</div>
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Today's Queue</div>
                     <div class="h4 mb-0 font-weight-bold"><?= count($pending) ?></div>
                 </div></div>
             </div>
@@ -136,12 +139,17 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <div class="card shadow mb-4">
-            <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Pending Patient Payments</h6></div>
+            <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Today's Payment Queue <span class="text-muted font-weight-normal">(<?= htmlspecialchars($today) ?>)</span></h6></div>
             <div class="card-body">
+                <form method="get" class="form-row mb-3">
+                    <div class="col-md-8 mb-2"><input type="search" name="q" value="<?= htmlspecialchars($search) ?>" class="form-control" placeholder="Search invoice, patient, patient number, phone or visit number"></div>
+                    <div class="col-md-4 mb-2"><button class="btn btn-outline-primary mr-2"><i class="fas fa-search"></i> Search Today's Queue</button><a href="/hospital_system/cashier/index.php" class="btn btn-outline-secondary">Clear</a></div>
+                </form>
                 <?php if (!$pending): ?>
                     <div class="text-center text-muted py-5">
                         <i class="fas fa-check-circle fa-3x mb-3"></i>
-                        <h5>No outstanding patient payments</h5>
+                        <h5>No outstanding payments in today's queue</h5>
+                        <p class="mb-0">Older unpaid balances are tracked separately under Aged Receivables.</p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
