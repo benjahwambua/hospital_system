@@ -201,18 +201,8 @@ if ($patient_id <= 0) {
         }
     }
 
-    // Handle Deletion Logic
-    if(isset($_GET['delete_item'])) {
-        $item_id = intval($_GET['item_id']);
-        $type = $_GET['type'];
-        if($type == 'service') {
-            $conn->query("DELETE FROM patient_services WHERE id = $item_id AND patient_id = $patient_id");
-        } elseif($type == 'prescription') {
-            $conn->query("DELETE FROM prescriptions WHERE id = $item_id AND patient_id = $patient_id");
-        }
-        header("Location: patient_dashboard.php?id=$patient_id&tab=billing&deleted=1");
-        exit;
-    }
+    // Deletions are handled by the dedicated POST-only endpoint.
+
 
     // Existing Lab Request Handler
     if(isset($_POST['add_lab_request'])){
@@ -828,7 +818,7 @@ function clearForm() {
                 <td><?= htmlspecialchars($s['service_name']) ?></td>
                 <td><span class="badge-info"><?= htmlspecialchars($s['svc_category']) ?></span></td>
                 <td>KSH <?= number_format($s['price'], 2) ?></td>
-                <td><a href="?id=<?= $patient_id ?>&delete_item=1&item_id=<?= $s['id'] ?>&type=service" style="color:red;">&times; Remove</a></td>
+                <td><a href="javascript:void(0)" onclick="document.getElementById('remove-service-<?= (int)$s['id'] ?>').submit()" style="color:red;">&times; Remove</a><form id="remove-service-<?= (int)$s['id'] ?>" method="post" action="remove_item.php" style="display:none;"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="service"></form></td>
             </tr>
             <?php endwhile; ?>
         </table>
@@ -875,8 +865,8 @@ function clearForm() {
                 <td>KSH <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
                 <td><?= date('d/m/y', strtotime($p['created_at'])) ?></td>
                 <td>
-                    <a href="?id=<?= $patient_id ?>&delete_item=1&item_id=<?= $p['id'] ?>&type=prescription" 
-                       style="color:red;" onclick="return confirm('Remove this medication?')">&times; Remove</a>
+                    <a href="javascript:void(0)" onclick="document.getElementById('remove-prescription-<?= (int)$p['id'] ?>').submit()" 
+                       style="color:red;" onclick="return confirm('Remove this medication?')">&times; Remove</a><form id="remove-prescription-<?= (int)$p['id'] ?>" method="post" action="remove_item.php" style="display:none;"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="prescription"></form>
                 </td>
             </tr>
             <?php endwhile; ?>
