@@ -328,6 +328,14 @@ function isParentActive($paths) {
         </div>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'finance')): ?>
+        <div class="menu-title">Finance</div>
+        <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register icon-main"></i> Central Cashier</a>
+        <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>"><i class="fas fa-clock icon-main"></i> Cashier Shift</a>
+        <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock icon-main"></i> Aged Receivables</a>
+        <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
+        <?php endif; ?>
+
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
         <div class="has-submenu <?= isParentActive(['users/', 'settings/']) ?>">
@@ -339,14 +347,6 @@ function isParentActive($paths) {
                 <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('sales_report.php') ?>"><i class="fas fa-chart-line"></i> System Reports</a>
             </div>
         </div>
-        <?php endif; ?>
-
-        <?php if (can_access_module($conn, 'finance')): ?>
-        <div class="menu-title">Finance</div>
-        <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register icon-main"></i> Central Cashier</a>
-        <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>"><i class="fas fa-clock icon-main"></i> Cashier Shift</a>
-        <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock icon-main"></i> Aged Receivables</a>
-        <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
         <?php endif; ?>
 
         <div class="menu-title">Exit</div>
