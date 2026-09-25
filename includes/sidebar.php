@@ -319,6 +319,7 @@ function isParentActive($paths) {
                     <a href="/hospital_system/procurement/purchase_orders.php" class="<?= isActive('purchase_orders.php') ?>"><i class="fas fa-shopping-basket"></i> Purchase Orders</a>
                     <a href="/hospital_system/procurement/receive_inventory.php" class="<?= isActive('receive_inventory.php') ?>"><i class="fas fa-warehouse"></i> Receive Inventory</a>
                     <a href="/hospital_system/procurement/supplier_payables.php" class="<?= isActive('supplier_payables.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Supplier Payables</a>
+                    <a href="/hospital_system/procurement/supplier_statement.php" class="<?= isActive('supplier_statement.php') ?>"><i class="fas fa-file-alt"></i> Supplier Statement</a>
                 </div>
             </div>
 
