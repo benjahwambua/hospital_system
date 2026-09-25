@@ -197,6 +197,50 @@ if ($patient_id <= 0) {
         $prescription_id = $stmt->insert_id;
         $stmt->close();
 
+        // Send every new prescription directly to the Pharmacy Dispensing Queue.
+        // Pharmacy will deduct stock only when the item is actually dispensed.
+        $queueTable = $conn->query("SHOW TABLES LIKE 'pharmacy_queue'");
+        if ($queueTable && $queueTable->num_rows > 0) {
+            $queueVisitColumn = $conn->query("SHOW COLUMNS FROM pharmacy_queue LIKE 'visit_id'");
+            $queueExists = $conn->prepare("SELECT id FROM pharmacy_queue WHERE prescription_id = ? AND status = 'pending' LIMIT 1");
+            if ($queueExists) {
+                $queueExists->bind_param('i', $prescription_id);
+                $queueExists->execute();
+                $alreadyQueued = $queueExists->get_result()->fetch_assoc();
+                $queueExists->close();
+
+                if (!$alreadyQueued) {
+                    if ($queueVisitColumn && $queueVisitColumn->num_rows > 0 && $visitId > 0) {
+                        $queueStmt = $conn->prepare("INSERT INTO pharmacy_queue (prescription_id, patient_id, medicine_id, quantity, status, visit_id, created_at) VALUES (?, ?, ?, ?, 'pending', ?, NOW())");
+                        if ($queueStmt) {
+                            $queueStmt->bind_param('iiiii', $prescription_id, $patient_id, $medicine_id, $qty, $visitId);
+                            if (!$queueStmt->execute()) {
+                                $queueError = $queueStmt->error;
+                                $queueStmt->close();
+                                throw new Exception('Prescription saved, but it could not be sent to Pharmacy: ' . $queueError);
+                            }
+                            $queueStmt->close();
+                        } else {
+                            throw new Exception('Prescription saved, but the Pharmacy queue could not be prepared.');
+                        }
+                    } else {
+                        $queueStmt = $conn->prepare("INSERT INTO pharmacy_queue (prescription_id, patient_id, medicine_id, quantity, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
+                        if ($queueStmt) {
+                            $queueStmt->bind_param('iiii', $prescription_id, $patient_id, $medicine_id, $qty);
+                            if (!$queueStmt->execute()) {
+                                $queueError = $queueStmt->error;
+                                $queueStmt->close();
+                                throw new Exception('Prescription saved, but it could not be sent to Pharmacy: ' . $queueError);
+                            }
+                            $queueStmt->close();
+                        } else {
+                            throw new Exception('Prescription saved, but the Pharmacy queue could not be prepared.');
+                        }
+                    }
+                }
+            }
+        }
+
         if ($invoice_total > 0) {
             $invoice_id = get_or_create_invoice($conn, $patient_id, null, $visitId);
             add_invoice_item(
