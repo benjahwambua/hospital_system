@@ -697,7 +697,7 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
 
     // cashier_shift_id belongs to payments, not invoices.
     if($shiftId>0 && payment_column_exists($conn,'cashier_shift_id')){ $columns[]='cashier_shift_id'; $placeholders[]='?'; $types.='i'; $values[]=$shiftId; }
-    if(payment_column_exists($conn,'created_at')) $columns[]='created_at', $placeholders[]='NOW()';
+    if(payment_column_exists($conn,'created_at')){ $columns[]='created_at'; $placeholders[]='NOW()'; }
 
     $sql='INSERT INTO payments ('.implode(', ',$columns).') VALUES ('.implode(', ',$placeholders).')';
     $stmt=$conn->prepare($sql);
