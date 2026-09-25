@@ -30,12 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
         $name = trim((string)($_POST['walkin_name'] ?? ''));
         $phone = trim((string)($_POST['walkin_phone'] ?? ''));
         $service_id = (int)($_POST['walkin_service_id'] ?? 0);
-        $payment_mode = trim((string)($_POST['walkin_payment_mode'] ?? 'Cash'));
-        $payment_amount = round((float)($_POST['walkin_payment_amount'] ?? 0), 2);
+        // Laboratory staff create charges only. All patient payments are collected by Central Cashier.
 
         if ($name === '') $name = 'Walk-in Lab ' . date('Hi');
         if ($service_id <= 0) $walkin_error = 'Please select a laboratory test.';
-        if (!in_array($payment_mode, ['Cash', 'Mpesa', 'Bank', 'Wire Transfer'], true)) $payment_mode = 'Cash';
 
         if ($walkin_error === '') {
             $serviceStmt = $conn->prepare("SELECT id, service_name, price FROM services_master WHERE id = ? AND active = 1 AND category = 'lab' LIMIT 1");
@@ -51,9 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                     $walkin_error = 'Selected laboratory service is invalid.';
                 } else {
                     $price = (float)$labService['price'];
-                    if ($payment_amount < 0) $payment_amount = 0;
-                    $payment_amount = min($payment_amount, $price);
-
                     $conn->begin_transaction();
                     try {
                         // Create a separate walk-in patient for each laboratory visit so the
@@ -90,15 +85,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                         if (!$serviceInsert->execute()) throw new Exception('Unable to create walk-in laboratory request: ' . $serviceInsert->error);
                         $serviceInsert->close();
 
-                        $invoiceId = create_invoice($conn, $walkinPatientId, null, null, $payment_amount >= $price ? 'paid' : 'unpaid', $payment_mode, 0.0);
+                        $invoiceId = get_or_create_visit_invoice($conn, $walkinPatientId, $visitId);
                         add_invoice_item($conn, $invoiceId, 'Lab: ' . $labService['service_name'], 1, $price, 'lab', $service_id);
                         post_invoice_journal($conn, $invoiceId, $walkinPatientId, $price, 'Walk-in laboratory');
 
-                        if ($payment_amount > 0) {
-                            $payment = record_payment($conn, $invoiceId, $payment_amount, $payment_mode, null);
-                            post_payment_journal($conn, $invoiceId, $payment['amount'], $payment_mode);
-                        }
-
+                        // No payment is recorded here. Central Cashier is the single collection point.
                         $conn->commit();
                         $walkin_message = 'Walk-in laboratory request created successfully. Invoice #' . $invoiceId . '.';
                     } catch (Throwable $e) {
@@ -260,18 +251,8 @@ while($row = $lab_jobs->fetch_assoc()) {
                     <?php endwhile; endif; ?>
                 </select>
             </div>
-            <div>
-                <label style="font-size:12px;font-weight:600;">Payment</label>
-                <input type="number" name="walkin_payment_amount" step="0.01" min="0" value="0" class="form-control" />
-            </div>
-            <div>
-                <label style="font-size:12px;font-weight:600;">Mode</label>
-                <select name="walkin_payment_mode" class="form-control">
-                    <option value="Cash">Cash</option>
-                    <option value="Mpesa">M-Pesa</option>
-                    <option value="Bank">Bank</option>
-                    <option value="Wire Transfer">Transfer</option>
-                </select>
+            <div style="grid-column:span 2;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:12px;">
+                <strong>Payment:</strong> No payment is collected in Laboratory. The charge is sent to Central Cashier after the request is created.
             </div>
             <button type="submit" name="create_walkin_lab" class="btn-filter" style="background:#f39c12;">Create Request</button>
         </form>
