@@ -3,6 +3,8 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+require_once __DIR__ . '/../includes/permissions.php';
+require_module_access($conn, 'front_desk', 'create');
 
 // Ensure walk-in registrations work even if the migration has not yet been run.
 ensure_walkin_column($conn);
