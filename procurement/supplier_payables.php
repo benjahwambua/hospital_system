@@ -23,6 +23,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if(!$p) throw new Exception('Supplier payable not found.');
     $balance=(float)$p['balance']; if($balance<=0) throw new Exception('This payable is already fully paid.');
     if($amount>$balance) $amount=$balance;
+    if($reference!==''){
+        $dup=$conn->prepare("SELECT id FROM supplier_payments WHERE supplier_id=? AND reference=? LIMIT 1");
+        $dup->bind_param('is',$p['supplier_id'],$reference); $dup->execute(); $duplicate=$dup->get_result()->fetch_assoc(); $dup->close();
+        if($duplicate) throw new Exception('This supplier payment reference has already been used.');
+    }
     $uid=(int)$_SESSION['user_id'];
     $s=$conn->prepare("INSERT INTO supplier_payments (payable_id,supplier_id,amount,payment_method,reference,notes,paid_by) VALUES (?,?,?,?,?,?,?)");
     $s->bind_param('iidsssi',$payableId,$p['supplier_id'],$amount,$method,$reference,$notes,$uid); if(!$s->execute()) throw new Exception('Unable to save supplier payment: '.$s->error); $paymentId=(int)$s->insert_id;$s->close();
