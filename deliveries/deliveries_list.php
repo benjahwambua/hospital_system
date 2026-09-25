@@ -91,9 +91,7 @@ $pages = ceil($total / $limit);
                 <td>
                     <a href="deliveries_edit.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-warning">Edit</a>
                     <a href="print_delivery.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-info">Print</a>
-                    <a href="deliveries_delete.php?id=<?= $row['id'] ?>" 
-                       onclick="return confirm('Delete this record?')" 
-                       class="btn btn-sm btn-danger">Delete</a>
+                    <form method="post" action="deliveries_delete.php" style="display:inline;" onsubmit="return confirm('Delete this record?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? csrf_token()) ?>"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
                 </td>
             </tr>
             <?php } ?>
