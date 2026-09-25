@@ -139,6 +139,7 @@ include __DIR__ . "/../includes/sidebar.php";
     <?php endif; ?>
 
     <form method="POST">
+<input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
         <div class="row">
             <div class="col-xl-8 col-lg-7">
                 <div class="card shadow mb-4">
