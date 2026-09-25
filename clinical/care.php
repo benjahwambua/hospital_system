@@ -3,6 +3,8 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+require_once __DIR__ . '/../includes/auth.php';
+require_role(['admin','doctor','nurse']);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 $csrfToken = $_SESSION['csrf_token'];
@@ -96,6 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_visit'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_clinical_care'])) {
     if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
         $message = "<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
+    } elseif (($visit['status'] ?? '') === 'Completed') {
+        $message = "<div class='alert alert-warning'>This visit is already completed. Start a new visit before adding another clinical encounter.</div>";
     } else {
         $fields = [
             trim($_POST['presenting_complaint'] ?? ''),
