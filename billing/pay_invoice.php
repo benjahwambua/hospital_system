@@ -76,7 +76,7 @@ try{
         post_payment_journal($conn,$id,$payment['amount'],$mode,$payment['payment_id']);
     }elseif($amount>0 && $remaining>0){
         $payment=record_payment($conn,$id,min($amount,$remaining),$mode,null,(int)$shift['id']);
-        post_payment_journal($conn,$id,$payment['amount'],$mode);
+        post_payment_journal($conn,$id,$payment['amount'],$mode,$payment['payment_id']);
     }
 
     $conn->commit();
