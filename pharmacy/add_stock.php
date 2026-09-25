@@ -10,6 +10,7 @@ require_login();
 $suppliers_query = $conn->query("SELECT id, name FROM suppliers ORDER BY name ASC");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     $drug_name     = trim($_POST['drug_name']);
     $unit          = trim($_POST['unit']);
     $quantity      = intval($_POST['quantity']);
