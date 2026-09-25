@@ -43,7 +43,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['dispense_id'])){
                 $movementType='out';
                 $note='Dispensed prescription #'.(int)$row['prescription_id'].' (Queue #'.$id.')';
                 $uid=(int)($_SESSION['user_id']??0);
-                $move->bind_param('isisii',$mid,$movementType,$qty,$balanceAfter,$note,$uid);
+                $move->bind_param('isiisi',$mid,$movementType,$qty,$balanceAfter,$note,$uid);
                 if(!$move->execute()) throw new Exception('Unable to log stock movement: '.$move->error);
                 $move->close();
             }
