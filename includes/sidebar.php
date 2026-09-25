@@ -317,6 +317,7 @@ function isParentActive($paths) {
                     <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
                     <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
                     <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
+                    <a href="/hospital_system/accounting/reconciliation.php" class="<?= isActive('reconciliation.php') ?>"><i class="fas fa-balance-scale"></i> Financial Reconciliation</a>
                     <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
                     <a href="/hospital_system/expenses/view_expenses.php" class="<?= isActive('view_expenses.php') ?>"><i class="fas fa-file-contract"></i> Expense History</a>
                 </div>
