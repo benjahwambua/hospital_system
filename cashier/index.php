@@ -59,12 +59,21 @@ if ($result) {
 $todayPayments = $conn->query("SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) AS total FROM payments p WHERE DATE(p.created_at)=CURDATE()");
 $collectedToday = $todayPayments ? (float)($todayPayments->fetch_assoc()['total'] ?? 0) : 0.0;
 
+$cashierId = (int)($_SESSION['user_id'] ?? 0);
+$openShift = get_open_cashier_shift($conn, $cashierId);
+$shiftTotals = $openShift ? cashier_shift_totals($conn, (int)$openShift['id']) : ['cash'=>0,'mpesa'=>0,'other'=>0,'total'=>0];
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <div class="main-content">
     <div class="container-fluid">
+        <?php if (!$openShift): ?>
+            <div class="alert alert-warning mb-4"><i class="fas fa-lock"></i> <strong>No cashier shift is open.</strong> Open your shift before receiving payments. <a href="/hospital_system/cashier/shifts.php" class="btn btn-sm btn-warning ml-2">Open Cashier Shift</a></div>
+        <?php else: ?>
+            <div class="alert alert-success mb-4"><i class="fas fa-unlock"></i> Shift #<?= (int)$openShift['id'] ?> is open. Cash collected: <strong>KSH <?= number_format($shiftTotals['cash'],2) ?></strong> · M-Pesa: <strong>KSH <?= number_format($shiftTotals['mpesa'],2) ?></strong> <a href="/hospital_system/cashier/shifts.php" class="btn btn-sm btn-outline-success ml-2">Manage Shift</a></div>
+        <?php endif; ?>
         <div class="alert alert-info mb-4"><i class="fas fa-info-circle"></i> Cashier is the single collection point. Clinical, laboratory, pharmacy and reception staff raise charges; only the Cashier records patient payments. Legacy invoices without a Visit are kept in billing history but are not placed in the active cashier queue.</div>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
@@ -148,7 +157,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                                     <option value="Cash">Cash</option>
                                                     <option value="Mpesa">M-Pesa</option>
                                                 </select>
-                                                <button class="btn btn-success" type="submit"><i class="fas fa-check"></i> Receive</button>
+                                                <button class="btn btn-success" type="submit" <?= !$openShift ? 'disabled title="Open a cashier shift first"' : '' ?>><i class="fas fa-check"></i> Receive</button>
                                             </div>
                                             <div class="mpesa-fields" style="display:none">
                                                 <div class="input-group input-group-sm">
