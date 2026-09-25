@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__.'/../../config/config.php';
+// Correct path from lab/inventory/ to the project config directory.
+require_once dirname(__DIR__, 2).'/config/config.php';
 require_once __DIR__.'/../../includes/session.php';
 require_once __DIR__.'/../../includes/auth.php';
 require_login();
