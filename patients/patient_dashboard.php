@@ -291,7 +291,7 @@ if ($patient_id <= 0) {
             $stmt->execute();
             $stmt->close();
 
-            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
             add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&lab_success=1");
