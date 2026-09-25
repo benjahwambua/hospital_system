@@ -101,10 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
     }
 }
 
-// Render shared layout only after all POST actions and redirects are complete.
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-
 // --- 1. HANDLE DATE RANGE (Defaults to today) ---
 $start_date = $_GET['start_date'] ?? date('Y-m-d');
 $end_date = $_GET['end_date'] ?? date('Y-m-d');
@@ -120,6 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
     header('Location: lab_requests.php?start_date=' . urlencode($start_date) . '&end_date=' . urlencode($end_date) . '&deleted=1');
     exit;
 }
+
+// All POST actions and redirects above must finish before shared HTML output begins.
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
 
 // --- 3. HANDLE LAB RESULT SUBMISSION ---
 if (isset($_POST['save_lab_result'])) {
