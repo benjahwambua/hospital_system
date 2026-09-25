@@ -636,8 +636,8 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     $total=(float)($invoice['total']??0);
     $itemStmt=$conn->prepare("SELECT COALESCE(SUM(total),0) items_total FROM invoice_items WHERE invoice_id=?");
     if($itemStmt){$itemStmt->bind_param('i',$invoice_id);$itemStmt->execute();$itemTotal=(float)(($itemStmt->get_result()->fetch_assoc()['items_total'])??0);$itemStmt->close();if($itemTotal>0)$total=$itemTotal;}
-    $paidStmt=$conn->prepare("SELECT COALESCE(SUM(amount),0) total_paid FROM payments WHERE invoice_id=?");
-    if($paidStmt){$paidStmt->bind_param('i',$invoice_id);$paidStmt->execute();$paid=(float)(($paidStmt->get_result()->fetch_assoc()['total_paid'])??0);$paidStmt->close();}else{$paid=max((float)($invoice['paid_amount']??0),(float)($invoice['amount_paid']??0));}
+    $paidStmt=$conn->prepare("SELECT COALESCE(SUM(p.amount),0) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.invoice_id=p.invoice_id AND r.status='Approved'),0) AS total_paid FROM payments p WHERE p.invoice_id=?");
+    if($paidStmt){$paidStmt->bind_param('i',$invoice_id);$paid=(float)(($paidStmt->get_result()->fetch_assoc()['total_paid'])??0);$paidStmt->close();}else{$paid=max((float)($invoice['paid_amount']??0),(float)($invoice['amount_paid']??0));}
     $balance=max($total-$paid,0); if($balance<=0) throw new Exception('Invoice is already fully paid.'); $amount=min($amount,$balance);
     $patientId=(int)$invoice['patient_id']; $method=trim((string)$payment_method); $referenceValue=$reference!==null?(string)$reference:null; $shiftId=(int)($cashier_shift_id??0);
     if($shiftId>0 && invoice_column_exists($conn,'cashier_shift_id')){
@@ -657,9 +657,74 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     if(!$update) throw new Exception('Unable to update invoice: '.$conn->error);
     $update->bind_param('ddddssssi',$total,$newPaid,$newPaid,$newBalance,$newStatus,$newStatus,$method,$newStatus,$invoice_id);
     if(!$update->execute()){ $err=$update->error;$update->close();throw new Exception('Unable to update invoice payment status: '.$err); } $update->close();
-    $billingStmt=$conn->prepare("INSERT INTO billing (patient_id,invoice_id,amount,paid_amount,method,paid,status,created_at) VALUES (?,?,?,?,?,1,'PAID',NOW())");
-    if($billingStmt){$billingStmt->bind_param('iidds',$patientId,$invoice_id,$amount,$amount,$method);if(!$billingStmt->execute()){$err=$billingStmt->error;$billingStmt->close();throw new Exception('Unable to save billing payment: '.$err);} $billingStmt->close();}
+    // The modern payments table is authoritative. Legacy billing is read-only compatibility data and is no longer written here.
     return ['amount'=>$amount,'paid_amount'=>$newPaid,'balance'=>$newBalance,'status'=>$newStatus,'payment_id'=>$paymentId];
+}
+
+function refresh_invoice_payment_state($conn, int $invoice_id): array {
+    $stmt=$conn->prepare("SELECT total FROM invoices WHERE id=? FOR UPDATE");
+    if(!$stmt) throw new Exception('Unable to load invoice for payment reconciliation: '.$conn->error);
+    $stmt->bind_param('i',$invoice_id); $stmt->execute(); $invoice=$stmt->get_result()->fetch_assoc(); $stmt->close();
+    if(!$invoice) throw new Exception('Invoice not found.');
+
+    $paidStmt=$conn->prepare("SELECT
+        COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=?),0)
+        - COALESCE((SELECT SUM(amount) FROM payment_refunds WHERE invoice_id=? AND status='Approved'),0) AS paid");
+    if(!$paidStmt) throw new Exception('Unable to calculate invoice payments: '.$conn->error);
+    $paidStmt->bind_param('ii',$invoice_id,$invoice_id); $paidStmt->execute();
+    $paid=(float)($paidStmt->get_result()->fetch_assoc()['paid']??0); $paidStmt->close();
+
+    $total=(float)($invoice['total']??0);
+    $paid=max(0,min($paid,$total));
+    $balance=max($total-$paid,0);
+    $status=$balance<=0.00001?'paid':($paid>0?'partial':'unpaid');
+
+    $upd=$conn->prepare("UPDATE invoices SET paid_amount=?, amount_paid=?, balance=?, payment_status=?, status=?, paid_at=CASE WHEN ?='paid' THEN COALESCE(paid_at,NOW()) ELSE NULL END WHERE id=?");
+    if(!$upd) throw new Exception('Unable to update invoice reconciliation: '.$conn->error);
+    $upd->bind_param('dddsssi',$paid,$paid,$balance,$status,$status,$status,$invoice_id);
+    if(!$upd->execute()){ $e=$upd->error; $upd->close(); throw new Exception('Unable to update invoice reconciliation: '.$e); }
+    $upd->close();
+    return ['total'=>$total,'paid'=>$paid,'balance'=>$balance,'status'=>$status];
+}
+
+function refund_payment($conn, int $paymentId, float $amount, string $reason, string $refundMethod='Original', ?string $reference=null, int $userId=0): array {
+    if($paymentId<=0 || $amount<=0) throw new Exception('Invalid refund amount.');
+    $reason=trim($reason);
+    if($reason==='') throw new Exception('Refund reason is required.');
+
+    $stmt=$conn->prepare("SELECT id,invoice_id,patient_id,amount,method,reference FROM payments WHERE id=? LIMIT 1 FOR UPDATE");
+    if(!$stmt) throw new Exception('Unable to load payment for refund: '.$conn->error);
+    $stmt->bind_param('i',$paymentId); $stmt->execute(); $payment=$stmt->get_result()->fetch_assoc(); $stmt->close();
+    if(!$payment) throw new Exception('Payment not found.');
+
+    $rs=$conn->prepare("SELECT COALESCE(SUM(amount),0) refunded FROM payment_refunds WHERE payment_id=? AND status='Approved'");
+    if(!$rs) throw new Exception('Unable to check previous refunds: '.$conn->error);
+    $rs->bind_param('i',$paymentId); $rs->execute(); $already=(float)($rs->get_result()->fetch_assoc()['refunded']??0); $rs->close();
+    $refundable=max((float)$payment['amount']-$already,0);
+    if($refundable<=0) throw new Exception('This payment has already been fully refunded.');
+    if($amount>$refundable+0.00001) throw new Exception('Refund exceeds the remaining refundable payment amount.');
+    if($userId<=0) $userId=(int)($_SESSION['user_id']??0);
+
+    $method=$refundMethod==='Original'?(string)$payment['method']:$refundMethod;
+    $reference=trim((string)($reference??''));
+    if($reference==='') $reference=null;
+
+    $ins=$conn->prepare("INSERT INTO payment_refunds (payment_id,invoice_id,patient_id,amount,refund_method,reference,reason,status,refunded_by,created_at) VALUES (?,?,?,?,?,?,?,'Approved',?,NOW())");
+    if(!$ins) throw new Exception('Unable to create refund. Run database/financial_core_phase2.sql first.');
+    $status='Approved';
+    $ins->bind_param('iiidsssi',$paymentId,$payment['invoice_id'],$payment['patient_id'],$amount,$method,$reference,$reason,$userId);
+    if(!$ins->execute()){ $e=$ins->error; $ins->close(); throw new Exception('Unable to save refund: '.$e); }
+    $refundId=(int)$ins->insert_id; $ins->close();
+
+    $account='Cash';
+    if(stripos($method,'mpesa')!==false) $account='M-Pesa';
+    elseif(stripos($method,'bank')!==false || stripos($method,'transfer')!==false) $account='Bank';
+    $note='Payment refund #'.$refundId.' for Invoice #'.$payment['invoice_id'];
+    post_journal_entry($conn,'Accounts Receivable',$amount,0,$note,(int)$payment['invoice_id'],'REF-'.$refundId.'-AR');
+    post_journal_entry($conn,$account,0,$amount,$note,(int)$payment['invoice_id'],'REF-'.$refundId.'-'.strtoupper(str_replace(' ','',$account)));
+
+    $state=refresh_invoice_payment_state($conn,(int)$payment['invoice_id']);
+    return ['refund_id'=>$refundId,'payment_id'=>$paymentId,'invoice_id'=>(int)$payment['invoice_id'],'amount'=>$amount,'balance'=>$state['balance'],'status'=>$state['status']];
 }
 
 function get_invoice_number($conn, $invoice_id) {
