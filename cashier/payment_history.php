@@ -171,6 +171,9 @@ include __DIR__ . '/../includes/sidebar.php';
        href="/hospital_system/billing/view_invoice.php?id=<?= (int)$payment['invoice_id'] ?>&print=1">
         <i class="fas fa-print"></i> View & Print Invoice
     </a>
+    <a class="btn btn-sm btn-outline-danger" href="/hospital_system/cashier/refund.php?id=<?= (int)$payment['id'] ?>">
+        <i class="fas fa-undo"></i> Refund
+    </a>
 </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -183,4 +186,3 @@ include __DIR__ . '/../includes/sidebar.php';
     </div>
 </div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-<!-- Refund links are provided by cashier/refund.php from the payment action column. -->
