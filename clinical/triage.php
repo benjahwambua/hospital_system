@@ -6,76 +6,285 @@ require_login();
 require_once __DIR__ . '/../includes/auth.php';
 require_role(['admin','doctor','nurse']);
 
-if(empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
-$csrfToken=$_SESSION['csrf_token']; $message='';
-$recordedBy=(int)($_SESSION['user_id']??0);
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrfToken = $_SESSION['csrf_token'];
+$message = '';
+$recordedBy = (int)($_SESSION['user_id'] ?? 0);
 
-$vitalsHasStatus=false;
-$vc=$conn->query("SHOW COLUMNS FROM vitals");
-if($vc) while($col=$vc->fetch_assoc()) if(($col['Field']??'')==='status') {$vitalsHasStatus=true;break;}
-$hasVisitColumn=($x=$conn->query("SHOW COLUMNS FROM vitals LIKE 'visit_id'")) && $x->num_rows>0;
-
-if($_SERVER['REQUEST_METHOD']==='POST'){
- if(!hash_equals($csrfToken,$_POST['csrf_token']??'')) $message="<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
- else{
-  $patientId=(int)($_POST['patient_id']??0);
-  $postedVisitId=(int)($_POST['visit_id']??0);
-  $bp=trim($_POST['bp']??''); $temp=trim($_POST['temp']??''); $weight=trim($_POST['weight']??''); $pulse=trim($_POST['pulse']??'');
-  $complaints=trim($_POST['complaints']??''); $clinic=trim($_POST['clinic_category']??'General');
-  if($patientId<=0) $message="<div class='alert alert-danger'>Select a valid patient.</div>";
-  else{
-   $p=$conn->prepare("SELECT id,full_name FROM patients WHERE id=? LIMIT 1"); $p->bind_param('i',$patientId); $p->execute(); $patient=$p->get_result()->fetch_assoc(); $p->close();
-   if(!$patient) $message="<div class='alert alert-danger'>Patient not found.</div>";
-   else{
-    try{
-     $visitId=$postedVisitId;
-     if($visitId>0){
-      $vs=$conn->prepare("SELECT id FROM visits WHERE id=? AND patient_id=? AND visit_date=CURDATE() AND status IN ('Open','In Progress') LIMIT 1");
-      if($vs){$vs->bind_param('ii',$visitId,$patientId);$vs->execute();$validVisit=$vs->get_result()->fetch_assoc();$vs->close();}
-      if(empty($validVisit)) $visitId=0;
-     }
-     if($visitId<=0) $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient',$clinic);
-     if($hasVisitColumn && $vitalsHasStatus){
-      $status='pending'; $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssiis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId,$status);
-     }elseif($hasVisitColumn){
-      $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssii',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId);
-     }elseif($vitalsHasStatus){
-      $status='pending'; $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,status,created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssis',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$status);
-     }else{
-      $stmt=$conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,created_at) VALUES (?,?,?,?,?,?,?,NOW())");
-      $stmt->bind_param('isssssi',$patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy);
-     }
-     if(!$stmt || !$stmt->execute()) throw new Exception($stmt?$stmt->error:$conn->error);
-     if($stmt)$stmt->close();
-     if($visitId>0){
-      $v=$conn->prepare("UPDATE visits SET clinic_category=?,status='Open',updated_at=NOW() WHERE id=? AND patient_id=? AND status IN ('Open','In Progress')");
-      if($v){$v->bind_param('sii',$clinic,$visitId,$patientId);$v->execute();$v->close();}
-     }
-     header("Location: consultations.php?triage=success"); exit;
-    }catch(Throwable $e){$message="<div class='alert alert-danger'>Unable to record triage: ".htmlspecialchars($e->getMessage())."</div>";}
-   }
-  }
- }
+$vitalsHasStatus = false;
+$vc = $conn->query("SHOW COLUMNS FROM vitals");
+if ($vc) {
+    while ($col = $vc->fetch_assoc()) {
+        if (($col['Field'] ?? '') === 'status') { $vitalsHasStatus = true; break; }
+    }
 }
-$patients=$conn->query("SELECT id,full_name,gender,age,patient_number FROM patients ORDER BY full_name ASC");
-include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sidebar.php';
+$hasVisitColumn = ($x = $conn->query("SHOW COLUMNS FROM vitals LIKE 'visit_id'")) && $x->num_rows > 0;
+
+$selectedPatientId = (int)($_GET['patient_id'] ?? $_POST['patient_id'] ?? 0);
+$selectedVisitId = (int)($_GET['visit_id'] ?? $_POST['visit_id'] ?? 0);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
+        $message = "<div class='alert alert-danger'>Invalid security token. Please refresh and try again.</div>";
+    } else {
+        $patientId = (int)($_POST['patient_id'] ?? 0);
+        $postedVisitId = (int)($_POST['visit_id'] ?? 0);
+        $bp = trim($_POST['bp'] ?? '');
+        $temp = trim($_POST['temp'] ?? '');
+        $weight = trim($_POST['weight'] ?? '');
+        $pulse = trim($_POST['pulse'] ?? '');
+        $complaints = trim($_POST['complaints'] ?? '');
+        $clinic = trim($_POST['clinic_category'] ?? 'General');
+
+        if ($patientId <= 0 || $postedVisitId <= 0) {
+            $message = "<div class='alert alert-danger'>Select a patient from the active Triage Queue.</div>";
+        } else {
+            $vs = $conn->prepare(
+                "SELECT id, patient_id, clinic_category, visit_type
+                 FROM visits
+                 WHERE id=? AND patient_id=? AND visit_date=CURDATE()
+                   AND status IN ('Open','In Progress')
+                   AND visit_type <> 'Walk-in'
+                   AND NOT EXISTS (SELECT 1 FROM vitals vt WHERE vt.visit_id=visits.id)
+                 LIMIT 1"
+            );
+            $validVisit = null;
+            if ($vs) {
+                $vs->bind_param('ii', $postedVisitId, $patientId);
+                $vs->execute();
+                $validVisit = $vs->get_result()->fetch_assoc();
+                $vs->close();
+            }
+
+            if (!$validVisit) {
+                $message = "<div class='alert alert-warning'>This visit is no longer waiting for triage. Please refresh the queue.</div>";
+            } else {
+                try {
+                    $visitId = (int)$validVisit['id'];
+                    if ($clinic === 'General' && !empty($validVisit['clinic_category'])) {
+                        $clinic = (string)$validVisit['clinic_category'];
+                    }
+
+                    if ($hasVisitColumn && $vitalsHasStatus) {
+                        $status = 'pending';
+                        $stmt = $conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
+                        $stmt->bind_param('isssssiis', $patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId,$status);
+                    } elseif ($hasVisitColumn) {
+                        $stmt = $conn->prepare("INSERT INTO vitals (patient_id,bp,temp,weight,pulse,complaints,recorded_by,visit_id,created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
+                        $stmt->bind_param('isssssii', $patientId,$bp,$temp,$weight,$pulse,$complaints,$recordedBy,$visitId);
+                    } else {
+                        $stmt = null;
+                        throw new Exception('The Vitals table is missing the visit_id column. Run the HMS workflow migration before recording triage.');
+                    }
+
+                    if (!$stmt || !$stmt->execute()) throw new Exception($stmt ? $stmt->error : $conn->error);
+                    if ($stmt) $stmt->close();
+
+                    $v = $conn->prepare("UPDATE visits SET clinic_category=?, status='Open', updated_at=NOW() WHERE id=? AND patient_id=?");
+                    if ($v) {
+                        $v->bind_param('sii', $clinic, $visitId, $patientId);
+                        $v->execute();
+                        $v->close();
+                    }
+
+                    header("Location: consultations.php?triage=success");
+                    exit;
+                } catch (Throwable $e) {
+                    $message = "<div class='alert alert-danger'>Unable to record triage: " . htmlspecialchars($e->getMessage()) . "</div>";
+                }
+            }
+        }
+    }
+}
+
+/* Only active visits that actually require triage are shown.
+ * Walk-in visits are deliberately excluded because triage is optional for them.
+ */
+$waiting = [];
+$waitingSql = "SELECT v.id AS visit_id, v.visit_number, v.visit_time, v.visit_type,
+                      v.clinic_category, p.id AS patient_id, p.full_name,
+                      p.patient_number, p.gender, p.age, p.phone
+               FROM visits v
+               INNER JOIN patients p ON p.id=v.patient_id
+               WHERE v.visit_date=CURDATE()
+                 AND v.status IN ('Open','In Progress')
+                 AND v.visit_type <> 'Walk-in'
+                 AND NOT EXISTS (SELECT 1 FROM vitals vt WHERE vt.visit_id=v.id)
+               ORDER BY v.visit_time ASC, v.id ASC";
+$waitingResult = $conn->query($waitingSql);
+if ($waitingResult) {
+    while ($row = $waitingResult->fetch_assoc()) $waiting[] = $row;
+}
+
+$selected = null;
+if ($selectedVisitId > 0) {
+    foreach ($waiting as $row) {
+        if ((int)$row['visit_id'] === $selectedVisitId && (int)$row['patient_id'] === $selectedPatientId) {
+            $selected = $row;
+            break;
+        }
+    }
+}
+if (!$selected && count($waiting) === 1) $selected = $waiting[0];
+
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
 ?>
-<div class="main-content"><div class="container-fluid pt-4"><div class="row justify-content-center"><div class="col-xl-9">
-<div class="card shadow-sm border-0"><div class="card-header bg-white py-3 d-flex justify-content-between"><h5 class="m-0 font-weight-bold text-primary"><i class="fas fa-heartbeat mr-2"></i>Patient Triage & Vitals</h5><a href="consultations.php" class="btn btn-sm btn-outline-primary">Doctor Queue</a></div>
-<div class="card-body p-4"><?=$message?>
-<form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
-<input type="hidden" name="visit_id" value="<?= (int)($_GET['visit_id'] ?? 0) ?>">
-<div class="row"><div class="col-md-8 mb-3"><label class="small font-weight-bold">PATIENT</label><select name="patient_id" class="form-control select2" required><option value="">-- Search patient --</option><?php if($patients)while($p=$patients->fetch_assoc()): ?><option value="<?=$p['id']?>" <?=((int)($_GET['patient_id'] ?? 0)===(int)$p['id'])?'selected':''?>><?=htmlspecialchars($p['full_name'])?> — <?=htmlspecialchars($p['patient_number']??'')?> · <?=htmlspecialchars($p['gender']??'')?> · <?=htmlspecialchars($p['age']??'')?> yrs</option><?php endwhile; ?></select></div>
-<div class="col-md-4 mb-3"><label class="small font-weight-bold">CLINIC / DEPARTMENT</label><select name="clinic_category" class="form-control"><option>General</option><option>Outpatient</option><option>Dental</option><option>Maternal</option><option>Pediatric</option><option>Emergency</option><option>Specialist</option></select></div></div>
-<div class="row">
-<div class="col-md-3 mb-3"><label>BP (mmHg)</label><input name="bp" class="form-control" placeholder="120/80"></div>
-<div class="col-md-3 mb-3"><label>Temperature (°C)</label><input name="temp" type="number" step="0.1" class="form-control" placeholder="36.5"></div>
-<div class="col-md-3 mb-3"><label>Weight (kg)</label><input name="weight" type="number" step="0.1" class="form-control" placeholder="70"></div>
-<div class="col-md-3 mb-3"><label>Pulse (bpm)</label><input name="pulse" type="number" class="form-control" placeholder="72"></div></div>
-<div class="form-group"><label>Chief Complaints / Triage Notes</label><textarea name="complaints" class="form-control" rows="4" placeholder="Symptoms, duration, immediate observations..."></textarea></div>
-<button class="btn btn-primary btn-block font-weight-bold py-2"><i class="fas fa-arrow-right mr-1"></i> Submit to Doctor's Queue</button>
-</form></div></div></div></div></div></div>
+<style>
+.triage-page{padding:28px 0 50px}
+.triage-hero{background:linear-gradient(135deg,#0d6efd,#174ea6);color:#fff;border-radius:16px;padding:24px 28px;box-shadow:0 10px 30px rgba(13,110,253,.16)}
+.triage-hero h3{margin:0 0 6px;font-weight:700}.triage-hero p{margin:0;opacity:.9}
+.stat-card{border:0;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.07);height:100%}.stat-number{font-size:28px;font-weight:700}
+.queue-card,.form-card{border:0;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.07)}
+.patient-row{cursor:pointer;border-radius:10px;margin-bottom:7px;padding:12px;border:1px solid #edf0f4;background:#fff}
+.patient-row:hover,.patient-row.active{background:#f2f7ff;border-color:#9ec5fe}
+.patient-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#e7f1ff;color:#0d6efd;font-weight:700}
+.vital-box{background:#f8fafc;border:1px solid #e9ecef;border-radius:12px;padding:16px}
+.vital-box label{font-size:12px;font-weight:700;color:#6c757d;text-transform:uppercase}
+.vital-box input{font-size:18px;font-weight:600}
+.section-label{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6c757d}
+</style>
+
+<div class="main-content">
+<div class="container-fluid triage-page">
+    <div class="triage-hero mb-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h3><i class="fas fa-heartbeat mr-2"></i>Triage & Vitals</h3>
+            <p>Assess patients who have been routed to triage. Walk-in treatment visits are not forced through this screen.</p>
+        </div>
+        <a href="consultations.php" class="btn btn-light"><i class="fas fa-user-md mr-1"></i> Doctor Queue</a>
+    </div>
+
+    <?= $message ?>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="card stat-card"><div class="card-body">
+                <div class="text-muted small">WAITING FOR TRIAGE</div>
+                <div class="stat-number text-primary"><?= count($waiting) ?></div>
+                <div class="small text-muted">Active visits requiring vitals</div>
+            </div></div>
+        </div>
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="card stat-card"><div class="card-body">
+                <div class="text-muted small">SELECTED PATIENT</div>
+                <div class="font-weight-bold mt-2"><?= $selected ? htmlspecialchars($selected['full_name']) : 'None selected' ?></div>
+                <div class="small text-muted"><?= $selected ? htmlspecialchars($selected['visit_number']) : 'Choose from the queue' ?></div>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card"><div class="card-body">
+                <div class="text-muted small">WORKFLOW</div>
+                <div class="font-weight-bold mt-2">Triage → Doctor</div>
+                <div class="small text-muted">One visit is preserved throughout</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-4 mb-4">
+            <div class="card queue-card h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="font-weight-bold mb-1">Triage Queue</h5>
+                    <div class="small text-muted">Only today's active visits needing triage</div>
+                </div>
+                <div class="card-body px-3">
+                    <?php if ($waiting): ?>
+                        <?php foreach ($waiting as $row): ?>
+                            <a href="?patient_id=<?= (int)$row['patient_id'] ?>&visit_id=<?= (int)$row['visit_id'] ?>" class="text-decoration-none text-dark">
+                                <div class="patient-row <?= $selected && (int)$selected['visit_id']===(int)$row['visit_id'] ? 'active' : '' ?>">
+                                    <div class="d-flex align-items-center">
+                                        <div class="patient-avatar mr-3"><?= htmlspecialchars(strtoupper(substr($row['full_name'],0,1))) ?></div>
+                                        <div class="flex-grow-1">
+                                            <div class="font-weight-bold"><?= htmlspecialchars($row['full_name']) ?></div>
+                                            <div class="small text-muted"><?= htmlspecialchars($row['patient_number']) ?> · <?= htmlspecialchars($row['visit_number']) ?></div>
+                                            <div class="small text-muted"><?= htmlspecialchars($row['clinic_category'] ?? 'General') ?> · <?= htmlspecialchars($row['visit_time']) ?></div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </div>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-check-circle fa-3x mb-3"></i>
+                            <h6 class="font-weight-bold">Triage queue is clear</h6>
+                            <p class="small mb-0">No active visits currently require triage.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-8">
+            <div class="card form-card">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <?php if ($selected): ?>
+                        <div class="section-label">Selected Patient</div>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <div>
+                                <h5 class="font-weight-bold mb-1"><?= htmlspecialchars($selected['full_name']) ?></h5>
+                                <div class="small text-muted"><?= htmlspecialchars($selected['patient_number']) ?> · <?= htmlspecialchars($selected['gender'] ?? '') ?> · <?= htmlspecialchars($selected['age'] ?? '') ?> yrs · Visit <?= htmlspecialchars($selected['visit_number']) ?></div>
+                            </div>
+                            <span class="badge badge-warning px-3 py-2">Waiting for Triage</span>
+                        </div>
+                    <?php else: ?>
+                        <h5 class="font-weight-bold mb-1">Record Triage</h5>
+                        <div class="small text-muted">Select a patient from the Triage Queue to begin.</div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="card-body p-4">
+                    <?php if ($selected): ?>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                        <input type="hidden" name="patient_id" value="<?= (int)$selected['patient_id'] ?>">
+                        <input type="hidden" name="visit_id" value="<?= (int)$selected['visit_id'] ?>">
+
+                        <div class="section-label mb-3">Vital Signs</div>
+                        <div class="row">
+                            <div class="col-md-6 col-lg-3 mb-3"><div class="vital-box"><label>Blood Pressure</label><input name="bp" class="form-control border-0 bg-transparent px-0" placeholder="120/80"></div></div>
+                            <div class="col-md-6 col-lg-3 mb-3"><div class="vital-box"><label>Temperature °C</label><input name="temp" type="number" step="0.1" class="form-control border-0 bg-transparent px-0" placeholder="36.5"></div></div>
+                            <div class="col-md-6 col-lg-3 mb-3"><div class="vital-box"><label>Weight kg</label><input name="weight" type="number" step="0.1" class="form-control border-0 bg-transparent px-0" placeholder="70.0"></div></div>
+                            <div class="col-md-6 col-lg-3 mb-3"><div class="vital-box"><label>Pulse bpm</label><input name="pulse" type="number" class="form-control border-0 bg-transparent px-0" placeholder="72"></div></div>
+                        </div>
+
+                        <div class="row mt-2">
+                            <div class="col-md-6 mb-3">
+                                <label class="section-label">Clinic / Department</label>
+                                <select name="clinic_category" class="form-control">
+                                    <?php foreach (['General','Outpatient','Dental','Maternal','Pediatric','Emergency','Specialist'] as $option): ?>
+                                        <option <?= (($selected['clinic_category'] ?? 'General') === $option) ? 'selected' : '' ?>><?= htmlspecialchars($option) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="section-label">Triage Outcome</label>
+                                <input class="form-control" value="Ready for Doctor assessment" readonly>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="section-label">Chief Complaints / Triage Notes</label>
+                            <textarea name="complaints" class="form-control mt-2" rows="5" placeholder="Symptoms, duration, immediate observations, urgency or other notes..."></textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="small text-muted"><i class="fas fa-info-circle mr-1"></i>Saving this record moves the same Visit to the Doctor Queue.</div>
+                            <button class="btn btn-primary px-4 py-2 font-weight-bold"><i class="fas fa-check mr-1"></i> Complete Triage</button>
+                        </div>
+                    </form>
+                    <?php else: ?>
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-stethoscope fa-3x mb-3"></i>
+                            <h5 class="font-weight-bold">No patient selected</h5>
+                            <p class="mb-0">Choose a patient from the left-hand Triage Queue.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
