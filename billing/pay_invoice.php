@@ -66,7 +66,7 @@ try{
         post_payment_journal($conn,$id,$payment['amount'],'Mpesa',$payment['payment_id']);
         $conn->commit();
         if (($_POST['return_to'] ?? '') === 'cashier') {
-            header("Location: /hospital_system/cashier/index.php?success=1");
+            header("Location: /hospital_system/cashier/index.php?success=1&paid_invoice=".$id);
         } else {
             header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1&mpesa=recorded");
         }
