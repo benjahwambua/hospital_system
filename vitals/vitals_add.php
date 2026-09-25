@@ -9,6 +9,8 @@ $patient_id = intval($_GET['patient_id'] ?? 0);
 $msg = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    $bp
     $bp = $conn->real_escape_string($_POST['bp']);
     $temp = floatval($_POST['temperature']);
     $pulse = intval($_POST['pulse']);
@@ -35,6 +37,7 @@ include __DIR__ . '/../includes/header.php';
     <h4>Add Vitals</h4>
     <?php if($msg) echo "<div class='alert alert-danger'>$msg</div>"; ?>
     <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
         <div class="mb-2"><input type="text" name="bp" class="form-control" placeholder="BP" required></div>
         <div class="mb-2"><input type="number" step="0.1" name="temperature" class="form-control" placeholder="Temperature" required></div>
         <div class="mb-2"><input type="number" name="pulse" class="form-control" placeholder="Pulse" required></div>
