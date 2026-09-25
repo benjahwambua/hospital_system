@@ -297,6 +297,10 @@ if ($financialAccountTable && $financialAccountTable->num_rows > 0) {
 
 // 4. BEGIN OUTPUT
 // ==============================================================================
+$activeVisit = null;
+$activeVisitRes = $conn->prepare("SELECT id, visit_number, visit_type, clinic_category, visit_date, visit_time, status FROM visits WHERE patient_id=? AND visit_date=CURDATE() AND status IN ('Open','In Progress') ORDER BY id DESC LIMIT 1");
+if ($activeVisitRes) { $activeVisitRes->bind_param('i', $patient_id); $activeVisitRes->execute(); $activeVisit = $activeVisitRes->get_result()->fetch_assoc(); $activeVisitRes->close(); }
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
@@ -403,7 +407,7 @@ if ($patient_id <= 0) {
     <?php if (isset($_GET['vitals_saved'])): ?><div class="alert alert-success">Vitals saved successfully.</div><?php endif; ?>
     <?php if (isset($_GET['error']) && $_GET['error'] === 'csrf'): ?><div class="alert alert-danger">Security token mismatch. Please retry the action.</div><?php endif; ?>
 
-    <div class="sub-card" style="border-left:5px solid var(--primary-blue);"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><div><h3 style="margin:0;color:var(--primary-blue);">Current Clinical Assessment</h3><p style="margin:6px 0 0;color:#666;">Today's vitals and clinical assessment are recorded against the active Visit through Clinical Care. This dashboard is for patient history and review.</p></div><a href="/hospital_system/clinical/care.php?patient_id=<?= (int)$patient_id ?>" class="btn-save" style="float:none; margin-top:0; text-decoration:none;">Open Clinical Care</a></div></div>
+    <div class="sub-card" style="border-left:5px solid var(--primary-blue);"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><div><h3 style="margin:0;color:var(--primary-blue);">Current Clinical Assessment</h3><p style="margin:6px 0 0;color:#666;">Today's clinical work is recorded against the active Visit. This dashboard is for patient history and review.</p></div><a href="/hospital_system/clinical/care.php?patient_id=<?= (int)$patient_id ?><?= $activeVisit ? '&visit_id=' . (int)$activeVisit['id'] : '' ?>" class="btn-save" style="float:none; margin-top:0; text-decoration:none;">Open Clinical Care</a></div></div>
 
     <h3>Vital Signs History</h3>
 
@@ -454,7 +458,7 @@ if ($patient_id <= 0) {
 
     <div class="sub-card"><h3 style="color:var(--primary-blue);margin:0;">Clinical History</h3><p style="color:#666;">Clinical notes, diagnoses, examination and management are recorded in the current Visit from Clinical Care. This dashboard does not create another encounter.</p><a href="/hospital_system/clinical/care.php?patient_id=<?= (int)$patient_id ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Clinical Care</a></div>
 
-<div id="services" class="card" style="display:none;"><h3>Services & Laboratory</h3><p style="color:#666;">New services and laboratory requests are created from the active Visit in Clinical Care.</p><a href="/hospital_system/clinical/orders.php?patient_id=<?= (int)$patient_id ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Orders & Referrals</a></div>
+<div id="services" class="card" style="display:none;"><h3>Services & Laboratory</h3><p style="color:#666;">New services and laboratory requests are created from the active Visit in Clinical Care.</p><a href="/hospital_system/clinical/orders.php?patient_id=<?= (int)$patient_id ?><?= $activeVisit ? '&visit_id=' . (int)$activeVisit['id'] : '' ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Orders & Referrals</a></div>
 
 <div id="prescriptions" class="card" style="display:none;"><h3>Medication History</h3><p style="color:#666;">Prescriptions are created from the active Visit by authorized clinical staff and dispensed through Pharmacy.</p><a href="/hospital_system/clinical/orders.php?patient_id=<?= (int)$patient_id ?>" class="btn-save" style="float:none;margin-top:10px;text-decoration:none;">Open Clinical Orders</a></div>
 
