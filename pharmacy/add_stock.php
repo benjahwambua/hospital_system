@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (drug_name, unit, quantity, buying_price, selling_price, invoice_no, supplier, batch_no, expiry_date) 
             VALUES (?,?,?,?,?,?,?,?,?)
         ");
-        $stmt->bind_param("ssidddsss", $drug_name, $unit, $quantity, $buying_price, $selling_price, $invoice_no, $supplier_name, $batch_no, $expiry_date);
+        $stmt->bind_param("ssiddssss", $drug_name, $unit, $quantity, $buying_price, $selling_price, $invoice_no, $supplier_name, $batch_no, $expiry_date);
         $stmt->execute();
 
         // Only post to ledger if there is a financial value
