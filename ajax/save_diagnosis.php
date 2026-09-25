@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_role(['admin','doctor']);
 
 $response = ['success'=>false,'message'=>'Invalid request'];
 
