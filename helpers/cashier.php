@@ -22,19 +22,22 @@ function open_cashier_shift($conn, int $cashierId, float $openingCash = 0.0, ?st
     if ($cashierId <= 0) throw new Exception('Invalid cashier.');
     if ($openingCash < 0) throw new Exception('Opening cash cannot be negative.');
 
-    $existing = get_open_cashier_shift($conn, $cashierId);
-    if ($existing) throw new Exception('You already have an open cashier shift.');
+    $conn->begin_transaction();
+    try {
+        $existing = get_open_cashier_shift($conn, $cashierId);
+        if ($existing) throw new Exception('You already have an open cashier shift.');
 
-    $stmt = $conn->prepare("INSERT INTO cashier_shifts (cashier_id, opening_cash, opening_notes, status, opened_at, created_at) VALUES (?, ?, ?, 'Open', NOW(), NOW())");
-    if (!$stmt) throw new Exception('Unable to open cashier shift: '.$conn->error);
-    $stmt->bind_param('ids', $cashierId, $openingCash, $notes);
-    if (!$stmt->execute()) {
-        $err=$stmt->error; $stmt->close();
-        throw new Exception('Unable to open cashier shift: '.$err);
+        $stmt = $conn->prepare("INSERT INTO cashier_shifts (cashier_id, opening_cash, opening_notes, status, opened_at, created_at) VALUES (?, ?, ?, 'Open', NOW(), NOW())");
+        if (!$stmt) throw new Exception('Unable to open cashier shift: '.$conn->error);
+        $stmt->bind_param('ids', $cashierId, $openingCash, $notes);
+        if (!$stmt->execute()) { $err=$stmt->error; $stmt->close(); throw new Exception('Unable to open cashier shift: '.$err); }
+        $id=(int)$stmt->insert_id; $stmt->close();
+        $conn->commit();
+        return $id;
+    } catch(Throwable $e) {
+        $conn->rollback();
+        throw $e;
     }
-    $id=(int)$stmt->insert_id;
-    $stmt->close();
-    return $id;
 }
 
 function cashier_shift_totals($conn, int $shiftId): array {
@@ -75,15 +78,29 @@ function close_cashier_shift($conn, int $shiftId, int $cashierId, float $closing
     $stmt->close();
     if(!$shift) throw new Exception('Open cashier shift not found.');
 
-    $totals=cashier_shift_totals($conn,$shiftId);
-    $expected=(float)$shift['opening_cash']+$totals['cash'];
-    $variance=$closingCash-$expected;
+    $conn->begin_transaction();
+    try {
+        // Re-lock the shift inside the transaction before calculating totals.
+        $stmt=$conn->prepare("SELECT * FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1 FOR UPDATE");
+        if(!$stmt) throw new Exception('Unable to lock cashier shift: '.$conn->error);
+        $stmt->bind_param('ii',$shiftId,$cashierId); $stmt->execute(); $locked=$stmt->get_result()->fetch_assoc(); $stmt->close();
+        if(!$locked) throw new Exception('Open cashier shift not found.');
+        $shift=$locked;
 
-    $upd=$conn->prepare("UPDATE cashier_shifts SET closed_at=NOW(), closing_cash=?, expected_cash=?, cash_variance=?, closing_notes=?, status='Closed' WHERE id=? AND status='Open'");
+        $totals=cashier_shift_totals($conn,$shiftId);
+        $expected=(float)$shift['opening_cash']+$totals['cash'];
+        $variance=$closingCash-$expected;
+
+        $upd=$conn->prepare("UPDATE cashier_shifts SET closed_at=NOW(), closing_cash=?, expected_cash=?, cash_variance=?, closing_notes=?, status='Closed' WHERE id=? AND status='Open'");
     if(!$upd) throw new Exception('Unable to close cashier shift: '.$conn->error);
     $upd->bind_param('dddsi',$closingCash,$expected,$variance,$notes,$shiftId);
     if(!$upd->execute()){ $err=$upd->error; $upd->close(); throw new Exception('Unable to close cashier shift: '.$err); }
     $upd->close();
+        $conn->commit();
+    } catch(Throwable $e) {
+        $conn->rollback();
+        throw $e;
+    }
 
     return ['opening_cash'=>(float)$shift['opening_cash'],'cash_collected'=>$totals['cash'],'mpesa_collected'=>$totals['mpesa'],'other_collected'=>$totals['other'],'total_collected'=>$totals['total'],'expected_cash'=>$expected,'closing_cash'=>$closingCash,'variance'=>$variance];
 }
