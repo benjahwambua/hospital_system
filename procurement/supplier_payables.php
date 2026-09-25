@@ -51,7 +51,7 @@ $rows=$conn->query("SELECT sp.*,s.name supplier_name,po.id po_id,ir.id grn_id FR
 include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.php';
 ?>
 <div class="container-fluid">
-<div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h3">Supplier Payables & Payments</h2><a href="receive_inventory.php" class="btn btn-outline-primary btn-sm">GRN / Receiving</a></div>
+<div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h3">Supplier Payables & Payments</h2><div><a href="supplier_statement.php" class="btn btn-outline-secondary btn-sm mr-1">Supplier Statement</a><a href="receive_inventory.php" class="btn btn-outline-primary btn-sm">GRN / Receiving</a></div></div>
 <?php if($message):?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif;?>
 <?php if($error):?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif;?>
 <div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>Supplier</th><th>PO</th><th>GRN</th><th>Supplier Invoice</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due Date</th><th>Receive Payment</th></tr></thead><tbody>
