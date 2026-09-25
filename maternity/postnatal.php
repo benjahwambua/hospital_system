@@ -8,6 +8,8 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    $maternity_id
     $maternity_id = intval($_POST['maternity_id']);
     $bp = $conn->real_escape_string($_POST['bp'] ?? '');
     $temp = $conn->real_escape_string($_POST['temp'] ?? '');
@@ -33,6 +35,7 @@ $mat_list = $conn->query("SELECT m.id, p.full_name FROM maternity m JOIN patient
     <div style="flex:1">
       <h4>Record PNC Visit</h4>
       <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
         <label>Maternity Record</label>
         <select name="maternity_id" class="form-control" required>
           <option value="">-- select --</option>
