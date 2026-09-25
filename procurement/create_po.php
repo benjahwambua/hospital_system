@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                         continue;
                     }
 
-                    $item_stmt->bind_param('isisidd', $po_id, $name, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
+                    $item_stmt->bind_param('issiidd', $po_id, $name, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
                     $item_stmt->execute();
                 }
                 $item_stmt->close();
