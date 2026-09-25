@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
         try {
             $payment = record_payment($conn, $invoiceId, $amount, 'Mpesa', $receipt);
             record_manual_mpesa_transaction($conn, $invoiceId, (int)$invoice['patient_id'], $payment['amount'], $phone, $receipt, 'Manually recorded M-Pesa payment');
-            post_payment_journal($conn, $invoiceId, $payment['amount'], 'Mpesa');
+            post_payment_journal($conn, $invoiceId, $payment['amount'], 'Mpesa', $payment['payment_id']);
             $conn->commit();
         } catch (Throwable $e) {
             $conn->rollback();
