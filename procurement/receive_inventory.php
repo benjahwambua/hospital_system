@@ -17,8 +17,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $poItemId=(int)($_POST['po_item_id']??0);
         $qty=(int)($_POST['actual_qty']??0);
         $supplierInvoice=trim((string)($_POST['supplier_invoice_no']??''));
-        $paymentMethod=trim((string)($_POST['payment_method']??'Credit'));
+        $paymentMethod='Credit';
         $unitCost=(float)($_POST['unit_cost']??0);
+        $batchNo=trim((string)($_POST['batch_no']??''));
+        $expiryDate=trim((string)($_POST['expiry_date']??''));
+        $storeName=trim((string)($_POST['store_name']??'Main Store'));
+        $remarks=trim((string)($_POST['remarks']??''));
+        $dueDate=trim((string)($_POST['due_date']??''));
 
         if($poId<=0||$poItemId<=0||$qty<=0||$supplierInvoice==='') {
             $message='PO item, quantity and supplier invoice number are required.'; $type='danger';
@@ -39,6 +44,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
                 $inventoryType=strtolower(trim((string)($item['inventory_type']??'pharmacy')));
                 if(!in_array($inventoryType,['pharmacy','lab'],true)) $inventoryType='pharmacy';
+                if($inventoryType==='pharmacy' && ($batchNo==='' || $expiryDate==='')) {
+                    throw new Exception('Batch number and expiry date are required for pharmacy/medicine receipts.');
+                }
+                if($expiryDate!=='' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/',$expiryDate)) {
+                    throw new Exception('Invalid expiry date.');
+                }
+                if($dueDate!=='' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/',$dueDate)) {
+                    throw new Exception('Invalid supplier due date.');
+                }
                 $inventoryId=(int)($item['inventory_item_id']??0);
                 $newBalance=0;
 
@@ -74,20 +88,31 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $upd->bind_param('iii',$qty,$inventoryId,$poItemId); if(!$upd->execute()) throw new Exception('Unable to update PO receiving balance.'); $upd->close();
 
                 $receiptTotal=round($qty*$unitCost,2);
-                $receipt=$conn->prepare("INSERT INTO inventory_receipts (po_id,po_item_id,inventory_type,supplier_invoice_no,qty_received,unit_cost,total_cost,payment_method,received_by,received_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-                $uid=(int)$_SESSION['user_id']; $receipt->bind_param('iiisiddsi',$poId,$poItemId,$inventoryType,$supplierInvoice,$qty,$unitCost,$receiptTotal,$paymentMethod,$uid);
-                if(!$receipt->execute()) throw new Exception('Unable to create GRN: '.$receipt->error); $printId=(int)$receipt->insert_id; $receipt->close();
+                $uid=(int)$_SESSION['user_id'];
+                $receipt=$conn->prepare("INSERT INTO inventory_receipts (po_id,po_item_id,inventory_type,supplier_invoice_no,batch_no,expiry_date,store_name,remarks,qty_received,unit_cost,total_cost,payment_method,received_by,received_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
+                $receipt->bind_param('iiisssssdddsii',$poId,$poItemId,$inventoryType,$supplierInvoice,$batchNo,$expiryDate,$storeName,$remarks,$qty,$unitCost,$receiptTotal,$paymentMethod,$uid);
+                if(!$receipt->execute()) throw new Exception('Unable to create GRN: '.$receipt->error);
+                $printId=(int)$receipt->insert_id; $receipt->close();
 
-                $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?)");
-                $pay->bind_param('iiisddi',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$uid);
+                $grnNo='GRN-'.date('Ymd').'-'.str_pad((string)$printId,5,'0',STR_PAD_LEFT);
+                $grnUpdate=$conn->prepare("UPDATE inventory_receipts SET grn_no=? WHERE id=?");
+                $grnUpdate->bind_param('si',$grnNo,$printId); $grnUpdate->execute(); $grnUpdate->close();
+
+                $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,due_date,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?,?)");
+                $pay->bind_param('iiisddsi',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$dueDate,$uid);
                 if(!$pay->execute()) throw new Exception('Unable to create supplier payable: '.$pay->error); $pay->close();
 
                 $hasRef=false;$cr=$conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'");$hasRef=($cr&&$cr->num_rows>0);
                 $inventoryAccount=$inventoryType==='lab'?'Laboratory Inventory':'Pharmacy Inventory';
-                $note="GRN #$printId - PO #$poId - $supplierInvoice";
+                $note="GRN $grnNo - PO #$poId - $supplierInvoice";
                 if($hasRef){
-                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES (?, ?, 0, ?, ?, NOW())");$ref="GRN-$printId";$a->bind_param('sdss',$inventoryAccount,$receiptTotal,$note,$ref);$a->execute();$a->close();
-                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES ('Accounts Payable',0,?,?,NOW())");$a->bind_param('ds',$receiptTotal,$note);$a->execute();$a->close();
+                    $refInventory="GRN-$printId-INV"; $refPayable="GRN-$printId-AP";
+                    $check=$conn->prepare("SELECT COUNT(*) c FROM accounting_entries WHERE reference_id IN (?,?)");
+                    $check->bind_param('ss',$refInventory,$refPayable); $check->execute(); $alreadyPosted=(int)$check->get_result()->fetch_assoc()['c']>0; $check->close();
+                    if(!$alreadyPosted){
+                        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES (?, ?, 0, ?, ?, NOW())");$a->bind_param('sdss',$inventoryAccount,$receiptTotal,$note,$refInventory);if(!$a->execute())throw new Exception('Unable to post inventory accounting entry: '.$a->error);$a->close();
+                        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES ('Accounts Payable',0,?,?,NOW())");$a->bind_param('ds',$receiptTotal,$refPayable);if(!$a->execute())throw new Exception('Unable to post payable accounting entry: '.$a->error);$a->close();
+                    }
                 }else{
                     $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?, ?, 0, ?, NOW())");$a->bind_param('sds',$inventoryAccount,$receiptTotal,$note);$a->execute();$a->close();
                     $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES ('Accounts Payable',0,?, ?,NOW())");$a->bind_param('ds',$receiptTotal,$note);$a->execute();$a->close();
@@ -111,15 +136,15 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 <div class="container-fluid">
 <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h3">GRN / Receive Inventory</h2><a href="purchase_orders.php" class="btn btn-secondary btn-sm">PO List</a></div>
 <?php if($message): ?><div class="alert alert-<?=htmlspecialchars($type)?>"><?=htmlspecialchars($message)?><?php if($printId): ?> <a class="btn btn-sm btn-light ml-2" target="_blank" href="?print_receipt=<?=$printId?>">Print GRN</a><?php endif;?></div><?php endif;?>
-<div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>PO</th><th>Supplier</th><th>Inventory</th><th>Item</th><th>Ordered</th><th>Received</th><th>Balance</th><th>Supplier Invoice</th><th>Payment</th><th>Qty</th><th></th></tr></thead><tbody>
+<div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>PO</th><th>Supplier</th><th>Inventory</th><th>Item</th><th>Ordered</th><th>Received</th><th>Balance</th><th>Supplier Invoice</th><th>Batch</th><th>Expiry</th><th>Due Date</th><th>Qty</th><th></th></tr></thead><tbody>
 <?php if($pending&&$pending->num_rows): while($row=$pending->fetch_assoc()): ?>
 <tr><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="po_id" value="<?=$row['po_id']?>"><input type="hidden" name="po_item_id" value="<?=$row['po_item_id']?>"><input type="hidden" name="unit_cost" value="<?=htmlspecialchars($row['unit_price'])?>">
 <td>#<?=$row['po_id']?></td><td><?=htmlspecialchars($row['supplier_name'])?></td><td><span class="badge badge-<?=$row['inventory_type']==='lab'?'info':'primary'?>"><?=strtoupper($row['inventory_type'])?></span></td><td><?=htmlspecialchars($row['item_name'])?></td><td><?=$row['quantity']?></td><td><?=$row['received_qty']?></td><td class="font-weight-bold text-danger"><?=$row['balance_remaining']?></td>
-<td><input name="supplier_invoice_no" class="form-control form-control-sm" required></td><td><select name="payment_method" class="form-control form-control-sm"><option value="Credit">Credit</option><option value="Cash">Cash</option><option value="Mpesa">M-Pesa</option><option value="Bank Transfer">Bank Transfer</option></select></td><td><input type="number" name="actual_qty" class="form-control form-control-sm" min="1" max="<?=$row['balance_remaining']?>" value="<?=$row['balance_remaining']?>" required></td><td><button name="receive_stock" class="btn btn-success btn-sm">Create GRN</button></td></form></tr>
-<?php endwhile; else: ?><tr><td colspan="11" class="text-center text-muted">No approved PO items awaiting receipt.</td></tr><?php endif;?>
+<td><input name="supplier_invoice_no" class="form-control form-control-sm" required></td><td><input name="batch_no" class="form-control form-control-sm" placeholder="Batch"></td><td><input name="expiry_date" type="date" class="form-control form-control-sm"></td><td><input name="due_date" type="date" class="form-control form-control-sm"></td><td><input type="number" name="actual_qty" class="form-control form-control-sm" min="1" max="<?=$row['balance_remaining']?>" value="<?=$row['balance_remaining']?>" required></td><td><button name="receive_stock" class="btn btn-success btn-sm">Create GRN</button></td></form></tr>
+<?php endwhile; else: ?><tr><td colspan="14" class="text-center text-muted">No approved PO items awaiting receipt.</td></tr><?php endif;?>
 </tbody></table></div></div></div>
 <?php
 if(isset($_GET['print_receipt'])&&(int)$_GET['print_receipt']>0){$rid=(int)$_GET['print_receipt'];$s=$conn->prepare("SELECT ir.*,poi.item_name,s.name supplier_name FROM inventory_receipts ir JOIN purchase_order_items poi ON poi.id=ir.po_item_id JOIN purchase_orders po ON po.id=ir.po_id JOIN suppliers s ON s.id=po.supplier_id WHERE ir.id=?");$s->bind_param('i',$rid);$s->execute();$grn=$s->get_result()->fetch_assoc();$s->close();if($grn):?>
-<div class="card shadow mt-4"><div class="card-body"><h4>Goods Received Note #<?=$grn['id']?></h4><p><strong>PO:</strong> #<?=$grn['po_id']?> <strong>Supplier:</strong> <?=htmlspecialchars($grn['supplier_name'])?></p><p><strong>Supplier Invoice:</strong> <?=htmlspecialchars($grn['supplier_invoice_no'])?></p><p><strong>Inventory:</strong> <?=htmlspecialchars(strtoupper($grn['inventory_type']))?> <strong>Item:</strong> <?=htmlspecialchars($grn['item_name'])?> <strong>Qty:</strong> <?=$grn['qty_received']?></p><p><strong>Total Cost:</strong> KES <?=number_format($grn['total_cost'],2)?></p><button onclick="window.print()" class="btn btn-primary no-print">Print GRN</button></div></div>
+<div class="card shadow mt-4"><div class="card-body"><h4>Goods Received Note #<?=$grn['id']?></h4><p><strong>PO:</strong> #<?=$grn['po_id']?> <strong>Supplier:</strong> <?=htmlspecialchars($grn['supplier_name'])?></p><p><strong>Supplier Invoice:</strong> <?=htmlspecialchars($grn['supplier_invoice_no'])?> <strong>GRN:</strong> <?=htmlspecialchars($grn['grn_no']??('GRN-'.$grn['id']))?></p><p><strong>Batch:</strong> <?=htmlspecialchars($grn['batch_no']??'N/A')?> <strong>Expiry:</strong> <?=htmlspecialchars($grn['expiry_date']??'N/A')?> <strong>Store:</strong> <?=htmlspecialchars($grn['store_name']??'N/A')?></p><p><strong>Inventory:</strong> <?=htmlspecialchars(strtoupper($grn['inventory_type']))?> <strong>Item:</strong> <?=htmlspecialchars($grn['item_name'])?> <strong>Qty:</strong> <?=$grn['qty_received']?></p><p><strong>Total Cost:</strong> KES <?=number_format($grn['total_cost'],2)?></p><button onclick="window.print()" class="btn btn-primary no-print">Print GRN</button></div></div>
 <?php endif;} ?>
 <?php include __DIR__.'/../includes/footer.php'; ?>
