@@ -553,9 +553,17 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
     $stmt->close();
 
     if ($total !== 0) {
-        if (!$conn->query("UPDATE invoices SET total = COALESCE(total, 0) + " . (float)$total . " WHERE id = " . (int)$invoice_id)) {
-            throw new Exception('Unable to update invoice total: ' . $conn->error);
+        $updateStmt = $conn->prepare("UPDATE invoices SET total = COALESCE(total, 0) + ? WHERE id = ?");
+        if (!$updateStmt) {
+            throw new Exception('Unable to prepare invoice total update: ' . $conn->error);
         }
+        $updateStmt->bind_param('di', $total, $invoice_id);
+        if (!$updateStmt->execute()) {
+            $error = $updateStmt->error;
+            $updateStmt->close();
+            throw new Exception('Unable to update invoice total: ' . $error);
+        }
+        $updateStmt->close();
     }
 
     return $itemId;
