@@ -56,10 +56,10 @@ $query = "
     LEFT JOIN (
         -- Payments belong to invoices, not patients. Aggregating by patient
         -- caused one patient's old payments to reduce another invoice.
-        SELECT invoice_id, SUM(amount) AS total_paid
-        FROM payments
-        WHERE invoice_id IS NOT NULL
-        GROUP BY invoice_id
+        SELECT p.invoice_id, SUM(p.amount) - COALESCE(SUM(CASE WHEN r.status='Approved' THEN r.amount ELSE 0 END),0) AS total_paid
+        FROM payments p LEFT JOIN payment_refunds r ON r.payment_id=p.id
+        WHERE p.invoice_id IS NOT NULL
+        GROUP BY p.invoice_id
     ) pay ON i.id = pay.invoice_id
     WHERE $where_sql
     ORDER BY i.created_at DESC";
