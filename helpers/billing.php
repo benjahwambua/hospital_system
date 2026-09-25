@@ -617,7 +617,7 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
     if (!$stmt) {
         throw new Exception('Unable to save M-Pesa transaction. Run mpesa_migration.sql first.');
     }
-    $stmt->bind_param('iidsss', $invoice_id, $patient_id, $amount, $phone, $receiptValue, $resultDesc);
+    $stmt->bind_param('iidsss', $invoice_id, $patientValue, $amount, $phone, $receiptValue, $resultDesc);
     if (!$stmt->execute()) {
         $error = $stmt->error;
         $stmt->close();
