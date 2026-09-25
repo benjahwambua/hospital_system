@@ -367,6 +367,38 @@ if ($patient_id <= 0) {
     }
 
 
+    // Dashboard data required by the Clinical Encounter and Billing tabs.
+    // Keep these queries defensive so older databases remain usable.
+    $latestVital = null;
+    $vitals = $conn->query("SELECT * FROM vitals WHERE patient_id = " . (int)$patient_id . " ORDER BY created_at DESC, id DESC");
+    if (!$vitals) {
+        $vitals = $conn->query("SELECT * FROM vitals WHERE patient_id = " . (int)$patient_id . " ORDER BY id DESC");
+    }
+    if ($vitals) {
+        $vitals->data_seek(0);
+        $latestVital = $vitals->fetch_assoc();
+        $vitals->data_seek(0);
+    }
+
+    $encounter = null;
+    $encounterRes = $conn->query("SELECT * FROM encounters WHERE patient_id = " . (int)$patient_id . " ORDER BY created_at DESC, id DESC LIMIT 1");
+    if ($encounterRes) {
+        $encounter = $encounterRes->fetch_assoc();
+    }
+
+    $all_services = $conn->query("SELECT id, category, service_name, price, active FROM services_master WHERE active = 1 ORDER BY category, service_name");
+    if (!$all_services) {
+        $all_services = $conn->query("SELECT id, category, service_name, price, active FROM services_master ORDER BY category, service_name");
+    }
+
+    $patient_services = $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " ORDER BY ps.created_at DESC, ps.id DESC");
+    $prescriptions = $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " ORDER BY pr.created_at DESC, pr.id DESC");
+    if (!$prescriptions) {
+        $prescriptions = $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id ORDER BY pr.created_at DESC, pr.id DESC");
+    }
+    $stock = $conn->query("SELECT id, drug_name, quantity, selling_price FROM pharmacy_stock WHERE quantity > 0 ORDER BY drug_name");
+
+
     // Walk-in requested service
 // Prefer the actual service already attached to the walk-in (for example a lab test).
 // Reception walk-ins fall back to the selected clinic/service category stored on the patient.
