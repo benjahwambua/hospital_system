@@ -84,6 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
 
                 $item_stmt = $conn->prepare('INSERT INTO purchase_order_items (purchase_order_id, item_name, inventory_type, inventory_item_id, quantity, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?)');
 
+                $serverGrandTotal = 0.0;
+                $insertedItems = 0;
+
                 foreach ($itemIds as $i => $stockId) {
                     $stockId = (int)$stockId;
                     $inventoryType = strtolower(trim((string)($inventoryTypes[$i] ?? 'pharmacy')));
@@ -92,88 +95,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                     $name = trim((string)($itemNames[$i] ?? ''));
                     $qty = max(1, (int)($qtys[$i] ?? 0));
                     $u_price = max(0, (float)($prices[$i] ?? 0));
-                    $l_total = $qty * $u_price;
+                    $l_total = round($qty * $u_price, 2);
 
-                    if ($stockId <= 0 || $name === '') {
+                    if ($stockId <= 0 || $name === '' || $inventoryItemId <= 0 || $qty <= 0 || $u_price < 0) {
+                        continue;
+                    }
                         continue;
                     }
 
                     $item_stmt->bind_param('issiidd', $po_id, $name, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
-                    $item_stmt->execute();
+                    if (!$item_stmt->execute()) {
+                        throw new Exception('Unable to save PO item: ' . $item_stmt->error);
+                    }
+                    $serverGrandTotal += $l_total;
+                    $insertedItems++;
                 }
                 $item_stmt->close();
 
-                $expenseDescription = 'PO #' . $po_id . ' procurement expense';
-                $expenseCols = ['expense_date', 'description', 'amount'];
-                $expenseVals = ['?', '?', '?'];
-                $expenseTypes = 'ssd';
-                $expenseParams = [$order_date, $expenseDescription, $total_amount];
+                if ($insertedItems < 1) {
+                    throw new Exception('At least one valid PO item is required.');
+                }
+                $total_amount = round($serverGrandTotal, 2);
+                $updateTotal = $conn->prepare("UPDATE purchase_orders SET total_amount=? WHERE id=?");
+                $updateTotal->bind_param('di', $total_amount, $po_id);
+                $updateTotal->execute();
+                $updateTotal->close();
 
-                if (in_array('category', $expenseColumns, true)) {
-                    $expenseCols[] = 'category';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 's';
-                    $expenseParams[] = 'Procurement';
-                } elseif (in_array('category_id', $expenseColumns, true)) {
-                    $defaultCategoryId = 1;
-                    $catRes = $conn->query("SELECT id FROM expense_categories ORDER BY id ASC LIMIT 1");
-                    if ($catRes && ($cat = $catRes->fetch_assoc())) {
-                        $defaultCategoryId = (int)$cat['id'];
-                    }
-                    $expenseCols[] = 'category_id';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 'i';
-                    $expenseParams[] = $defaultCategoryId;
-                }
-
-                if (in_array('source_type', $expenseColumns, true)) {
-                    $expenseCols[] = 'source_type';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 's';
-                    $expenseParams[] = 'purchase_order';
-                }
-                if (in_array('source_id', $expenseColumns, true)) {
-                    $expenseCols[] = 'source_id';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 'i';
-                    $expenseParams[] = $po_id;
-                }
-                if (in_array('status', $expenseColumns, true)) {
-                    $expenseCols[] = 'status';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 's';
-                    $expenseParams[] = in_array($paymentStatus, ['Paid', 'Pending'], true) ? $paymentStatus : 'Pending';
-                }
-                if (in_array('payment_method', $expenseColumns, true)) {
-                    $expenseCols[] = 'payment_method';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 's';
-                    $expenseParams[] = in_array($paymentMethod, ['Cash', 'Mpesa', 'Bank Transfer'], true) ? $paymentMethod : 'Cash';
-                }
-                if (in_array('created_by', $expenseColumns, true)) {
-                    $expenseCols[] = 'created_by';
-                    $expenseVals[] = '?';
-                    $expenseTypes .= 'i';
-                    $expenseParams[] = $user_id;
-                }
-                if (in_array('created_at', $expenseColumns, true)) {
-                    $expenseCols[] = 'created_at';
-                    $expenseVals[] = 'NOW()';
-                }
-
-                $expenseSql = 'INSERT INTO expenses (' . implode(', ', $expenseCols) . ') VALUES (' . implode(', ', $expenseVals) . ')';
-                $expenseStmt = $conn->prepare($expenseSql);
-                $expenseStmt->bind_param($expenseTypes, ...$expenseParams);
-                $expenseStmt->execute();
-                $expenseId = (int)$conn->insert_id;
-                $expenseStmt->close();
-
-                $ledgerNote = 'PO #' . $po_id . ' linked expense #' . $expenseId;
-                $ledgerStmt = $conn->prepare("INSERT INTO accounting_entries (account, debit, credit, note, created_at) VALUES ('Procurement Expense', ?, 0, ?, NOW())");
-                $ledgerStmt->bind_param('ds', $total_amount, $ledgerNote);
-                $ledgerStmt->execute();
-                $ledgerStmt->close();
-
+                // A PO is a commitment, not an accounting expense.
+                // Inventory/AP are recognized only when goods are actually received through GRN.
                 $conn->commit();
                 header('Location: purchase_orders.php?view_id=' . $po_id);
                 exit;
@@ -235,19 +184,15 @@ include __DIR__ . '/../includes/sidebar.php';
                         <input type="date" name="order_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="col-md-3 form-group">
-                        <label>Payment Method</label>
+                        <label>Payment Terms</label>
                         <select name="payment_method" class="form-control" required>
-                            <option value="Cash">Cash</option>
-                            <option value="Mpesa">Mpesa</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Credit">Credit / Supplier Payable</option>
                         </select>
                     </div>
                     <div class="col-md-3 form-group">
                         <label>Payment Status</label>
-                        <select name="payment_status" class="form-control" required>
-                            <option value="Pending">Pending</option>
-                            <option value="Paid">Paid</option>
-                        </select>
+                        <input type="text" class="form-control" value="Pending until supplier payment" readonly>
+                        <small class="text-muted">Payment is recorded after GRN in Supplier Payables.</small>
                     </div>
                 </div>
 
