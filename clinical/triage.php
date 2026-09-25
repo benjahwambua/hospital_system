@@ -19,6 +19,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!hash_equals($csrfToken,$_POST['csrf_token']??'')) $message="<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
  else{
   $patientId=(int)($_POST['patient_id']??0);
+  $postedVisitId=(int)($_POST['visit_id']??0);
   $bp=trim($_POST['bp']??''); $temp=trim($_POST['temp']??''); $weight=trim($_POST['weight']??''); $pulse=trim($_POST['pulse']??'');
   $complaints=trim($_POST['complaints']??''); $clinic=trim($_POST['clinic_category']??'General');
   if($patientId<=0) $message="<div class='alert alert-danger'>Select a valid patient.</div>";
