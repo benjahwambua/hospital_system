@@ -7,7 +7,6 @@ require_role(['admin','receptionist','nurse']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
-    $patient_id
     $patient_id = intval($_POST['patient_id']);
     $doctor_id = intval($_POST['doctor_id']);
     $date = $_POST['appointment_date'];
