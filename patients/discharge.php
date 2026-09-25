@@ -9,6 +9,8 @@ $pid = intval($_GET['id'] ?? 0);
 if (!$pid) header('Location: /hospital_system/patients.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
+    $summary
     $summary = $conn->real_escape_string($_POST['summary'] ?? '');
     $user = current_user_id();
     $stmt = $conn->prepare("INSERT INTO discharges (patient_id, discharged_by, summary) VALUES (?,?,?)");
@@ -29,6 +31,7 @@ $patient = $conn->query("SELECT * FROM patients WHERE id=$pid")->fetch_assoc();
   <div class="page-title">Discharge patient — <?= htmlspecialchars($patient['full_name'] ?? '') ?></div>
   <div class="card" style="max-width:800px;">
     <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
       <label>Discharge Summary</label>
       <textarea class="form-control" name="summary" required></textarea>
       <div style="margin-top:8px;"><button class="btn" type="submit">Discharge</button></div>
