@@ -327,6 +327,7 @@ while($row = $lab_jobs->fetch_assoc()) {
                         <td><span class="test-cost">KES <?= number_format($job['price'], 2) ?></span></td>
                         
                         <form method="post">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                             <td>
                                 <textarea name="findings" rows="2" placeholder="Enter findings..."><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
                             </td>
@@ -340,9 +341,7 @@ while($row = $lab_jobs->fetch_assoc()) {
                                         <a href="lab_results.php?id=<?= $job['id'] ?>" target="_blank" class="btn-view">View Report</a>
                                     <?php endif; ?>
                                     <a href="lab_receipt.php?id=<?= $job['id'] ?>" target="_blank" class="btn-receipt">Receipt</a>
-                                    <a href="javascript:void(0)" 
-                                       class="btn-delete" 
-                                       onclick="return confirm('Are you sure?')">Delete</a>
+                                    <button type="submit" name="delete_id" value="<?= (int)$job['id'] ?>" class="btn-delete" onclick="return confirm('Are you sure you want to delete this laboratory request?')">Delete</button>
                                 </div>
                             </td>
                         </form>
