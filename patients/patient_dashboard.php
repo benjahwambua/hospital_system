@@ -464,42 +464,62 @@ if (!empty($patient['is_walkin'])) {
         FROM payments p
         INNER JOIN invoices i ON i.id = p.invoice_id
         WHERE i.patient_id = ?
-    );
+    ");
+
     if ($paidStmt) {
         $paidStmt->bind_param('i', $patient_id);
         $paidStmt->execute();
         $paidRes = $paidStmt->get_result();
-    if ($paidRes) {
-        $total_paid = (float)($paidRes->fetch_assoc()['total_paid'] ?? 0);
-    }
-    if (isset($paidStmt) && $paidStmt) $paidStmt->close();
 
-    // Logic to prevent negative balance.
+        if ($paidRes) {
+            $paidRow = $paidRes->fetch_assoc();
+            $total_paid = (float)($paidRow['total_paid'] ?? 0);
+        }
+
+        $paidStmt->close();
+    }
+
+    // Prevent negative balances.
     $balance_due = max($total_charges - $total_paid, 0.0);
 
-$insuranceCovered = 0;
-$amountToPayNow = $balance_due;
-$currentPayerLabel = 'Cash / Self Pay';
-$currentCopayEstimate = 0;
+    $insuranceCovered = 0.0;
+    $amountToPayNow = $balance_due;
+    $currentPayerLabel = 'Cash / Self Pay';
+    $currentCopayEstimate = 0.0;
 
-$financialAccountTable = $conn->query("SHOW TABLES LIKE 'patient_financial_accounts'");
-if ($financialAccountTable && $financialAccountTable->num_rows > 0) {
-    $financialAccount = $conn->query("SELECT pfa.*, p.payer_name FROM patient_financial_accounts pfa LEFT JOIN payers p ON pfa.current_payer_id = p.id WHERE pfa.patient_id = $patient_id LIMIT 1")->fetch_assoc();
-    if ($financialAccount) {
-        $insuranceCovered = min($balance_due, (float)($financialAccount['total_claims_outstanding'] ?? 0));
-        $currentCopayEstimate = (float)($financialAccount['total_copay_due'] ?? 0);
-        $amountToPayNow = max($balance_due - $insuranceCovered, 0);
-        if (!empty($financialAccount['payer_name'])) {
-            $currentPayerLabel = $financialAccount['payer_name'];
-        } elseif (!empty($financialAccount['account_class'])) {
-            $currentPayerLabel = $financialAccount['account_class'];
+    // Read the optional financial-account data defensively.
+    $financialAccountTable = $conn->query("SHOW TABLES LIKE 'patient_financial_accounts'");
+    if ($financialAccountTable && $financialAccountTable->num_rows > 0) {
+        $financialAccountStmt = $conn->prepare("
+            SELECT pfa.*, p.payer_name
+            FROM patient_financial_accounts pfa
+            LEFT JOIN payers p ON pfa.current_payer_id = p.id
+            WHERE pfa.patient_id = ?
+            LIMIT 1
+        ");
+
+        if ($financialAccountStmt) {
+            $financialAccountStmt->bind_param('i', $patient_id);
+            $financialAccountStmt->execute();
+            $financialAccount = $financialAccountStmt->get_result()->fetch_assoc();
+            $financialAccountStmt->close();
+
+            if ($financialAccount) {
+                $insuranceCovered = min(
+                    $balance_due,
+                    (float)($financialAccount['total_claims_outstanding'] ?? 0)
+                );
+                $currentCopayEstimate = (float)($financialAccount['total_copay_due'] ?? 0);
+                $amountToPayNow = max($balance_due - $insuranceCovered, 0.0);
+
+                if (!empty($financialAccount['payer_name'])) {
+                    $currentPayerLabel = $financialAccount['payer_name'];
+                } elseif (!empty($financialAccount['account_class'])) {
+                    $currentPayerLabel = $financialAccount['account_class'];
+                }
+            }
         }
     }
-}
-
-// ==============================================================================
-
-}
 
 // 4. BEGIN OUTPUT
 // ==============================================================================
