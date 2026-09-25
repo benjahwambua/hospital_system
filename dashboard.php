@@ -20,7 +20,7 @@ $stats = [
     'patients' => $conn->query("SELECT COUNT(*) AS c FROM patients")->fetch_assoc()['c'] ?? 0,
     'appointments' => $conn->query("SELECT COUNT(*) AS c FROM encounters WHERE DATE(created_at)=CURDATE()")->fetch_assoc()['c'] ?? 0,
     'lab' => $conn->query("SELECT COUNT(*) AS c FROM lab_requests WHERE status='pending'")->fetch_assoc()['c'] ?? 0,
-    'revenue' => $isSuper ? ($conn->query("SELECT COALESCE(SUM(amount),0) AS c FROM billing WHERE DATE(created_at)=CURDATE()")->fetch_assoc()['c'] ?? 0) : 0,
+    'revenue' => $isSuper ? ($conn->query("SELECT COALESCE(SUM(p.amount),0) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) AS c FROM payments p WHERE DATE(p.created_at)=CURDATE()")->fetch_assoc()['c'] ?? 0) : 0,
     'pharmacy_val' => $isSuper ? ($conn->query("SELECT COALESCE(SUM(quantity * selling_price),0) AS c FROM pharmacy_stock")->fetch_assoc()['c'] ?? 0) : 0,
     'stock_units' => $conn->query("SELECT COALESCE(SUM(quantity),0) AS c FROM pharmacy_stock")->fetch_assoc()['c'] ?? 0,
 ];
@@ -28,7 +28,7 @@ $stats = [
 $chart_labels = [];
 $chart_data = [];
 if ($isSuper) {
-    $revenueQuery = $conn->query("SELECT DATE_FORMAT(created_at, '%D %b') as day, SUM(amount) as total FROM billing WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY created_at ASC");
+    $revenueQuery = $conn->query("SELECT DATE_FORMAT(p.created_at, '%D %b') as day, SUM(p.amount) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=DATE(p.created_at) AND r.status='Approved'),0) as total FROM payments p WHERE p.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY DATE(p.created_at) ORDER BY DATE(p.created_at) ASC");
     while($row = $revenueQuery->fetch_assoc()) {
         $chart_labels[] = $row['day'];
         $chart_data[] = (float)$row['total'];
