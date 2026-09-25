@@ -100,8 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                     if ($stockId <= 0 || $name === '' || $inventoryItemId <= 0 || $qty <= 0 || $u_price < 0) {
                         continue;
                     }
-                        continue;
-                    }
 
                     $item_stmt->bind_param('issiidd', $po_id, $name, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
                     if (!$item_stmt->execute()) {
@@ -140,11 +138,6 @@ if ($stockRes) while ($row = $stockRes->fetch_assoc()) { $row['inventory_type']=
 $labRes = $conn->query("SELECT id, item_name, buying_price, quantity FROM lab_inventory WHERE status='active' ORDER BY item_name ASC");
 if ($labRes) while ($row = $labRes->fetch_assoc()) { $row['inventory_type']='lab'; $stockItems[]=$row; }
 $stockRes = null;
-if ($stockRes) {
-    while ($row = $stockRes->fetch_assoc()) {
-        $stockItems[] = $row;
-    }
-}
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
