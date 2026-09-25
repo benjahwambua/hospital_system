@@ -19,12 +19,35 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['dispense_id'])){
     else {
         $conn->begin_transaction();
         try{
-            $u=$conn->prepare("UPDATE pharmacy_stock SET quantity=quantity-? WHERE id=? AND quantity>=?");
-            $qty=(int)$row['quantity']; $mid=(int)$row['medicine_id']; $u->bind_param('iii',$qty,$mid,$qty);
+            // Claim the queue row first so the same prescription cannot be
+            // dispensed twice by concurrent submissions.
+            $claim=$conn->prepare("UPDATE pharmacy_queue SET status='completed', completed_at=NOW() WHERE id=? AND status='pending'");
+            $claim->bind_param('i',$id);
+            if(!$claim->execute() || $claim->affected_rows!==1) throw new Exception('Queue item is no longer pending.');
+            $claim->close();
+
+            $qty=(int)$row['quantity']; $mid=(int)$row['medicine_id'];
+            $u=$conn->prepare("UPDATE pharmacy_stock SET quantity=quantity-?, updated_at=NOW() WHERE id=? AND quantity>=?");
+            $u->bind_param('iii',$qty,$mid,$qty);
             if(!$u->execute() || $u->affected_rows!==1) throw new Exception('Unable to deduct stock.');
             $u->close();
-            $d=$conn->prepare("UPDATE pharmacy_queue SET status='completed', completed_at=NOW() WHERE id=?");
-            $d->bind_param('i',$id); if(!$d->execute()) throw new Exception('Unable to complete pharmacy queue item.'); $d->close();
+
+            $balanceStmt=$conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id=? LIMIT 1");
+            $balanceStmt->bind_param('i',$mid); $balanceStmt->execute();
+            $balanceRow=$balanceStmt->get_result()->fetch_assoc(); $balanceStmt->close();
+            $balanceAfter=(int)($balanceRow['quantity'] ?? 0);
+
+            // Keep a stock movement trail for every dispensing transaction.
+            $move=$conn->prepare("INSERT INTO stock_movements (stock_id,movement_type,quantity_change,balance_after,note,user_id,created_at) VALUES (?,?,?,?,?,?,NOW())");
+            if($move){
+                $movementType='out';
+                $note='Dispensed prescription #'.(int)$row['prescription_id'].' (Queue #'.$id.')';
+                $uid=(int)($_SESSION['user_id']??0);
+                $move->bind_param('isisii',$mid,$movementType,$qty,$balanceAfter,$note,$uid);
+                if(!$move->execute()) throw new Exception('Unable to log stock movement: '.$move->error);
+                $move->close();
+            }
+
             $conn->commit(); $message='Medicine dispensed and stock updated successfully.';
         }catch(Throwable $e){$conn->rollback();$message=$e->getMessage();}
     }
