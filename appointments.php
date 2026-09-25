@@ -31,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <h2><i class="fa fa-calendar-plus"></i> Add Appointment</h2>
 
 <form method="POST" class="form-card">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Patient</label>
     <select name="patient_id" required>
         <?php while($p = $patients->fetch_assoc()): ?>
