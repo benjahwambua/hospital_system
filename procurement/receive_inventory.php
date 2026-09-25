@@ -1,306 +1,129 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_role(['admin']);
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrfToken = $_SESSION['csrf_token'];
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
+$csrf=$_SESSION['csrf_token'];
+$message=''; $type='success'; $printId=0;
 
-if (!isset($_SESSION['is_super']) || (int)$_SESSION['is_super'] !== 1) {
-    die('Access Denied: Superuser Privileges Required.');
-}
-
-// Schema safety
-$conn->query("CREATE TABLE IF NOT EXISTS inventory_receipts (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    po_id INT NOT NULL,
-    po_item_id INT NOT NULL,
-    supplier_invoice_no VARCHAR(120) NOT NULL,
-    qty_received INT NOT NULL,
-    unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
-    total_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
-    payment_method VARCHAR(50) DEFAULT NULL,
-    received_by INT DEFAULT NULL,
-    received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)");
-$conn->query("CREATE TABLE IF NOT EXISTS expenses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    expense_date DATE NOT NULL,
-    category VARCHAR(120) NOT NULL,
-    description VARCHAR(255) NOT NULL,
-    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-    source_type VARCHAR(80) DEFAULT NULL,
-    source_id INT DEFAULT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-    created_by INT DEFAULT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)");
-
-$poiCols = [];
-$poiColsRes = $conn->query('SHOW COLUMNS FROM purchase_order_items');
-if ($poiColsRes) {
-    while ($col = $poiColsRes->fetch_assoc()) {
-        $poiCols[] = $col['Field'] ?? '';
-    }
-}
-if (!in_array('received_qty', $poiCols, true)) {
-    $conn->query('ALTER TABLE purchase_order_items ADD COLUMN received_qty INT NOT NULL DEFAULT 0 AFTER quantity');
-}
-
-$expCols = [];
-$expColsRes = $conn->query('SHOW COLUMNS FROM expenses');
-if ($expColsRes) {
-    while ($col = $expColsRes->fetch_assoc()) {
-        $expCols[] = $col['Field'] ?? '';
-    }
-}
-if (!in_array('source_type', $expCols, true)) {
-    $conn->query('ALTER TABLE expenses ADD COLUMN source_type VARCHAR(80) DEFAULT NULL AFTER amount');
-}
-if (!in_array('source_id', $expCols, true)) {
-    $conn->query('ALTER TABLE expenses ADD COLUMN source_id INT DEFAULT NULL AFTER source_type');
-}
-if (!in_array('status', $expCols, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'Pending' AFTER source_id");
-}
-if (!in_array('payment_method', $expCols, true)) {
-    $conn->query('ALTER TABLE expenses ADD COLUMN payment_method VARCHAR(50) DEFAULT NULL AFTER expense_date');
-}
-
-$message = '';
-$messageType = 'success';
-$printReceiptId = 0;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $postedToken = $_POST['csrf_token'] ?? '';
-    if (!hash_equals($csrfToken, $postedToken)) {
-        $message = 'Invalid CSRF token.';
-        $messageType = 'danger';
+if ($_SERVER['REQUEST_METHOD']==='POST') {
+    if (!hash_equals($csrf,(string)($_POST['csrf_token']??''))) {
+        $message='Invalid security token.'; $type='danger';
     } elseif (isset($_POST['receive_stock'])) {
-        $poItemId = (int)($_POST['po_item_id'] ?? 0);
-        $poId = (int)($_POST['po_id'] ?? 0);
-        $incomingQty = (int)($_POST['actual_qty'] ?? 0);
-        $drugName = trim((string)($_POST['drug_name'] ?? ''));
-        $unitCost = (float)($_POST['unit_cost'] ?? 0);
-        $supplierInvoiceNo = trim((string)($_POST['supplier_invoice_no'] ?? ''));
-        $paymentMethod = trim((string)($_POST['payment_method'] ?? 'Cash'));
+        $poId=(int)($_POST['po_id']??0);
+        $poItemId=(int)($_POST['po_item_id']??0);
+        $qty=(int)($_POST['actual_qty']??0);
+        $supplierInvoice=trim((string)($_POST['supplier_invoice_no']??''));
+        $paymentMethod=trim((string)($_POST['payment_method']??'Credit'));
+        $unitCost=(float)($_POST['unit_cost']??0);
 
-        if ($incomingQty <= 0 || $poItemId <= 0 || $poId <= 0 || $supplierInvoiceNo === '' || $drugName === '') {
-            $message = 'PO item, quantity, drug and supplier invoice are required.';
-            $messageType = 'danger';
+        if($poId<=0||$poItemId<=0||$qty<=0||$supplierInvoice==='') {
+            $message='PO item, quantity and supplier invoice number are required.'; $type='danger';
         } else {
             $conn->begin_transaction();
             try {
-                // Lock the PO line and enforce the remaining quantity server-side.
-                $lineStmt = $conn->prepare('SELECT item_name, quantity, COALESCE(received_qty,0) AS received_qty, unit_price FROM purchase_order_items WHERE id=? AND purchase_order_id=? FOR UPDATE');
-                $lineStmt->bind_param('ii', $poItemId, $poId);
-                $lineStmt->execute();
-                $line = $lineStmt->get_result()->fetch_assoc();
-                $lineStmt->close();
-                if (!$line) {
-                    throw new Exception('Purchase order item not found.');
-                }
-                $remaining = (int)$line['quantity'] - (int)$line['received_qty'];
-                if ($incomingQty > $remaining) {
-                    throw new Exception('Received quantity exceeds the remaining PO balance of ' . $remaining . '.');
-                }
+                $po=$conn->prepare("SELECT id,supplier_id,status FROM purchase_orders WHERE id=? FOR UPDATE");
+                $po->bind_param('i',$poId); $po->execute(); $poRow=$po->get_result()->fetch_assoc(); $po->close();
+                if(!$poRow) throw new Exception('Purchase order not found.');
+                if(in_array($poRow['status'],['Pending','Cancelled'],true)) throw new Exception('This PO must be approved before goods can be received.');
 
-                // Match an existing pharmacy item by name; create it when the PO item is new.
-                $stockStmt = $conn->prepare('SELECT id FROM pharmacy_stock WHERE drug_name=? LIMIT 1 FOR UPDATE');
-                $stockStmt->bind_param('s', $drugName);
-                $stockStmt->execute();
-                $stockRow = $stockStmt->get_result()->fetch_assoc();
-                $stockStmt->close();
+                $line=$conn->prepare("SELECT id,item_name,inventory_type,inventory_item_id,quantity,COALESCE(received_qty,0) received_qty,unit_price FROM purchase_order_items WHERE id=? AND purchase_order_id=? FOR UPDATE");
+                $line->bind_param('ii',$poItemId,$poId); $line->execute(); $item=$line->get_result()->fetch_assoc(); $line->close();
+                if(!$item) throw new Exception('Purchase order item not found.');
+                $remaining=(int)$item['quantity']-(int)$item['received_qty'];
+                if($qty>$remaining) throw new Exception("Received quantity exceeds remaining PO quantity of $remaining.");
+                if($unitCost<=0) $unitCost=(float)$item['unit_price'];
 
-                if ($stockRow) {
-                    $stockUpdate = $conn->prepare('UPDATE pharmacy_stock SET quantity = quantity + ? WHERE id=?');
-                    $stockUpdate->bind_param('ii', $incomingQty, $stockRow['id']);
-                    $stockUpdate->execute();
-                    $stockUpdate->close();
-                } else {
-                    $insertStock = $conn->prepare("INSERT INTO pharmacy_stock (drug_name, quantity, selling_price) VALUES (?, ?, ?)");
-                    $sellingPrice = (float)$unitCost;
-                    $insertStock->bind_param('sid', $drugName, $incomingQty, $sellingPrice);
-                    if (!$insertStock->execute()) {
-                        throw new Exception('Unable to create new pharmacy stock item: ' . $insertStock->error);
+                $inventoryType=strtolower(trim((string)($item['inventory_type']??'pharmacy')));
+                if(!in_array($inventoryType,['pharmacy','lab'],true)) $inventoryType='pharmacy';
+                $inventoryId=(int)($item['inventory_item_id']??0);
+                $newBalance=0;
+
+                if($inventoryType==='pharmacy') {
+                    $stock=null;
+                    if($inventoryId>0) {
+                        $s=$conn->prepare("SELECT id,quantity FROM pharmacy_stock WHERE id=? FOR UPDATE"); $s->bind_param('i',$inventoryId); $s->execute(); $stock=$s->get_result()->fetch_assoc(); $s->close();
                     }
-                    $insertStock->close();
+                    if(!$stock) {
+                        $s=$conn->prepare("SELECT id,quantity FROM pharmacy_stock WHERE drug_name=? LIMIT 1 FOR UPDATE"); $name=$item['item_name']; $s->bind_param('s',$name); $s->execute(); $stock=$s->get_result()->fetch_assoc(); $s->close();
+                    }
+                    if($stock) {
+                        $newBalance=(int)$stock['quantity']+$qty;
+                        $u=$conn->prepare("UPDATE pharmacy_stock SET quantity=? WHERE id=?"); $u->bind_param('ii',$newBalance,$stock['id']); if(!$u->execute()) throw new Exception('Unable to update pharmacy stock.'); $u->close();
+                        $inventoryId=(int)$stock['id'];
+                    } else {
+                        $name=$item['item_name']; $sell=$unitCost;
+                        $u=$conn->prepare("INSERT INTO pharmacy_stock (drug_name,quantity,buying_price,selling_price) VALUES (?,?,?,?)"); $u->bind_param('sidd',$name,$qty,$unitCost,$sell); if(!$u->execute()) throw new Exception('Unable to create pharmacy stock item: '.$u->error); $inventoryId=(int)$u->insert_id; $u->close(); $newBalance=$qty;
+                    }
+                    $m=$conn->prepare("INSERT INTO stock_movements (stock_id,movement_type,quantity_change,balance_after,note,user_id,created_at) VALUES (?,'in',?,?,?, ?,NOW())");
+                    if($m){$note="GRN receipt for PO #$poId / Supplier Invoice $supplierInvoice";$uid=(int)$_SESSION['user_id'];$change=$qty;$m->bind_param('iiisi',$inventoryId,$change,$newBalance,$note,$uid);$m->execute();$m->close();}
+                } else {
+                    $stock=null;
+                    if($inventoryId>0){$s=$conn->prepare("SELECT id,quantity FROM lab_inventory WHERE id=? FOR UPDATE");$s->bind_param('i',$inventoryId);$s->execute();$stock=$s->get_result()->fetch_assoc();$s->close();}
+                    if(!$stock){$s=$conn->prepare("SELECT id,quantity FROM lab_inventory WHERE item_name=? LIMIT 1 FOR UPDATE");$name=$item['item_name'];$s->bind_param('s',$name);$s->execute();$stock=$s->get_result()->fetch_assoc();$s->close();}
+                    if($stock){$newBalance=(float)$stock['quantity']+$qty;$u=$conn->prepare("UPDATE lab_inventory SET quantity=? WHERE id=?");$u->bind_param('di',$newBalance,$stock['id']);if(!$u->execute())throw new Exception('Unable to update laboratory inventory.');$u->close();$inventoryId=(int)$stock['id'];}
+                    else{$name=$item['item_name'];$cat='Laboratory Consumable';$unit='Piece';$reorder=0;$status='active';$u=$conn->prepare("INSERT INTO lab_inventory (item_name,category,unit,quantity,reorder_level,buying_price,status) VALUES (?,?,?,?,?,?,?)");$u->bind_param('sssddds',$name,$cat,$unit,$qty,$reorder,$unitCost,$status);if(!$u->execute())throw new Exception('Unable to create laboratory inventory item: '.$u->error);$inventoryId=(int)$u->insert_id;$u->close();$newBalance=$qty;}
+                    $m=$conn->prepare("INSERT INTO lab_inventory_movements (inventory_id,movement_type,quantity,balance_after,reference_no,note,user_id) VALUES (?,'in',?,?,?, ?,?)");
+                    if($m){$ref="PO-$poId-GRN";$note="Supplier Invoice $supplierInvoice";$uid=(int)$_SESSION['user_id'];$m->bind_param('idsssi',$inventoryId,$qty,$newBalance,$ref,$note,$uid);$m->execute();$m->close();}
                 }
 
-                $itemStmt = $conn->prepare('UPDATE purchase_order_items SET received_qty = received_qty + ? WHERE id = ?');
-                $itemStmt->bind_param('ii', $incomingQty, $poItemId);
-                $itemStmt->execute();
-                $itemStmt->close();
+                $upd=$conn->prepare("UPDATE purchase_order_items SET received_qty=COALESCE(received_qty,0)+? , inventory_item_id=? WHERE id=?");
+                $upd->bind_param('iii',$qty,$inventoryId,$poItemId); if(!$upd->execute()) throw new Exception('Unable to update PO receiving balance.'); $upd->close();
 
-                $checkStmt = $conn->prepare('SELECT id FROM purchase_order_items WHERE purchase_order_id = ? AND (quantity - received_qty) > 0 LIMIT 1');
-                $checkStmt->bind_param('i', $poId);
-                $checkStmt->execute();
-                $hasBalance = $checkStmt->get_result()->num_rows > 0;
-                $checkStmt->close();
+                $receiptTotal=round($qty*$unitCost,2);
+                $receipt=$conn->prepare("INSERT INTO inventory_receipts (po_id,po_item_id,inventory_type,supplier_invoice_no,qty_received,unit_cost,total_cost,payment_method,received_by,received_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
+                $uid=(int)$_SESSION['user_id']; $receipt->bind_param('iiisiddsi',$poId,$poItemId,$inventoryType,$supplierInvoice,$qty,$unitCost,$receiptTotal,$paymentMethod,$uid);
+                if(!$receipt->execute()) throw new Exception('Unable to create GRN: '.$receipt->error); $printId=(int)$receipt->insert_id; $receipt->close();
 
-                $newStatus = $hasBalance ? 'Partial' : 'Received';
-                $poStmt = $conn->prepare('UPDATE purchase_orders SET status = ? WHERE id = ?');
-                $poStmt->bind_param('si', $newStatus, $poId);
-                $poStmt->execute();
-                $poStmt->close();
+                $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?)");
+                $pay->bind_param('iiisdd i',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$uid);
+                // mysqli does not accept a space in a bind type string; recreate cleanly.
+                $pay->close();
+                $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?)");
+                $pay->bind_param('iiisddi',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$uid);
+                if(!$pay->execute()) throw new Exception('Unable to create supplier payable: '.$pay->error); $pay->close();
 
-                $totalVal = $incomingQty * $unitCost;
-                $receiptStmt = $conn->prepare('INSERT INTO inventory_receipts (po_id, po_item_id, supplier_invoice_no, qty_received, unit_cost, total_cost, payment_method, received_by, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())');
-                $userId = (int)($_SESSION['user_id'] ?? 0);
-                $receiptStmt->bind_param('iisiddsi', $poId, $poItemId, $supplierInvoiceNo, $incomingQty, $unitCost, $totalVal, $paymentMethod, $userId);
-                $receiptStmt->execute();
-                $printReceiptId = (int)$receiptStmt->insert_id;
-                $receiptStmt->close();
+                $hasRef=false;$cr=$conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'");$hasRef=($cr&&$cr->num_rows>0);
+                $inventoryAccount=$inventoryType==='lab'?'Laboratory Inventory':'Pharmacy Inventory';
+                $note="GRN #$printId - PO #$poId - $supplierInvoice";
+                if($hasRef){
+                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES (?, ?, 0, ?, ?, NOW())");$ref="GRN-$printId";$a->bind_param('sdss',$inventoryAccount,$receiptTotal,$note,$ref);$a->execute();$a->close();
+                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES ('Accounts Payable',0,?,?,NOW())");$a->bind_param('ds',$receiptTotal,$note);$a->execute();$a->close();
+                }else{
+                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?, ?, 0, ?, NOW())");$a->bind_param('sds',$inventoryAccount,$receiptTotal,$note);$a->execute();$a->close();
+                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES ('Accounts Payable',0,?, ?,NOW())");$a->bind_param('ds',$receiptTotal,$note);$a->execute();$a->close();
+                }
 
-                $accStmt = $conn->prepare("INSERT INTO accounting_entries (account, debit, credit, note, created_at) VALUES ('Procurement Expense', ?, 0, ?, NOW())");
-                $note = 'Stock In: ' . $incomingQty . ' x ' . $drugName . ' (PO #' . $poId . ', Supplier Invoice ' . $supplierInvoiceNo . ')';
-                $accStmt->bind_param('ds', $totalVal, $note);
-                $accStmt->execute();
-                $accStmt->close();
+                $remainingStmt=$conn->prepare("SELECT COUNT(*) c FROM purchase_order_items WHERE purchase_order_id=? AND quantity>COALESCE(received_qty,0)");
+                $remainingStmt->bind_param('i',$poId);$remainingStmt->execute();$hasRemaining=(int)$remainingStmt->get_result()->fetch_assoc()['c']>0;$remainingStmt->close();
+                $newStatus=$hasRemaining?'Partial':'Received';
+                $pou=$conn->prepare("UPDATE purchase_orders SET status=? WHERE id=?");$pou->bind_param('si',$newStatus,$poId);$pou->execute();$pou->close();
 
-                $expStmt = $conn->prepare("UPDATE expenses SET status = CASE WHEN ? = 'Paid' THEN 'Paid' ELSE status END, payment_method = ? WHERE source_type = 'purchase_order' AND source_id = ?");
-                $paidMarker = isset($_POST['mark_paid']) ? 'Paid' : 'Pending';
-                $expStmt->bind_param('ssi', $paidMarker, $paymentMethod, $poId);
-                $expStmt->execute();
-                $expStmt->close();
-
-                $conn->commit();
-                $message = 'Confirmed: ' . $incomingQty . ' units received successfully.';
-                $messageType = 'success';
-            } catch (Throwable $e) {
-                $conn->rollback();
-                $message = 'Error: ' . $e->getMessage();
-                $messageType = 'danger';
-            }
+                $conn->commit(); $message="GRN #$printId created. $qty unit(s) added to ".strtoupper($inventoryType)." inventory and KES ".number_format($receiptTotal,2)." added to Supplier Payables.";
+            } catch(Throwable $e){$conn->rollback();$message=$e->getMessage();$type='danger';}
         }
     }
 }
 
-$pendingItemsStmt = $conn->prepare("SELECT po.id AS po_id, s.name AS supplier_name, poi.id AS po_item_id, poi.item_name AS drug_name,
-       poi.quantity AS total_ordered, COALESCE(poi.received_qty, 0) AS total_received,
-       (poi.quantity - COALESCE(poi.received_qty, 0)) AS balance_remaining, poi.unit_price AS unit_cost,
-       e.status AS expense_status, e.payment_method AS expense_payment_method
-    FROM purchase_order_items poi
-    JOIN purchase_orders po ON poi.purchase_order_id = po.id
-    JOIN suppliers s ON po.supplier_id = s.id
-    LEFT JOIN expenses e ON e.source_type = 'purchase_order' AND e.source_id = po.id
-    WHERE (poi.quantity - COALESCE(poi.received_qty, 0)) > 0 AND po.status <> 'Cancelled'
-    ORDER BY po.id DESC");
-$pendingItemsStmt->execute();
-$pendingItems = $pendingItemsStmt->get_result();
-$pendingItemsStmt->close();
+$pending=$conn->query("SELECT po.id po_id,s.name supplier_name,poi.id po_item_id,poi.item_name,poi.inventory_type,poi.quantity,COALESCE(poi.received_qty,0) received_qty,(poi.quantity-COALESCE(poi.received_qty,0)) balance_remaining,poi.unit_price FROM purchase_order_items poi JOIN purchase_orders po ON po.id=poi.purchase_order_id JOIN suppliers s ON s.id=po.supplier_id WHERE po.status IN ('Approved','Partial') AND poi.quantity>COALESCE(poi.received_qty,0) ORDER BY po.id DESC");
 
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
+include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
 ?>
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h3 text-gray-800">Inventory Receiving & PO Payment</h2>
-        <a href="purchase_orders.php" class="btn btn-secondary btn-sm">Back to PO List</a>
-    </div>
-
-    <?php if ($message !== ''): ?>
-        <div class="alert alert-<?= $messageType ?>">
-            <?= htmlspecialchars($message) ?>
-            <?php if ($printReceiptId > 0): ?>
-                <a class="btn btn-sm btn-light ml-2" target="_blank" href="receive_inventory.php?print_receipt=<?= $printReceiptId ?>">Print Receiving Note</a>
-            <?php endif; ?>
-        </div>
-    <?php endif; ?>
-
-    <div class="card shadow border-left-info mb-4">
-        <div class="card-header py-3 bg-info text-white"><strong>Awaiting Fulfillment</strong></div>
-        <div class="card-body table-responsive">
-            <table class="table table-hover table-bordered">
-                <thead class="bg-light">
-                    <tr>
-                        <th>PO #</th>
-                        <th>Supplier</th>
-                        <th>Drug</th>
-                        <th>Ordered</th>
-                        <th>Received</th>
-                        <th>Balance</th>
-                        <th>Supplier Invoice #</th>
-                        <th>Pay Method</th>
-                        <th>Mark Paid</th>
-                        <th>Receive Qty</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if ($pendingItems && $pendingItems->num_rows > 0): ?>
-                        <?php while ($row = $pendingItems->fetch_assoc()): ?>
-                            <tr>
-                                <form method="POST">
-                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                                    <input type="hidden" name="po_id" value="<?= (int)$row['po_id'] ?>">
-                                    <input type="hidden" name="po_item_id" value="<?= (int)$row['po_item_id'] ?>">
-                                    <input type="hidden" name="drug_name" value="<?= htmlspecialchars($row['drug_name']) ?>">
-                                    <input type="hidden" name="unit_cost" value="<?= (float)$row['unit_cost'] ?>">
-                                    <td><strong>#<?= (int)$row['po_id'] ?></strong></td>
-                                    <td><?= htmlspecialchars((string)$row['supplier_name']) ?></td>
-                                    <td><?= htmlspecialchars((string)$row['drug_name']) ?></td>
-                                    <td class="text-center"><?= (int)$row['total_ordered'] ?></td>
-                                    <td class="text-center"><?= (int)$row['total_received'] ?></td>
-                                    <td class="text-center text-danger font-weight-bold"><?= (int)$row['balance_remaining'] ?></td>
-                                    <td><input type="text" name="supplier_invoice_no" class="form-control form-control-sm" placeholder="INV-..." required></td>
-                                    <td>
-                                        <select name="payment_method" class="form-control form-control-sm" required>
-                                            <option value="Cash">Cash</option>
-                                            <option value="Mpesa">Mpesa</option>
-                                            <option value="Bank Transfer">Bank Transfer</option>
-                                        </select>
-                                    </td>
-                                    <td class="text-center"><input type="checkbox" name="mark_paid" value="1"></td>
-                                    <td><input type="number" name="actual_qty" class="form-control form-control-sm" value="<?= (int)$row['balance_remaining'] ?>" min="1" max="<?= (int)$row['balance_remaining'] ?>" required></td>
-                                    <td>
-                                        <button type="submit" name="receive_stock" class="btn btn-info btn-sm btn-block">Receive</button>
-                                        <a href="purchase_orders.php?view_id=<?= (int)$row['po_id'] ?>" target="_blank" class="btn btn-light btn-sm btn-block mt-1">Print PO</a>
-                                    </td>
-                                </form>
-                            </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <tr><td colspan="11" class="text-center">All pending items received.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<?php if (isset($_GET['print_receipt']) && (int)$_GET['print_receipt'] > 0):
-    $receiptId = (int)$_GET['print_receipt'];
-    $printStmt = $conn->prepare("SELECT ir.*, poi.item_name, s.name AS supplier_name
-                                FROM inventory_receipts ir
-                                JOIN purchase_order_items poi ON ir.po_item_id = poi.id
-                                JOIN purchase_orders po ON ir.po_id = po.id
-                                JOIN suppliers s ON po.supplier_id = s.id
-                                WHERE ir.id = ? LIMIT 1");
-    $printStmt->bind_param('i', $receiptId);
-    $printStmt->execute();
-    $receipt = $printStmt->get_result()->fetch_assoc();
-    $printStmt->close();
-    if ($receipt): ?>
-    <script>
-        window.open('', '_blank');
-    </script>
-    <div class="container-fluid">
-        <div class="card shadow mt-3">
-            <div class="card-body">
-                <h4>Receiving Note #<?= (int)$receipt['id'] ?></h4>
-                <p><strong>PO:</strong> #<?= (int)$receipt['po_id'] ?> | <strong>Supplier:</strong> <?= htmlspecialchars((string)$receipt['supplier_name']) ?></p>
-                <p><strong>Supplier Invoice:</strong> <?= htmlspecialchars((string)$receipt['supplier_invoice_no']) ?></p>
-                <p><strong>Item:</strong> <?= htmlspecialchars((string)$receipt['item_name']) ?> | <strong>Qty:</strong> <?= (int)$receipt['qty_received'] ?></p>
-                <p><strong>Unit Cost:</strong> KES <?= number_format((float)$receipt['unit_cost'], 2) ?> | <strong>Total:</strong> KES <?= number_format((float)$receipt['total_cost'], 2) ?></p>
-                <p><strong>Payment Method:</strong> <?= htmlspecialchars((string)$receipt['payment_method']) ?> | <strong>Received At:</strong> <?= htmlspecialchars((string)$receipt['received_at']) ?></p>
-                <button onclick="window.print()" class="btn btn-primary no-print">Print Receiving Note</button>
-            </div>
-        </div>
-    </div>
-    <?php endif; endif; ?>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h3">GRN / Receive Inventory</h2><a href="purchase_orders.php" class="btn btn-secondary btn-sm">PO List</a></div>
+<?php if($message): ?><div class="alert alert-<?=htmlspecialchars($type)?>"><?=htmlspecialchars($message)?><?php if($printId): ?> <a class="btn btn-sm btn-light ml-2" target="_blank" href="?print_receipt=<?=$printId?>">Print GRN</a><?php endif;?></div><?php endif;?>
+<div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>PO</th><th>Supplier</th><th>Inventory</th><th>Item</th><th>Ordered</th><th>Received</th><th>Balance</th><th>Supplier Invoice</th><th>Payment</th><th>Qty</th><th></th></tr></thead><tbody>
+<?php if($pending&&$pending->num_rows): while($row=$pending->fetch_assoc()): ?>
+<tr><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="po_id" value="<?=$row['po_id']?>"><input type="hidden" name="po_item_id" value="<?=$row['po_item_id']?>"><input type="hidden" name="unit_cost" value="<?=htmlspecialchars($row['unit_price'])?>">
+<td>#<?=$row['po_id']?></td><td><?=htmlspecialchars($row['supplier_name'])?></td><td><span class="badge badge-<?=$row['inventory_type']==='lab'?'info':'primary'?>"><?=strtoupper($row['inventory_type'])?></span></td><td><?=htmlspecialchars($row['item_name'])?></td><td><?=$row['quantity']?></td><td><?=$row['received_qty']?></td><td class="font-weight-bold text-danger"><?=$row['balance_remaining']?></td>
+<td><input name="supplier_invoice_no" class="form-control form-control-sm" required></td><td><select name="payment_method" class="form-control form-control-sm"><option value="Credit">Credit</option><option value="Cash">Cash</option><option value="Mpesa">M-Pesa</option><option value="Bank Transfer">Bank Transfer</option></select></td><td><input type="number" name="actual_qty" class="form-control form-control-sm" min="1" max="<?=$row['balance_remaining']?>" value="<?=$row['balance_remaining']?>" required></td><td><button name="receive_stock" class="btn btn-success btn-sm">Create GRN</button></td></form></tr>
+<?php endwhile; else: ?><tr><td colspan="11" class="text-center text-muted">No approved PO items awaiting receipt.</td></tr><?php endif;?>
+</tbody></table></div></div></div>
+<?php
+if(isset($_GET['print_receipt'])&&(int)$_GET['print_receipt']>0){$rid=(int)$_GET['print_receipt'];$s=$conn->prepare("SELECT ir.*,poi.item_name,s.name supplier_name FROM inventory_receipts ir JOIN purchase_order_items poi ON poi.id=ir.po_item_id JOIN purchase_orders po ON po.id=ir.po_id JOIN suppliers s ON s.id=po.supplier_id WHERE ir.id=?");$s->bind_param('i',$rid);$s->execute();$grn=$s->get_result()->fetch_assoc();$s->close();if($grn):?>
+<div class="card shadow mt-4"><div class="card-body"><h4>Goods Received Note #<?=$grn['id']?></h4><p><strong>PO:</strong> #<?=$grn['po_id']?> <strong>Supplier:</strong> <?=htmlspecialchars($grn['supplier_name'])?></p><p><strong>Supplier Invoice:</strong> <?=htmlspecialchars($grn['supplier_invoice_no'])?></p><p><strong>Inventory:</strong> <?=htmlspecialchars(strtoupper($grn['inventory_type']))?> <strong>Item:</strong> <?=htmlspecialchars($grn['item_name'])?> <strong>Qty:</strong> <?=$grn['qty_received']?></p><p><strong>Total Cost:</strong> KES <?=number_format($grn['total_cost'],2)?></p><button onclick="window.print()" class="btn btn-primary no-print">Print GRN</button></div></div>
+<?php endif;} ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>
