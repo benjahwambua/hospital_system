@@ -298,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
-            header('Location: /hospital_system/queue/index.php?registered=1&patient_id=' . $patientId);
+            header('Location: /hospital_system/patients/patient_list.php?registered=1&patient_id=' . $patientId);
             exit;
         } catch (Throwable $e) {
             $conn->rollback();
