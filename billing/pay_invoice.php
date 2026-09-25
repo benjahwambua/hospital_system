@@ -6,15 +6,13 @@ require_once __DIR__.'/../helpers/cashier.php';
 require_once __DIR__.'/../config/mpesa.php';
 require_login();
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) die('Invalid security token.');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
+    http_response_code(419);
+    exit('Invalid security token.');
+}
 
 // Centralize all patient collections through the Cashier module.
-$role = strtolower(trim((string)($_SESSION['role'] ?? '')));
-$isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
-if (!$isSuper && !in_array($role, ['admin', 'cashier'], true)) {
-    http_response_code(403);
-    die('Access denied. Patient payments must be recorded by the Cashier.');
-}
+require_role(['admin','cashier']);
 
 $id=(int)($_POST['invoice_id'] ?? $_GET['id'] ?? 0);
 $amount=(float)($_POST['amount'] ?? 0);
@@ -23,15 +21,15 @@ $mark_paid=isset($_POST['mark_paid']) && $_POST['mark_paid']=='1';
 $cashierId=(int)($_SESSION['user_id']??0);
 $shift=get_open_cashier_shift($conn,$cashierId);
 
-if(!$id) die("Invalid invoice ID");
-if(!$shift) die("No open cashier shift. Please open your cashier shift before receiving patient payments.");
+if(!$id) { http_response_code(400); exit("Invalid invoice ID"); }
+if(!$shift) { http_response_code(409); exit("No open cashier shift. Please open your cashier shift before receiving patient payments."); }
 
 $stmt=$conn->prepare("SELECT * FROM invoices WHERE id=? LIMIT 1");
 $stmt->bind_param('i',$id);
 $stmt->execute();
 $invoice=$stmt->get_result()->fetch_assoc();
 $stmt->close();
-if(!$invoice) die("Invoice not found");
+if(!$invoice) { http_response_code(404); exit("Invoice not found"); }
 
 $conn->begin_transaction();
 try{
@@ -95,6 +93,7 @@ try{
     }
 }catch(Throwable $e){
     $conn->rollback();
-    if(isset($_POST['ajax'])) echo json_encode(['status'=>'error','message'=>$e->getMessage()]);
-    else die("Error: ".$e->getMessage());
+    error_log('HMS payment error: ' . $e->getMessage());
+    if(isset($_POST['ajax'])) echo json_encode(['status'=>'error','message'=>'Unable to complete payment. Please try again.']);
+    else { http_response_code(500); exit('Unable to complete payment. Please try again.'); }
 }
