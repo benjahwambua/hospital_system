@@ -51,7 +51,7 @@ ORDER BY a.appointment_date DESC
     </td>
     <td>
         <a href="edit_appointment.php?id=<?= $a['id'] ?>"><i class="fa fa-edit"></i></a>
-        <a onclick="return confirm('Delete?')" href="delete_appointment.php?id=<?= $a['id'] ?>"><i class="fa fa-trash" style="color:red"></i></a>
+        
     </td>
 </tr>
 <?php endwhile; ?>
