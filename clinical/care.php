@@ -42,16 +42,8 @@ if ($visitId > 0) {
 }
 
 if ($visitId <= 0) {
-    $visitId = get_or_create_current_visit($conn, $patientId, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
-    if ($visitId > 0) {
-        $stmt = $conn->prepare("SELECT * FROM visits WHERE id=? LIMIT 1");
-        $stmt->bind_param('i', $visitId);
-        $stmt->execute();
-        $visit = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-    } else {
-        $visit = null;
-    }
+    $message = "<div class='alert alert-warning'>No visit was supplied. Open this patient from the Doctor's Consultation Queue so the same visit is preserved.</div>";
+    $visit = null;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_visit'])) {
