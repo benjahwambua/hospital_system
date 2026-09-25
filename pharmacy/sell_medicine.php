@@ -1,8 +1,3 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../includes/session.php';
-require_once __DIR__ . '/../includes/auth.php';
-require_login();
-require_role(['pharmacist','admin','cashier']);
-header('Location: /hospital_system/pharmacy/walkin_sale.php');
-exit;
+// Active walk-in pharmacy sales screen. Kept at the legacy URL so existing menus/bookmarks continue to work.
+require __DIR__ . '/walkin_sale.php';
