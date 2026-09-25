@@ -12,14 +12,25 @@ if (!$isSuper && !in_array($role, ['admin', 'cashier'], true)) {
     die('Access denied. Only the cashier or administrator can access the Cashier module.');
 }
 
-$from = $_GET['from'] ?? date('Y-m-d');
-$to = $_GET['to'] ?? date('Y-m-d');
-$fromEsc = $conn->real_escape_string($from);
-$toEsc = $conn->real_escape_string($to);
+$today = date('Y-m-d');
+$search = trim((string)($_GET['q'] ?? ''));
+$searchEsc = $conn->real_escape_string($search);
 
+$whereSearch = '';
+if ($search !== '') {
+    $whereSearch = " AND (i.invoice_number LIKE '%{$searchEsc}%' OR p.full_name LIKE '%{$searchEsc}%' OR p.patient_number LIKE '%{$searchEsc}%' OR wc.full_name LIKE '%{$searchEsc}%' OR wc.phone LIKE '%{$searchEsc}%' OR v.visit_number LIKE '%{$searchEsc}%')";
+}
+
+/*
+ * Active cashier queue:
+ * Only charges created/raised for today's operational date are shown here.
+ * Historical unpaid invoices are deliberately kept out of this queue and
+ * appear in Aged Receivables instead.
+ */
 $sql = "
-    SELECT i.id, i.patient_id, i.visit_id, i.created_at,
-           p.patient_number, COALESCE(p.full_name, wc.full_name) AS patient_name, COALESCE(p.is_walkin,1*(i.walkin_id IS NOT NULL)) AS is_walkin,
+    SELECT i.id, i.invoice_number, i.patient_id, i.visit_id, i.created_at,
+           p.patient_number, COALESCE(p.full_name, wc.full_name) AS patient_name,
+           COALESCE(p.is_walkin, 1*(i.walkin_id IS NOT NULL)) AS is_walkin,
            wc.phone AS walkin_phone,
            v.visit_number, v.visit_type, v.clinic_category, v.status AS visit_status,
            COALESCE(items.total, i.total, 0) AS bill_total,
@@ -33,13 +44,22 @@ $sql = "
         FROM invoice_items GROUP BY invoice_id
     ) items ON items.invoice_id = i.id
     LEFT JOIN (
-        SELECT p.invoice_id, SUM(p.amount) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.invoice_id=p.invoice_id AND r.status='Approved'),0) AS paid
-        FROM payments p WHERE p.invoice_id IS NOT NULL
+        SELECT p.invoice_id,
+               SUM(p.amount) - COALESCE((
+                   SELECT SUM(r.amount)
+                   FROM payment_refunds r
+                   WHERE r.invoice_id = p.invoice_id AND r.status = 'Approved'
+               ),0) AS paid
+        FROM payments p
+        WHERE p.invoice_id IS NOT NULL
         GROUP BY p.invoice_id
     ) pay ON pay.invoice_id = i.id
-    WHERE (i.visit_id IS NOT NULL OR i.walkin_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
+    WHERE DATE(COALESCE(v.visit_date, DATE(i.created_at))) = '{$today}'
+      AND (i.visit_id IS NOT NULL OR i.walkin_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
       AND COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
-    ORDER BY COALESCE(v.visit_date, DATE(i.created_at)) DESC, i.id DESC
+      AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')
+      {$whereSearch}
+    ORDER BY i.created_at ASC, i.id ASC
 ";
 
 $pending = [];
@@ -56,7 +76,6 @@ if ($result) {
         }
     }
 }
-
 $todayPayments = $conn->query("SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) AS total FROM payments p WHERE DATE(p.created_at)=CURDATE()");
 $collectedToday = $todayPayments ? (float)($todayPayments->fetch_assoc()['total'] ?? 0) : 0.0;
 
