@@ -334,63 +334,92 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
         throw new Exception('Invalid patient for consultation billing.');
     }
 
-    // Walk-in patients receive laboratory/services charges only; consultation is free.
-    $isWalkin = false;
-    // Ensure the live database has the walk-in flag before using it.
     ensure_walkin_column($conn);
-    if (invoice_column_exists($conn, 'is_walkin')) {
-        $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id = ? LIMIT 1");
-        if ($patientStmt) {
-            $patientStmt->bind_param('i', $patient_id);
-            $patientStmt->execute();
-            $patientRow = $patientStmt->get_result()->fetch_assoc();
-            $patientStmt->close();
-            $isWalkin = !empty($patientRow['is_walkin']);
-        }
-    }
-    if ($isWalkin) {
+
+    $patientStmt = $conn->prepare("SELECT is_walkin FROM patients WHERE id=? LIMIT 1");
+    if (!$patientStmt) throw new Exception('Unable to load patient for consultation billing: '.$conn->error);
+    $patientStmt->bind_param('i', $patient_id);
+    $patientStmt->execute();
+    $patientRow = $patientStmt->get_result()->fetch_assoc();
+    $patientStmt->close();
+
+    if (!$patientRow) throw new Exception('Patient not found.');
+    if (!empty($patientRow['is_walkin'])) {
         return get_or_create_invoice($conn, $patient_id);
     }
 
-    $invoice_id = get_or_create_invoice($conn, $patient_id);
+    $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General');
+    $invoiceId = get_or_create_visit_invoice($conn, $patient_id, $visitId);
 
-    $check = $conn->prepare("SELECT id FROM patient_services ps INNER JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = ? AND sm.service_name = 'Consultation' AND DATE(ps.created_at) = CURDATE() AND ps.status <> 'Cancelled' LIMIT 1");
-    $hasService = false;
-    if ($check) {
-        $check->bind_param('i', $patient_id);
-        $check->execute();
-        $hasService = (bool)$check->get_result()->fetch_assoc();
-        $check->close();
-    }
+    $serviceStmt = $conn->prepare(
+        "SELECT id, category FROM services_master
+         WHERE service_name='Consultation' AND active=1 LIMIT 1"
+    );
+    $service = $serviceStmt ? (function() use ($serviceStmt) {
+        $serviceStmt->execute();
+        $row=$serviceStmt->get_result()->fetch_assoc();
+        $serviceStmt->close();
+        return $row;
+    })() : null;
 
-    if (!$hasService) {
-        $consult = $conn->query("SELECT id, service_name, category FROM services_master WHERE service_name = 'Consultation' AND active = 1 LIMIT 1");
-        $consult = $consult ? $consult->fetch_assoc() : null;
-        if ($consult) {
-            $category = (string)($consult['category'] ?? 'procedures');
-            $stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
-            if (!$stmt) throw new Exception('Unable to prepare consultation service: ' . $conn->error);
-            $stmt->bind_param('iisd', $patient_id, $consult['id'], $category, $fee);
-            if (!$stmt->execute()) throw new Exception('Unable to create consultation service: ' . $stmt->error);
-            $stmt->close();
+    if ($service) {
+        $check = $conn->prepare(
+            "SELECT id FROM patient_services
+             WHERE patient_id=? AND service_id=?
+               AND visit_id=? AND status<>'Cancelled' LIMIT 1"
+        );
+        if ($check) {
+            $sid=(int)$service['id'];
+            $check->bind_param('iii',$patient_id,$sid,$visitId);
+            $check->execute();
+            $exists=(bool)$check->get_result()->fetch_assoc();
+            $check->close();
+
+            if (!$exists) {
+                $category=(string)($service['category'] ?? 'procedures');
+                if (invoice_column_exists($conn,'visit_id')) {
+                    $stmt=$conn->prepare(
+                        "INSERT INTO patient_services
+                         (patient_id,service_id,category,price,visit_id,created_at,status)
+                         VALUES (?,?,?,?,?,NOW(),'Completed')"
+                    );
+                    if (!$stmt) throw new Exception('Unable to prepare consultation service: '.$conn->error);
+                    $stmt->bind_param('iisdi',$patient_id,$sid,$category,$fee,$visitId);
+                } else {
+                    $stmt=$conn->prepare(
+                        "INSERT INTO patient_services
+                         (patient_id,service_id,category,price,created_at,status)
+                         VALUES (?,?,?, ?,NOW(),'Completed')"
+                    );
+                    if (!$stmt) throw new Exception('Unable to prepare consultation service: '.$conn->error);
+                    $stmt->bind_param('iisd',$patient_id,$sid,$category,$fee);
+                }
+                if (!$stmt->execute()) {
+                    $err=$stmt->error; $stmt->close();
+                    throw new Exception('Unable to create consultation service: '.$err);
+                }
+                $stmt->close();
+            }
         }
     }
 
-    // Add the fixed KES 200 once to the actual invoice. If the service master is
-    // unavailable, the invoice item still records the legitimate registration fee.
-    $itemCheck = $conn->prepare("SELECT id FROM invoice_items WHERE invoice_id = ? AND LOWER(description) LIKE 'service: consultation%' LIMIT 1");
-    $hasItem = false;
-    if ($itemCheck) {
-        $itemCheck->bind_param('i', $invoice_id);
+    $itemCheck=$conn->prepare(
+        "SELECT id FROM invoice_items
+         WHERE invoice_id=? AND LOWER(TRIM(description))='service: consultation' LIMIT 1"
+    );
+    $hasItem=false;
+    if($itemCheck){
+        $itemCheck->bind_param('i',$invoiceId);
         $itemCheck->execute();
-        $hasItem = (bool)$itemCheck->get_result()->fetch_assoc();
+        $hasItem=(bool)$itemCheck->get_result()->fetch_assoc();
         $itemCheck->close();
     }
-    if (!$hasItem) {
-        add_invoice_item($conn, $invoice_id, 'Service: Consultation', 1, $fee, 'service', null);
+    if(!$hasItem){
+        add_invoice_item($conn,$invoiceId,'Service: Consultation',1,$fee,'service',$service ? (int)$service['id'] : null);
+        post_invoice_journal($conn,$invoiceId,$patient_id,$fee,'Consultation');
     }
 
-    return $invoice_id;
+    return $invoiceId;
 }
 
 function remove_walkin_consultation_charge($conn, int $patient_id): void {
@@ -589,7 +618,7 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
 function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $reference = null, $cashier_shift_id = null) {
     $invoice_id=(int)$invoice_id; $amount=(float)$amount;
     if($invoice_id<=0||$amount<=0) throw new Exception('Invalid invoice payment.');
-    $stmt=$conn->prepare("SELECT id,patient_id,total,paid_amount,amount_paid FROM invoices WHERE id=? LIMIT 1");
+    $stmt=$conn->prepare("SELECT id,patient_id,total,paid_amount,amount_paid FROM invoices WHERE id=? LIMIT 1 FOR UPDATE");
     if(!$stmt) throw new Exception('Unable to load invoice: '.$conn->error);
     $stmt->bind_param('i',$invoice_id); $stmt->execute(); $invoice=$stmt->get_result()->fetch_assoc(); $stmt->close();
     if(!$invoice) throw new Exception('Invoice not found.');
@@ -609,7 +638,9 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
         if(!$stmt) throw new Exception('Unable to record payment: '.$conn->error);
         $stmt->bind_param('idssi',$patientId,$amount,$method,$referenceValue,$invoice_id);
     }
-    if(!$stmt->execute()){ $err=$stmt->error;$stmt->close();throw new Exception('Unable to save payment: '.$err); } $stmt->close();
+    if(!$stmt->execute()){ $err=$stmt->error;$stmt->close();throw new Exception('Unable to save payment: '.$err); }
+    $paymentId=(int)$stmt->insert_id;
+    $stmt->close();
     $newPaid=$paid+$amount;$newBalance=max($total-$newPaid,0);$newStatus=$newBalance<=0.00001?'paid':'unpaid';
     $update=$conn->prepare("UPDATE invoices SET total=?,paid_amount=?,amount_paid=?,balance=?,payment_status=?,status=?,payment_mode=?,paid_at=CASE WHEN ?='paid' THEN NOW() ELSE paid_at END WHERE id=?");
     if(!$update) throw new Exception('Unable to update invoice: '.$conn->error);
@@ -617,7 +648,7 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     if(!$update->execute()){ $err=$update->error;$update->close();throw new Exception('Unable to update invoice payment status: '.$err); } $update->close();
     $billingStmt=$conn->prepare("INSERT INTO billing (patient_id,invoice_id,amount,paid_amount,method,paid,status,created_at) VALUES (?,?,?,?,?,1,'PAID',NOW())");
     if($billingStmt){$billingStmt->bind_param('iidds',$patientId,$invoice_id,$amount,$amount,$method);if(!$billingStmt->execute()){$err=$billingStmt->error;$billingStmt->close();throw new Exception('Unable to save billing payment: '.$err);} $billingStmt->close();}
-    return ['amount'=>$amount,'paid_amount'=>$newPaid,'balance'=>$newBalance,'status'=>$newStatus];
+    return ['amount'=>$amount,'paid_amount'=>$newPaid,'balance'=>$newBalance,'status'=>$newStatus,'payment_id'=>$paymentId];
 }
 
 function get_invoice_number($conn, $invoice_id) {
@@ -697,6 +728,15 @@ function post_journal_entry($conn, $account, $debit, $credit, $note, $invoice_id
 function post_invoice_journal($conn, $invoice_id, $patient_id, $total, $note = null) {
     if ($total <= 0) return;
 
+    $dup = $conn->prepare("SELECT COUNT(*) AS c FROM accounting_entries WHERE invoice_id=? AND account IN ('Accounts Receivable','Sales Revenue') AND note LIKE 'Sale:%'");
+    if ($dup) {
+        $dup->bind_param('i', $invoice_id);
+        $dup->execute();
+        $already = (int)($dup->get_result()->fetch_assoc()['c'] ?? 0);
+        $dup->close();
+        if ($already >= 2) return;
+    }
+
     $invoice_note = $note ?? ('Invoice #' . $invoice_id);
     $invNum = get_invoice_number($conn, $invoice_id);
     if ($invNum) {
@@ -721,6 +761,15 @@ function post_payment_journal($conn, $invoice_id, $amount, $payment_method = 'Ca
 
     $invNum = get_invoice_number($conn, $invoice_id);
     $note = $invNum ? ('Payment received: Invoice ' . $invNum) : ('Payment received: Invoice #' . $invoice_id);
+
+    $dup = $conn->prepare("SELECT COUNT(*) AS c FROM accounting_entries WHERE invoice_id=? AND account=? AND debit=? AND note=?");
+    if ($dup) {
+        $dup->bind_param('isds', $invoice_id, $paymentAccount, $amount, $note);
+        $dup->execute();
+        $already = (int)($dup->get_result()->fetch_assoc()['c'] ?? 0);
+        $dup->close();
+        if ($already > 0) return;
+    }
 
     // Debit: Payment Account (Cash/Bank/M-Pesa)
     post_journal_entry($conn, $paymentAccount, $amount, 0, $note, $invoice_id);
