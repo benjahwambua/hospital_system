@@ -4,10 +4,14 @@
 ================================================== */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_role(['admin','pharmacist']);
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 
 // Handle Form Stock Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_stock_submit'])) {
+    if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) { die('Invalid security token.'); }
     $stock_id     = intval($_POST['stock_id']);
     $new_quantity = intval($_POST['new_quantity']);
     $new_price    = floatval($_POST['new_price']);
@@ -103,6 +107,7 @@ include __DIR__ . '/../includes/sidebar.php';
                     <?php while ($row = $res->fetch_assoc()): ?>
                         <tr>
                             <form method="POST">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                                 <td class="medicine-name"><strong><?= htmlspecialchars($row['drug_name']) ?></strong></td>
                                 <td><?= $row['quantity'] ?></td>
                                 <td><input type="number" name="new_quantity" value="<?= $row['quantity'] ?>" class="form-control" required></td>
