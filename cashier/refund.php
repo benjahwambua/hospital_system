@@ -8,7 +8,7 @@ require_role(['admin','cashier']);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $paymentId=(int)($_GET['id'] ?? $_POST['payment_id'] ?? 0);
-$message=''; $error='';
+$message=''; $error=''; $transactionStarted=false;
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
@@ -18,12 +18,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $method=trim((string)($_POST['refund_method'] ?? 'Original'));
         $reference=trim((string)($_POST['reference'] ?? ''));
         $conn->begin_transaction();
+        $transactionStarted=true;
         $result=refund_payment($conn,$paymentId,$amount,$reason,$method,$reference!==''?$reference:null,(int)$_SESSION['user_id']);
         $conn->commit();
+        $transactionStarted=false;
         $message='Refund approved. Refund #'.$result['refund_id'].' recorded and the invoice balance was reconciled.';
     } catch(Throwable $e) {
-        if ($conn->errno===0) { /* transaction may already be closed */ }
-        else { $conn->rollback(); }
+        if ($transactionStarted) { $conn->rollback(); $transactionStarted=false; }
         error_log('HMS refund error: '.$e->getMessage());
         $error=$e->getMessage();
     }
