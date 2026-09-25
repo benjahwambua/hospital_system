@@ -49,7 +49,7 @@ try{
 
         if(!$existing){
             $payment=record_payment($conn,(int)$tx['invoice_id'],(float)$tx['amount'],'M-Pesa',$receipt);
-            post_payment_journal($conn,(int)$tx['invoice_id'],$payment['amount'],'M-Pesa');
+            post_payment_journal($conn,(int)$tx['invoice_id'],$payment['amount'],'M-Pesa',$payment['payment_id']);
         }
     }
     $conn->commit();
