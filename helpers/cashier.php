@@ -44,11 +44,10 @@ function cashier_shift_totals($conn, int $shiftId): array {
     $totals = ['cash'=>0.0, 'mpesa'=>0.0, 'other'=>0.0, 'total'=>0.0];
     if ($shiftId <= 0) return $totals;
 
-    $stmt=$conn->prepare("SELECT method,
-        COALESCE(SUM(amount),0) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r
-            JOIN payments rp ON rp.id=r.payment_id
-            WHERE rp.cashier_shift_id=p.cashier_shift_id AND r.status='Approved'),0) AS total
-        FROM payments p WHERE cashier_shift_id=? GROUP BY method");
+    $stmt=$conn->prepare("SELECT p.method,
+        COALESCE(SUM(p.amount),0) - COALESCE(SUM(CASE WHEN r.status='Approved' THEN r.amount ELSE 0 END),0) AS total
+        FROM payments p LEFT JOIN payment_refunds r ON r.payment_id=p.id
+        WHERE p.cashier_shift_id=? GROUP BY p.method");
     if ($stmt) {
         $stmt->bind_param('i',$shiftId);
         $stmt->execute();
