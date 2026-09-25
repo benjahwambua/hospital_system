@@ -27,10 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
         $itemNames = $_POST['item_name'] ?? [];
         $qtys = $_POST['qty'] ?? [];
         $prices = $_POST['price'] ?? [];
+        $inventoryTypes = $_POST['inventory_type'] ?? [];
+        $inventoryItemIds = $_POST['inventory_item_id'] ?? [];
 
         if ($supplier_id <= 0 || $order_date === '' || $user_id <= 0) {
             $error = 'Supplier, order date and user session are required.';
-        } elseif (!$itemIds || count($itemIds) !== count($qtys) || count($itemIds) !== count($prices)) {
+        } elseif (!$itemIds || count($itemIds) !== count($qtys) || count($itemIds) !== count($prices) || count($itemIds) !== count($inventoryTypes) || count($itemIds) !== count($inventoryItemIds)) {
             $error = 'Please add at least one valid item.';
         } else {
             $conn->begin_transaction();
@@ -80,10 +82,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                 $po_id = (int)$conn->insert_id;
                 $stmt->close();
 
-                $item_stmt = $conn->prepare('INSERT INTO purchase_order_items (purchase_order_id, item_name, quantity, unit_price, line_total) VALUES (?, ?, ?, ?, ?)');
+                $item_stmt = $conn->prepare('INSERT INTO purchase_order_items (purchase_order_id, item_name, inventory_type, inventory_item_id, quantity, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?)');
 
                 foreach ($itemIds as $i => $stockId) {
                     $stockId = (int)$stockId;
+                    $inventoryType = strtolower(trim((string)($inventoryTypes[$i] ?? 'pharmacy')));
+                    if (!in_array($inventoryType, ['pharmacy','lab'], true)) $inventoryType = 'pharmacy';
+                    $inventoryItemId = (int)($inventoryItemIds[$i] ?? $stockId);
                     $name = trim((string)($itemNames[$i] ?? ''));
                     $qty = max(1, (int)($qtys[$i] ?? 0));
                     $u_price = max(0, (float)($prices[$i] ?? 0));
@@ -93,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                         continue;
                     }
 
-                    $item_stmt->bind_param('isidd', $po_id, $name, $qty, $u_price, $l_total);
+                    $item_stmt->bind_param('isisidd', $po_id, $name, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
                     $item_stmt->execute();
                 }
                 $item_stmt->close();
@@ -181,7 +186,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
 }
 
 $stockItems = [];
-$stockRes = $conn->query('SELECT id, drug_name, buying_price, quantity FROM pharmacy_stock ORDER BY drug_name ASC');
+$stockRes = $conn->query('SELECT id, drug_name AS item_name, buying_price, quantity FROM pharmacy_stock ORDER BY drug_name ASC');
+if ($stockRes) while ($row = $stockRes->fetch_assoc()) { $row['inventory_type']='pharmacy'; $stockItems[]=$row; }
+$labRes = $conn->query("SELECT id, item_name, buying_price, quantity FROM lab_inventory WHERE status='active' ORDER BY item_name ASC");
+if ($labRes) while ($row = $labRes->fetch_assoc()) { $row['inventory_type']='lab'; $stockItems[]=$row; }
+$stockRes = null;
 if ($stockRes) {
     while ($row = $stockRes->fetch_assoc()) {
         $stockItems[] = $row;
@@ -286,6 +295,8 @@ include __DIR__ . '/../includes/sidebar.php';
         <td>
             <input type="hidden" name="item_id[]" class="item-id" value="">
             <input type="hidden" name="item_name[]" class="item-name" value="">
+            <input type="hidden" name="inventory_item_id[]" class="inventory-item-id" value="">
+            <select name="inventory_type[]" class="form-control form-control-sm inventory-type mb-1"><option value="pharmacy">Pharmacy</option><option value="lab">Laboratory</option></select>
             <input type="text" class="form-control item-search" list="stock-item-options" placeholder="Search medicine/item..." required>
         </td>
         <td><input type="number" name="qty[]" class="form-control qty" min="1" value="1" required></td>
@@ -297,10 +308,11 @@ include __DIR__ . '/../includes/sidebar.php';
 <datalist id="stock-item-options">
     <?php foreach ($stockItems as $stock): ?>
         <option
-            value="<?= htmlspecialchars($stock['drug_name']) ?>"
+            value="<?= htmlspecialchars($stock['item_name']) ?>"
             data-id="<?= (int)$stock['id'] ?>"
+            data-type="<?= htmlspecialchars($stock['inventory_type']) ?>"
             data-price="<?= number_format((float)($stock['buying_price'] ?? 0), 2, '.', '') ?>"
-        ><?= htmlspecialchars($stock['drug_name']) ?> (Stock: <?= (int)$stock['quantity'] ?>)</option>
+        ><?= htmlspecialchars($stock['item_name']) ?> [<?= strtoupper($stock['inventory_type']) ?>] (Stock: <?= (int)$stock['quantity'] ?>)</option>
     <?php endforeach; ?>
 </datalist>
 
@@ -337,8 +349,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const id = option?.dataset?.id || '';
             const name = option?.value || '';
             const price = option?.dataset?.price || '0.00';
+            const type = option?.dataset?.type || 'pharmacy';
 
             row.querySelector('.item-id').value = id;
+            row.querySelector('.inventory-item-id').value = id;
+            row.querySelector('.inventory-type').value = type;
             row.querySelector('.item-name').value = name;
             row.querySelector('.price').value = parseFloat(price || 0).toFixed(2);
             recalc();
