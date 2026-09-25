@@ -270,6 +270,21 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <div class="payment-panel">
             <div class="panel-card">
+                <h4>Payment History</h4>
+                <table class="history-table">
+                    <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($paymentHistory as $payment): ?>
+                        <tr><td><?= htmlspecialchars($payment['created_at'] ?? '') ?></td><td><?= htmlspecialchars($payment['method'] ?? '') ?></td><td><?= htmlspecialchars($payment['reference'] ?? '') ?></td><td>KSH <?= number_format((float)$payment['amount'],2) ?></td></tr>
+                    <?php endforeach; ?>
+                    <?php if (!$paymentHistory): ?><tr><td colspan="4">No payment received yet.</td></tr><?php endif; ?>
+                    <?php foreach ($refundHistory as $refund): ?>
+                        <tr><td><?= htmlspecialchars($refund['created_at']) ?></td><td class="text-danger">Refund</td><td><?= htmlspecialchars($refund['reference'] ?? '') ?></td><td class="text-danger">- KSH <?= number_format((float)$refund['amount'],2) ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="panel-card">
                 <h4>Received By</h4>
                 <table class="history-table">
                     <thead><tr><th>Method</th><th>Amount</th></tr></thead>
