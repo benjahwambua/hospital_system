@@ -6,9 +6,6 @@ require_login();
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];
 
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-
 // -------------------------
 // Handle Lab Result Submission
 // -------------------------
@@ -31,6 +28,10 @@ if (isset($_POST['save_lab_result'])) {
     $stmt->close();
     }
 }
+
+// Shared layout is rendered only after all POST processing and redirects.
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
 
 // -------------------------
 // Fetch Lab Worklist
