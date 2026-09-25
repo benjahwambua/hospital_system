@@ -549,6 +549,7 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
         $stmt->close();
         throw new Exception('Unable to save invoice item: ' . $error);
     }
+    $itemId = (int)$stmt->insert_id;
     $stmt->close();
 
     if ($total !== 0) {
@@ -556,6 +557,8 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
             throw new Exception('Unable to update invoice total: ' . $conn->error);
         }
     }
+
+    return $itemId;
 }
 
 function get_prescription_total($conn, $patient_id) {
@@ -689,6 +692,14 @@ function generate_invoice_number($conn) {
     return $prefix . '-' . str_pad($next_id, 4, '0', STR_PAD_LEFT);
 }
 
+function accounting_reference_column_exists($conn): bool {
+    static $exists = null;
+    if ($exists !== null) return $exists;
+    $check = $conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'");
+    $exists = (bool)($check && $check->num_rows > 0);
+    return $exists;
+}
+
 function post_journal_entry($conn, $account, $debit, $credit, $note, $invoice_id = null, $reference_id = null) {
     $columns = ['account', 'debit', 'credit', 'note', 'created_at'];
     $placeholders = ['?', '?', '?', '?', 'NOW()'];
@@ -702,11 +713,11 @@ function post_journal_entry($conn, $account, $debit, $credit, $note, $invoice_id
         $values[] = $invoice_id;
     }
 
-    if ($reference_id !== null) {
+    if ($reference_id !== null && accounting_reference_column_exists($conn)) {
         $columns[] = 'reference_id';
         $placeholders[] = '?';
         $types .= 's';
-        $values[] = $reference_id;
+        $values[] = (string)$reference_id;
     }
 
     $sql = sprintf(
@@ -721,21 +732,16 @@ function post_journal_entry($conn, $account, $debit, $credit, $note, $invoice_id
     }
 
     $stmt->bind_param($types, ...$values);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new Exception('Failed to post journal entry: ' . $error);
+    }
     $stmt->close();
 }
 
-function post_invoice_journal($conn, $invoice_id, $patient_id, $total, $note = null) {
+function post_invoice_journal($conn, $invoice_id, $patient_id, $total, $note = null, $invoice_item_id = null) {
     if ($total <= 0) return;
-
-    $dup = $conn->prepare("SELECT COUNT(*) AS c FROM accounting_entries WHERE invoice_id=? AND account IN ('Accounts Receivable','Sales Revenue') AND note LIKE 'Sale:%'");
-    if ($dup) {
-        $dup->bind_param('i', $invoice_id);
-        $dup->execute();
-        $already = (int)($dup->get_result()->fetch_assoc()['c'] ?? 0);
-        $dup->close();
-        if ($already >= 2) return;
-    }
 
     $invoice_note = $note ?? ('Invoice #' . $invoice_id);
     $invNum = get_invoice_number($conn, $invoice_id);
@@ -743,13 +749,27 @@ function post_invoice_journal($conn, $invoice_id, $patient_id, $total, $note = n
         $invoice_note = $invNum;
     }
 
-    // Debit: Accounts Receivable
-    post_journal_entry($conn, 'Accounts Receivable', $total, 0, 'Sale: ' . $invoice_note, $invoice_id);
-    // Credit: Sales Revenue
-    post_journal_entry($conn, 'Sales Revenue', 0, $total, 'Sale: ' . $invoice_note, $invoice_id);
+    // Each invoice item gets its own balanced AR/revenue pair. This prevents
+    // a multi-item invoice from losing later revenue lines while remaining
+    // idempotent when the same item is posted again.
+    $reference = $invoice_item_id !== null ? 'INVITEM-' . (int)$invoice_item_id : null;
+    if ($reference !== null && accounting_reference_column_exists($conn)) {
+        $dup = $conn->prepare("SELECT COUNT(*) AS c FROM accounting_entries WHERE reference_id=?");
+        if ($dup) {
+            $dup->bind_param('s', $reference);
+            $dup->execute();
+            $already = (int)($dup->get_result()->fetch_assoc()['c'] ?? 0);
+            $dup->close();
+            if ($already > 0) return;
+        }
+    }
+
+    $saleNote = 'Sale: ' . $invoice_note;
+    post_journal_entry($conn, 'Accounts Receivable', $total, 0, $saleNote, $invoice_id, $reference);
+    post_journal_entry($conn, 'Sales Revenue', 0, $total, $saleNote, $invoice_id, $reference);
 }
 
-function post_payment_journal($conn, $invoice_id, $amount, $payment_method = 'Cash') {
+function post_payment_journal($conn, $invoice_id, $amount, $payment_method = 'Cash', $payment_id = null) {
     if ($amount <= 0) return;
 
     $paymentAccount = 'Cash';
@@ -762,19 +782,22 @@ function post_payment_journal($conn, $invoice_id, $amount, $payment_method = 'Ca
     $invNum = get_invoice_number($conn, $invoice_id);
     $note = $invNum ? ('Payment received: Invoice ' . $invNum) : ('Payment received: Invoice #' . $invoice_id);
 
-    $dup = $conn->prepare("SELECT COUNT(*) AS c FROM accounting_entries WHERE invoice_id=? AND account=? AND debit=? AND note=?");
-    if ($dup) {
-        $dup->bind_param('isds', $invoice_id, $paymentAccount, $amount, $note);
-        $dup->execute();
-        $already = (int)($dup->get_result()->fetch_assoc()['c'] ?? 0);
-        $dup->close();
-        if ($already > 0) return;
+    // Payments are separate accounting events. Use the payment primary key as
+    // the idempotency reference so two legitimate equal payments are not merged.
+    $reference = $payment_id !== null ? 'PAY-' . (int)$payment_id : null;
+    if ($reference !== null && accounting_reference_column_exists($conn)) {
+        $dup = $conn->prepare("SELECT COUNT(*) AS c FROM accounting_entries WHERE reference_id=?");
+        if ($dup) {
+            $dup->bind_param('s', $reference);
+            $dup->execute();
+            $already = (int)($dup->get_result()->fetch_assoc()['c'] ?? 0);
+            $dup->close();
+            if ($already > 0) return;
+        }
     }
 
-    // Debit: Payment Account (Cash/Bank/M-Pesa)
-    post_journal_entry($conn, $paymentAccount, $amount, 0, $note, $invoice_id);
-    // Credit: Accounts Receivable
-    post_journal_entry($conn, 'Accounts Receivable', 0, $amount, $note, $invoice_id);
+    post_journal_entry($conn, $paymentAccount, $amount, 0, $note, $invoice_id, $reference);
+    post_journal_entry($conn, 'Accounts Receivable', 0, $amount, $note, $invoice_id, $reference);
 }
 
 function post_expense_journal($conn, $expense_id, $category, $amount, $payment_method = 'Cash', $note = null) {
