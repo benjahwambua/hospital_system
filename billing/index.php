@@ -3,16 +3,23 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 
-$encounter_id = (int)$_GET['encounter_id'];
+$encounter_id = (int)($_GET['encounter_id'] ?? 0);
 if (!$encounter_id) die("Missing encounter");
 
-$inv = $conn->query("SELECT * FROM invoices WHERE encounter_id=$encounter_id")->fetch_assoc();
+$invStmt = $conn->prepare("SELECT * FROM invoices WHERE encounter_id=? ORDER BY id DESC LIMIT 1");
+$invStmt->bind_param('i', $encounter_id);
+$invStmt->execute();
+$inv = $invStmt->get_result()->fetch_assoc();
+$invStmt->close();
 
 if (!$inv) {
     die("No invoice found for this encounter");
 }
 
-$items = $conn->query("SELECT * FROM invoice_items WHERE invoice_id=".$inv['id']);
+$itemsStmt = $conn->prepare("SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY id ASC");
+$itemsStmt->bind_param('i', $inv['id']);
+$itemsStmt->execute();
+$items = $itemsStmt->get_result();
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
