@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_role(['admin']);
 
 $conn->query("CREATE TABLE IF NOT EXISTS expenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
