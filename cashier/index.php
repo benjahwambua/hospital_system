@@ -18,12 +18,14 @@ $toEsc = $conn->real_escape_string($to);
 
 $sql = "
     SELECT i.id, i.patient_id, i.visit_id, i.created_at,
-           p.patient_number, p.full_name AS patient_name, p.is_walkin,
+           p.patient_number, COALESCE(p.full_name, wc.full_name) AS patient_name, COALESCE(p.is_walkin,1*(i.walkin_id IS NOT NULL)) AS is_walkin,
+           wc.phone AS walkin_phone,
            v.visit_number, v.visit_type, v.clinic_category, v.status AS visit_status,
            COALESCE(items.total, i.total, 0) AS bill_total,
            COALESCE(pay.paid, 0) AS paid_total
     FROM invoices i
     LEFT JOIN patients p ON p.id = i.patient_id
+    LEFT JOIN walkin_customers wc ON wc.id = i.walkin_id
     LEFT JOIN visits v ON v.id = i.visit_id
     LEFT JOIN (
         SELECT invoice_id, SUM(total) AS total
@@ -34,7 +36,7 @@ $sql = "
         FROM payments WHERE invoice_id IS NOT NULL
         GROUP BY invoice_id
     ) pay ON pay.invoice_id = i.id
-    WHERE (i.visit_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
+    WHERE (i.visit_id IS NOT NULL OR i.walkin_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
       AND COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
     ORDER BY COALESCE(v.visit_date, DATE(i.created_at)) DESC, i.id DESC
 ";
