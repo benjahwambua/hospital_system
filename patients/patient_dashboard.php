@@ -55,6 +55,20 @@ if ($patient_id > 0 && $appointment_id > 0) {
     }
 }
 
+// Visit-linked clinical records are preferred whenever the modern visit columns exist.
+$hasVisitVitals = false;
+$hasVisitServices = false;
+$hasVisitInvoices = false;
+$hasVisitPrescriptions = false;
+if ($patient_id > 0) {
+    $q = $conn->query("SHOW COLUMNS FROM vitals LIKE 'visit_id'");
+    $hasVisitVitals = $q && $q->num_rows > 0;
+    $q = $conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'");
+    $hasVisitServices = $q && $q->num_rows > 0;
+    $hasVisitInvoices = invoice_column_exists($conn, 'visit_id');
+    $hasVisitPrescriptions = ensure_prescription_visit_column($conn);
+}
+
 if ($patient_id <= 0) {
     // We handle the error later in the HTML section to keep the UI consistent
 } else {
@@ -134,7 +148,14 @@ if ($patient_id <= 0) {
                 $stmt->bind_param('sssssii', $temperature, $bp, $weight, $pulse, $respiration, $vitalId, $patient_id);
             }
         } else {
-            if ($vitalsHasSpo2) {
+            $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
+            if ($vitalsHasSpo2 && $hasVisitVitals && $visitId > 0) {
+                $stmt = $conn->prepare("INSERT INTO vitals (temperature, bp, weight, pulse, respiration, spo2, patient_id, visit_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                $stmt->bind_param('ssssssii', $temperature, $bp, $weight, $pulse, $respiration, $spo2, $patient_id, $visitId);
+            } elseif ($hasVisitVitals && $visitId > 0) {
+                $stmt = $conn->prepare("INSERT INTO vitals (temperature, bp, weight, pulse, respiration, patient_id, visit_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+                $stmt->bind_param('ssssssii', $temperature, $bp, $weight, $pulse, $respiration, $patient_id, $visitId);
+            } elseif ($vitalsHasSpo2) {
                 $stmt = $conn->prepare("INSERT INTO vitals (temperature, bp, weight, pulse, respiration, spo2, patient_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
                 $stmt->bind_param('ssssssi', $temperature, $bp, $weight, $pulse, $respiration, $spo2, $patient_id);
             } else {
@@ -150,17 +171,6 @@ if ($patient_id <= 0) {
         exit;
     }
 
-    // Handle Next Appointment Booking
-    if(isset($_POST['book_appointment'])) {
-        $app_date = $_POST['appointment_date'];
-        $app_time = $_POST['appointment_time'];
-        $reason = $_POST['reason'] ?? 'Follow-up';
-        $stmt = $conn->prepare("INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status) VALUES (?, ?, ?, ?, ?, 'Scheduled')");
-        $stmt->bind_param("iisss", $patient_id, $patient['doctor_id'], $app_date, $app_time, $reason);
-        if($stmt->execute()) {
-            echo "<script>alert('Appointment booked successfully');</script>";
-        }
-    }
 
     // Handle Prescription with Price Override
     if(isset($_POST['add_prescription_stock'])) {
@@ -174,15 +184,21 @@ if ($patient_id <= 0) {
         if ($unit_price <= 0 && $stock) $unit_price = (float)$stock['selling_price'];
         $invoice_total = $qty * $unit_price;
 
-        $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
         $invoiceLink = 0;
-        $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
+        if ($hasVisitPrescriptions && $visitId > 0) {
+            $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, visit_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("iiidiis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $visitId, $instructions);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, medicine_id, quantity, unit_price, invoice_id, frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("iiidis", $patient_id, $medicine_id, $qty, $unit_price, $invoiceLink, $instructions);
+        }
         $stmt->execute();
         $prescription_id = $stmt->insert_id;
         $stmt->close();
 
         if ($invoice_total > 0) {
-            $invoice_id = get_or_create_invoice($conn, $patient_id);
+            $invoice_id = get_or_create_invoice($conn, $patient_id, null, $visitId);
             add_invoice_item(
                 $conn,
                 $invoice_id,
@@ -218,12 +234,18 @@ if ($patient_id <= 0) {
 
             if(!$service) throw new Exception('Selected service is not active or does not exist.');
 
-            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
-            $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
+            $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category'] ?: 'General', (int)($patient['doctor_id'] ?? 0));
+            if ($hasVisitServices && $visitId > 0) {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at, status) VALUES (?, ?, ?, ?, ?, NOW(), 'Completed')");
+                $stmt->bind_param("iisdi",$patient_id,$service_id,$service['category'],$price,$visitId);
+            } else {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
+                $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
+            }
             $stmt->execute();
             $stmt->close();
 
-            $invoice_id=get_or_create_invoice($conn,$patient_id);
+            $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
             add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
@@ -231,14 +253,15 @@ if ($patient_id <= 0) {
         }
     }
 
-    // Handle Deletion Logic
-    if(isset($_GET['delete_item'])) {
-        $item_id = intval($_GET['item_id']);
-        $type = $_GET['type'];
-        if($type == 'service') {
-            $conn->query("DELETE FROM patient_services WHERE id = $item_id AND patient_id = $patient_id");
-        } elseif($type == 'prescription') {
-            $conn->query("DELETE FROM prescriptions WHERE id = $item_id AND patient_id = $patient_id");
+    // Deletions are POST-only and protected by the dashboard CSRF token.
+    if (isset($_POST['delete_item'])) {
+        $item_id = (int)($_POST['item_id'] ?? 0);
+        $type = $_POST['type'] ?? '';
+        if ($item_id > 0 && in_array($type, ['service', 'prescription'], true)) {
+            $stmt = $conn->prepare($type === 'service'
+                ? "DELETE FROM patient_services WHERE id = ? AND patient_id = ?"
+                : "DELETE FROM prescriptions WHERE id = ? AND patient_id = ?");
+            if ($stmt) { $stmt->bind_param('ii', $item_id, $patient_id); $stmt->execute(); $stmt->close(); }
         }
         header("Location: patient_dashboard.php?id=$patient_id&tab=billing&deleted=1");
         exit;
@@ -257,8 +280,14 @@ if ($patient_id <= 0) {
             $stmt->close();
             if(!$labService) throw new Exception('Selected laboratory service is invalid.');
 
-            $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
-            $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
+            $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Laboratory', (int)($patient['doctor_id'] ?? 0));
+            if ($hasVisitServices && $visitId > 0) {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,visit_id,created_at,status) VALUES (?, ?, 'lab', ?, ?, ?, NOW(), 'Pending')");
+                $stmt->bind_param("iidsi",$patient_id,$service_id,$price,$instructions,$visitId);
+            } else {
+                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
+                $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
+            }
             $stmt->execute();
             $stmt->close();
 
@@ -300,7 +329,7 @@ if ($patient_id <= 0) {
             $_POST['investigations'] ?? '', $_POST['management_plan'] ?? '',
             $_POST['prescription_instructions'] ?? '', $_POST['doctor_notes'] ?? ''
         ];
-        $visitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
+        $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
         $hasEncounterVisit = ensure_encounter_visit_column($conn);
         if ($hasEncounterVisit && $visitId > 0) {
             $stmt=$conn->prepare("INSERT INTO encounters (patient_id,visit_id,presenting_complaint,hpc,medical_history,surgical_history,family_history,drug_history,allergies,social_history,review_systems,physical_exam,diagnosis,differential_diagnosis,investigations,management_plan,prescription_instructions,doctor_notes,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
@@ -320,23 +349,6 @@ if ($patient_id <= 0) {
     }
 
 
-    // Handle External Referral
-    if(isset($_POST['add_referral'])){
-        $referred_facility = $_POST['referred_facility'] ?? '';
-        $referred_doctor = $_POST['referred_doctor'] ?? '';
-        $specialty = $_POST['specialty'] ?? '';
-        $reason = $_POST['referral_reason'] ?? '';
-        $urgency = $_POST['urgency'] ?? 'Routine';
-        $notes = $_POST['referral_notes'] ?? '';
-
-        $stmt = $conn->prepare("INSERT INTO external_referrals (patient_id, referred_facility, referred_doctor, specialty, reason, urgency, notes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())");
-        $stmt->bind_param("issssss", $patient_id, $referred_facility, $referred_doctor, $specialty, $reason, $urgency, $notes);
-        if($stmt->execute()) {
-            $stmt->close();
-            header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&referral_success=1");
-            exit;
-        }
-    }
 
     // Patient-facing pages no longer collect money. All payments are processed
     // through the Central Cashier to keep financial control in one place.
@@ -346,8 +358,12 @@ if ($patient_id <= 0) {
     }
 
     // NEW: Clinical History & Invoice Queries
-    $clinical_history = $conn->query("SELECT * FROM encounters WHERE patient_id=$patient_id ORDER BY created_at DESC");
-    $invoices = $conn->query("SELECT * FROM invoices WHERE patient_id=$patient_id ORDER BY created_at DESC");
+    $clinical_history = ($activeVisitId > 0 && ensure_encounter_visit_column($conn))
+        ? $conn->query("SELECT * FROM encounters WHERE patient_id=" . (int)$patient_id . " AND visit_id=" . (int)$activeVisitId . " ORDER BY created_at DESC")
+        : $conn->query("SELECT * FROM encounters WHERE patient_id=" . (int)$patient_id . " ORDER BY created_at DESC");
+    $invoices = ($activeVisitId > 0 && $hasVisitInvoices)
+        ? $conn->query("SELECT * FROM invoices WHERE patient_id=" . (int)$patient_id . " AND visit_id=" . (int)$activeVisitId . " ORDER BY created_at DESC")
+        : $conn->query("SELECT * FROM invoices WHERE patient_id=" . (int)$patient_id . " ORDER BY created_at DESC");
     $referrals = $conn->query("SELECT * FROM external_referrals WHERE patient_id=$patient_id ORDER BY created_at DESC");
     $labResults = [];
     $labResultsTable = $conn->query("SHOW TABLES LIKE 'lab_results'");
@@ -402,7 +418,9 @@ if ($patient_id <= 0) {
     // Dashboard data required by the Clinical Encounter and Billing tabs.
     // Keep these queries defensive so older databases remain usable.
     $latestVital = null;
-    $vitals = $conn->query("SELECT * FROM vitals WHERE patient_id = " . (int)$patient_id . " ORDER BY created_at DESC, id DESC");
+    $vitals = ($activeVisitId > 0 && $hasVisitVitals)
+        ? $conn->query("SELECT * FROM vitals WHERE patient_id = " . (int)$patient_id . " AND visit_id = " . (int)$activeVisitId . " ORDER BY created_at DESC, id DESC")
+        : $conn->query("SELECT * FROM vitals WHERE patient_id = " . (int)$patient_id . " ORDER BY created_at DESC, id DESC");
     if (!$vitals) {
         $vitals = $conn->query("SELECT * FROM vitals WHERE patient_id = " . (int)$patient_id . " ORDER BY id DESC");
     }
@@ -413,7 +431,9 @@ if ($patient_id <= 0) {
     }
 
     $encounter = null;
-    $encounterRes = $conn->query("SELECT * FROM encounters WHERE patient_id = " . (int)$patient_id . " ORDER BY created_at DESC, id DESC LIMIT 1");
+    $encounterRes = ($activeVisitId > 0 && ensure_encounter_visit_column($conn))
+        ? $conn->query("SELECT * FROM encounters WHERE patient_id = " . (int)$patient_id . " AND visit_id = " . (int)$activeVisitId . " ORDER BY created_at DESC, id DESC LIMIT 1")
+        : $conn->query("SELECT * FROM encounters WHERE patient_id = " . (int)$patient_id . " ORDER BY created_at DESC, id DESC LIMIT 1");
     if ($encounterRes) {
         $encounter = $encounterRes->fetch_assoc();
     }
@@ -423,8 +443,12 @@ if ($patient_id <= 0) {
         $all_services = $conn->query("SELECT id, category, service_name, price, active FROM services_master ORDER BY category, service_name");
     }
 
-    $patient_services = $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " ORDER BY ps.created_at DESC, ps.id DESC");
-    $prescriptions = $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " ORDER BY pr.created_at DESC, pr.id DESC");
+    $patient_services = ($activeVisitId > 0 && $hasVisitServices)
+        ? $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " AND ps.visit_id = " . (int)$activeVisitId . " ORDER BY ps.created_at DESC, ps.id DESC")
+        : $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " ORDER BY ps.created_at DESC, ps.id DESC");
+    $prescriptions = ($activeVisitId > 0 && $hasVisitPrescriptions)
+        ? $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " AND pr.visit_id = " . (int)$activeVisitId . " ORDER BY pr.created_at DESC, pr.id DESC")
+        : $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " ORDER BY pr.created_at DESC, pr.id DESC");
     if (!$prescriptions) {
         $prescriptions = $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id ORDER BY pr.created_at DESC, pr.id DESC");
     }
@@ -475,7 +499,7 @@ if (!empty($patient['is_walkin'])) {
             FROM invoice_items
             GROUP BY invoice_id
         ) items ON items.invoice_id = i.id
-        WHERE i.patient_id = " . (int)$patient_id . "
+        WHERE i.patient_id = " . (int)$patient_id . ($activeVisitId > 0 && $hasVisitInvoices ? " AND i.visit_id = " . (int)$activeVisitId : "") . "
         ORDER BY i.id ASC
     ");
 
@@ -491,11 +515,15 @@ if (!empty($patient['is_walkin'])) {
         SELECT COALESCE(SUM(p.amount), 0) AS total_paid
         FROM payments p
         INNER JOIN invoices i ON i.id = p.invoice_id
-        WHERE i.patient_id = ?
+        WHERE i.patient_id = ?($activeVisitId > 0 && $hasVisitInvoices ? " AND i.visit_id = ?" : "")
     ");
 
     if ($paidStmt) {
-        $paidStmt->bind_param('i', $patient_id);
+        if ($activeVisitId > 0 && $hasVisitInvoices) {
+            $paidStmt->bind_param('ii', $patient_id, $activeVisitId);
+        } else {
+            $paidStmt->bind_param('i', $patient_id);
+        }
         $paidStmt->execute();
         $paidRes = $paidStmt->get_result();
 
@@ -891,7 +919,7 @@ function clearForm() {
                 <td><?= htmlspecialchars($s['service_name']) ?></td>
                 <td><span class="badge-info"><?= htmlspecialchars($s['svc_category']) ?></span></td>
                 <td>KSH <?= number_format($s['price'], 2) ?></td>
-                <td><a href="?id=<?= $patient_id ?>&delete_item=1&item_id=<?= $s['id'] ?>&type=service" style="color:red;">&times; Remove</a></td>
+                <td><form method="post" style="display:inline;" onsubmit="return confirm('Remove this service?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="item_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="type" value="service"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form></td>
             </tr>
             <?php endwhile; ?>
         </table>
@@ -938,8 +966,7 @@ function clearForm() {
                 <td>KSH <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
                 <td><?= date('d/m/y', strtotime($p['created_at'])) ?></td>
                 <td>
-                    <a href="?id=<?= $patient_id ?>&delete_item=1&item_id=<?= $p['id'] ?>&type=prescription" 
-                       style="color:red;" onclick="return confirm('Remove this medication?')">&times; Remove</a>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('Remove this medication?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="item_id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="type" value="prescription"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form>
                 </td>
             </tr>
             <?php endwhile; ?>
