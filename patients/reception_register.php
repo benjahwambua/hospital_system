@@ -298,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
-            header('Location: /hospital_system/patients/appointments.php?success=1&patient_id=' . $patientId);
+            header('Location: /hospital_system/queue/index.php?registered=1&patient_id=' . $patientId);
             exit;
         } catch (Throwable $e) {
             $conn->rollback();
@@ -354,7 +354,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
         <div class="form-card">
             <div class="form-header">
                 <h2>Reception Desk</h2>
-                <p>Register a new patient, create the queue/appointment record, and capture optional triage vitals in one controlled workflow.</p>
+                <p>Register a patient and create one clinical visit. The patient then moves to the Queue and Triage before Doctor assessment.</p>
             </div>
 
             <div class="form-body">
