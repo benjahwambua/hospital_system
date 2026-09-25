@@ -21,9 +21,9 @@ if ($vitalsColumns) {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
-// Build the clinical queue from today's open visits.
-// This includes registered patients and fast-track walk-ins.
-// If the Visit migration is unavailable, retain the legacy vitals queue.
+// Build the clinical queue from today's visits that have completed triage.
+ // The same visit created by Reception is carried forward; a patient without
+ // visit-linked vitals remains in the Reception/Triage queue.
 $hasVisits = false;
 $visitCheck = $conn->query("SHOW TABLES LIKE 'visits'");
 if ($visitCheck && $visitCheck->num_rows > 0) {
@@ -53,7 +53,11 @@ if ($hasVisits) {
                 ORDER BY CASE WHEN v2.visit_id = v.id THEN 0 ELSE 1 END, v2.id DESC LIMIT 1
             )
             WHERE v.visit_date = CURDATE()
-              AND v.status IN ('Open','In Progress')
+              AND v.status = 'Open'
+              AND EXISTS (
+                  SELECT 1 FROM vitals tv
+                  WHERE tv.visit_id = v.id
+              )
             ORDER BY v.id ASC";
 } else {
     $sql = "SELECT v.*, p.full_name, p.gender, p.age, p.patient_number,
@@ -71,7 +75,10 @@ $res = $conn->query($sql);
 
 <div class="main-content">
     <div class="container-fluid pt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4"><div><h4 class="font-weight-bold text-gray-800 mb-1">Doctor's Consultation Queue</h4><div class="text-muted small">Patients triaged and waiting for clinical assessment</div></div><a href="index.php" class="btn btn-outline-primary"><i class="fas fa-th-large"></i> Clinical Dashboard</a></div>
+        <div class="d-flex justify-content-between align-items-center mb-4"><div><h4 class="font-weight-bold text-gray-800 mb-1">Doctor's Consultation Queue</h4><div class="text-muted small">Patients triaged and waiting for clinical assessment</div></div><div>
+<a href="triage.php" class="btn btn-outline-warning mr-2"><i class="fas fa-heartbeat"></i> Triage</a>
+<a href="index.php" class="btn btn-outline-primary"><i class="fas fa-th-large"></i> Clinical Dashboard</a>
+</div></div>
         <?php if (isset($_GET['triage']) && $_GET['triage'] === 'success'): ?><div class="alert alert-success">Vitals recorded and patient added to the doctor queue.</div><?php endif; ?>
         <div class="row">
             <?php if($res && $res->num_rows > 0): while($row = $res->fetch_assoc()): ?>
