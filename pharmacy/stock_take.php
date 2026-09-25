@@ -1,7 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_role(['admin','pharmacist']);
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
 /* Get medicine ID */
 $id = intval($_GET['id'] ?? 0);
@@ -11,8 +14,11 @@ if (!$id) {
 
 /* Handle form submission */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
+        $error = 'Invalid security token.';
+    }
     $quantity = intval($_POST['quantity']);
-    if ($quantity < 0) {
+    if (!isset($error) && $quantity < 0) {
         $error = "Quantity cannot be negative.";
     } else {
         $stmt = $conn->prepare("UPDATE pharmacy_stock SET quantity = ? WHERE id = ?");
@@ -45,6 +51,7 @@ include __DIR__ . '/../includes/sidebar.php';
     <?php endif; ?>
 
     <form method="POST" class="form-card form-compact">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
         <label>Medicine Name</label>
         <input type="text" value="<?= htmlspecialchars($medicine['drug_name']) ?>" readonly>
 
