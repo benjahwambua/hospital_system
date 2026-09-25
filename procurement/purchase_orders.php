@@ -4,46 +4,6 @@ require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_role(['admin']);
 
-$conn->query("CREATE TABLE IF NOT EXISTS expenses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    expense_date DATE NOT NULL,
-    category VARCHAR(120) NOT NULL,
-    description VARCHAR(255) NOT NULL,
-    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-    source_type VARCHAR(80) DEFAULT NULL,
-    source_id INT DEFAULT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-    created_by INT DEFAULT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)");
-
-$expenseColumns = [];
-$expenseColsRes = $conn->query("SHOW COLUMNS FROM expenses");
-if ($expenseColsRes) {
-    while ($col = $expenseColsRes->fetch_assoc()) {
-        $expenseColumns[] = $col['Field'] ?? '';
-    }
-}
-
-if (!in_array('source_type', $expenseColumns, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN source_type VARCHAR(80) DEFAULT NULL AFTER amount");
-}
-if (!in_array('source_id', $expenseColumns, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN source_id INT DEFAULT NULL AFTER source_type");
-}
-if (!in_array('status', $expenseColumns, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'Pending' AFTER source_id");
-}
-if (!in_array('created_by', $expenseColumns, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN created_by INT DEFAULT NULL AFTER status");
-}
-if (!in_array('created_at', $expenseColumns, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_by");
-}
-if (!in_array('payment_method', $expenseColumns, true)) {
-    $conn->query("ALTER TABLE expenses ADD COLUMN payment_method VARCHAR(50) DEFAULT NULL AFTER expense_date");
-}
-
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['approve_po'])) {
@@ -82,12 +42,7 @@ if ($viewId > 0):
         $items_stmt->close();
     }
 
-    $expense = null;
-    $expenseStmt = $conn->prepare("SELECT id, amount, status, expense_date, payment_method FROM expenses WHERE source_type = 'purchase_order' AND source_id = ? ORDER BY id DESC LIMIT 1");
-    $expenseStmt->bind_param('i', $viewId);
-    $expenseStmt->execute();
-    $expense = $expenseStmt->get_result()->fetch_assoc();
-    $expenseStmt->close();
+    // PO accounting is recognized at GRN/receiving, when inventory is actually received.
 ?>
 <style>
 .po-container { max-width: 1000px; margin: 24px auto; padding: 0 12px; width: 100%; }
@@ -186,12 +141,7 @@ if ($viewId > 0):
 
                 <div class="po-total">Grand Total: KES <?= number_format((float)$po['total_amount'], 2) ?></div>
                 <div style="margin-top:8px; text-align:right;">
-                    <?php if ($expense): ?>
-                        <small>Linked Expense #<?= (int)$expense['id'] ?> • <?= htmlspecialchars((string)$expense['status']) ?> • <?= htmlspecialchars((string)($expense['payment_method'] ?? 'N/A')) ?> • KES <?= number_format((float)$expense['amount'], 2) ?></small><br>
-                        <a class="btn btn-sm btn-light no-print mt-2" href="/hospital_system/accounting/ledger.php?view_mode=ledger&account=<?= urlencode('Procurement Expense') ?>">Open in Ledger</a>
-                    <?php else: ?>
-                        <small>No linked expense found for this PO.</small>
-                    <?php endif; ?>
+                    <small>Accounting is posted when goods are received through GRN.</small>
                 </div>
 
                 <div class="po-signatures">
@@ -247,10 +197,9 @@ $totalRows = (int)($countStmt->get_result()->fetch_assoc()['total'] ?? 0);
 $countStmt->close();
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
 
-$listSql = "SELECT po.*, s.name AS s_name, e.id AS expense_id, e.status AS expense_status, e.amount AS expense_amount, e.payment_method AS expense_payment_method
+$listSql = "SELECT po.*, s.name AS s_name
             FROM purchase_orders po
             JOIN suppliers s ON po.supplier_id = s.id
-            LEFT JOIN expenses e ON e.source_type = 'purchase_order' AND e.source_id = po.id
             {$whereSql}
             ORDER BY po.id DESC
             LIMIT ? OFFSET ?";
@@ -276,7 +225,7 @@ $listRes = $listStmt->get_result();
                 <div class="col-md-3 mb-2">
                     <select name="status" class="form-control">
                         <option value="">All statuses</option>
-                        <?php foreach (['Pending', 'Approved', 'Received', 'Cancelled'] as $status): ?>
+                        <?php foreach (['Pending', 'Approved', 'Partial', 'Received', 'Cancelled'] as $status): ?>
                             <option value="<?= $status ?>" <?= $statusFilter === $status ? 'selected' : '' ?>><?= $status ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -303,8 +252,7 @@ $listRes = $listStmt->get_result();
                         <th>Date</th>
                         <th>Supplier</th>
                         <th>Status</th>
-                        <th>Expense Link</th>
-                        <th>Payment Method</th>
+                        
                         <th>Total Amount</th>
                         <th>Action</th>
                     </tr>
@@ -316,14 +264,6 @@ $listRes = $listStmt->get_result();
                             <td><?= !empty($row['order_date']) ? date('d M Y', strtotime($row['order_date'])) : 'N/A' ?></td>
                             <td><?= htmlspecialchars((string)$row['s_name']) ?></td>
                             <td><?= htmlspecialchars((string)($row['status'] ?? 'Pending')) ?></td>
-                            <td>
-                                <?php if (!empty($row['expense_id'])): ?>
-                                    <span class="badge badge-info">#<?= (int)$row['expense_id'] ?> <?= htmlspecialchars((string)($row['expense_status'] ?? 'Pending')) ?></span>
-                                <?php else: ?>
-                                    <span class="text-muted">Not linked</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= htmlspecialchars((string)($row['expense_payment_method'] ?? 'N/A')) ?></td>
                             <td>KES <?= number_format((float)$row['total_amount'], 2) ?></td>
                             <td>
                                 <a href="purchase_orders.php?view_id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
