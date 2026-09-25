@@ -683,7 +683,7 @@ function refresh_invoice_payment_state($conn, int $invoice_id): array {
     $balance=max($total-$paid,0);
     $status=$balance<=0.00001?'Paid':($paid>0?'Partially Paid':'Unpaid');
 
-    $upd=$conn->prepare("UPDATE invoices SET paid_amount=?, amount_paid=?, balance=?, payment_status=?, status=?, paid_at=CASE WHEN ?='paid' THEN COALESCE(paid_at,NOW()) ELSE NULL END WHERE id=?");
+    $upd=$conn->prepare("UPDATE invoices SET paid_amount=?, amount_paid=?, balance=?, payment_status=?, status=?, paid_at=CASE WHEN ?='Paid' THEN COALESCE(paid_at,NOW()) ELSE NULL END WHERE id=?");
     if(!$upd) throw new Exception('Unable to update invoice reconciliation: '.$conn->error);
     $upd->bind_param('dddsssi',$paid,$paid,$balance,$status,$status,$status,$invoice_id);
     if(!$upd->execute()){ $e=$upd->error; $upd->close(); throw new Exception('Unable to update invoice reconciliation: '.$e); }
