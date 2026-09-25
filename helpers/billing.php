@@ -639,7 +639,7 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     $paidStmt=$conn->prepare("SELECT COALESCE(SUM(p.amount),0) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.invoice_id=p.invoice_id AND r.status='Approved'),0) AS total_paid FROM payments p WHERE p.invoice_id=?");
     if($paidStmt){$paidStmt->bind_param('i',$invoice_id);$paid=(float)(($paidStmt->get_result()->fetch_assoc()['total_paid'])??0);$paidStmt->close();}else{$paid=max((float)($invoice['paid_amount']??0),(float)($invoice['amount_paid']??0));}
     $balance=max($total-$paid,0); if($balance<=0) throw new Exception('Invoice is already fully paid.'); $amount=min($amount,$balance);
-    $patientId=(int)($invoice['patient_id'] ?? 0); $method=trim((string)$payment_method); $referenceValue=$reference!==null?trim((string)$reference):null; $shiftId=(int)($cashier_shift_id??0);
+    $patientId=(int)($invoice['patient_id'] ?? 0); $patientValue=$patientId>0?$patientId:null; $method=trim((string)$payment_method); $referenceValue=$reference!==null?trim((string)$reference):null; $shiftId=(int)($cashier_shift_id??0);
     if($referenceValue!==null && $referenceValue!==''){
         $dup=$conn->prepare("SELECT id FROM payments WHERE reference=? LIMIT 1");
         if($dup){$dup->bind_param('s',$referenceValue);$dup->execute();$existing=$dup->get_result()->fetch_assoc();$dup->close();if($existing) throw new Exception('This payment reference has already been recorded.');}
@@ -647,11 +647,11 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     if($shiftId>0 && invoice_column_exists($conn,'cashier_shift_id')){
         $stmt=$conn->prepare("INSERT INTO payments (patient_id,amount,method,reference,invoice_id,cashier_shift_id,created_at) VALUES (?,?,?,?,?,?,NOW())");
         if(!$stmt) throw new Exception('Unable to record payment with cashier shift: '.$conn->error);
-        $stmt->bind_param('idssii',$patientId,$amount,$method,$referenceValue,$invoice_id,$shiftId);
+        $stmt->bind_param('idssii',$patientValue,$amount,$method,$referenceValue,$invoice_id,$shiftId);
     }else{
         $stmt=$conn->prepare("INSERT INTO payments (patient_id,amount,method,reference,invoice_id,created_at) VALUES (?,?,?,?,?,NOW())");
         if(!$stmt) throw new Exception('Unable to record payment: '.$conn->error);
-        $stmt->bind_param('idssi',$patientId,$amount,$method,$referenceValue,$invoice_id);
+        $stmt->bind_param('idssi',$patientValue,$amount,$method,$referenceValue,$invoice_id);
     }
     if(!$stmt->execute()){ $err=$stmt->error;$stmt->close();throw new Exception('Unable to save payment: '.$err); }
     $paymentId=(int)$stmt->insert_id;
