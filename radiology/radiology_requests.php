@@ -25,7 +25,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['request_radiology'])){
    if($visitId>0){
     $ps=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
     if(!$ps)throw new Exception('Unable to create radiology order: '.$conn->error);$pid=(int)$enc['patient_id'];$sid=(int)$service['id'];$price=(float)$service['price'];$cat='radiology';$ps->bind_param('iisdi',$pid,$sid,$cat,$price,$visitId);if(!$ps->execute())throw new Exception($ps->error);$ps->close();
-    $invoice=get_or_create_visit_invoice($conn,$pid,$visitId);add_invoice_item($conn,$invoice,'Radiology: '.$procedure,1,$price,'radiology',$sid);post_invoice_journal($conn,$invoice,$pid,$price,'Radiology order');
+    $invoice=get_or_create_visit_invoice($conn,$pid,$visitId);$invoiceItemId=add_invoice_item($conn,$invoice,'Radiology: '.$procedure,1,$price,'radiology',$sid);post_invoice_journal($conn,$invoice,$pid,$price,'Radiology order',$invoiceItemId);
    }
    $message='Radiology request placed. The charge has been sent to Central Cashier.';
   }catch(Throwable $e){$message=$e->getMessage();}
