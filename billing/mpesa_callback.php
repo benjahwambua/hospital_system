@@ -45,7 +45,7 @@ try {
         $check->bind_param('s',$receipt); $check->execute(); $existing=$check->get_result()->fetch_assoc(); $check->close();
 
         if(!$existing){
-            $payment=record_payment($conn,(int)$tx['invoice_id'],(float)$tx['amount'],'M-Pesa',$receipt);
+            $payment=record_payment($conn,(int)$tx['invoice_id'],(float)$tx['amount'],'M-Pesa',$receipt,(int)($tx['cashier_shift_id']??0));
             post_payment_journal($conn,(int)$tx['invoice_id'],$payment['amount'],'M-Pesa',$payment['payment_id']);
         }
     }
