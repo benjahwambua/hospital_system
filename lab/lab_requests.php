@@ -9,9 +9,6 @@ require_role(['admin','lab_tech']);
 // Ensure walk-in registrations work even if the migration has not yet been run.
 ensure_walkin_column($conn);
 
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -104,6 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
     }
 }
 
+// Render shared layout only after all POST actions and redirects are complete.
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
+
 // --- 1. HANDLE DATE RANGE (Defaults to today) ---
 $start_date = $_GET['start_date'] ?? date('Y-m-d');
 $end_date = $_GET['end_date'] ?? date('Y-m-d');
@@ -122,6 +123,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
 
 // --- 3. HANDLE LAB RESULT SUBMISSION ---
 if (isset($_POST['save_lab_result'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        http_response_code(419);
+        exit('Invalid security token.');
+    }
     $record_id = intval($_POST['record_id']);
     $findings = $_POST['findings'] ?? '';
     $status = 'Completed'; 
