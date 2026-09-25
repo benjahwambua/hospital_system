@@ -350,13 +350,8 @@ if ($patient_id <= 0) {
 
 
 
-    // Patient-facing pages no longer collect money. All payments are processed
-    // through the Central Cashier to keep financial control in one place.
-    if(isset($_POST['register_payment'])){
-        header("Location: /hospital_system/cashier/index.php");
-        exit;
-    }
-
+    // Patient Dashboard is intentionally read-only for payments.
+    // All collections are handled through the Central Cashier.
     // NEW: Clinical History & Invoice Queries
     $clinical_history = ($activeVisitId > 0 && ensure_encounter_visit_column($conn))
         ? $conn->query("SELECT * FROM encounters WHERE patient_id=" . (int)$patient_id . " AND visit_id=" . (int)$activeVisitId . " ORDER BY created_at DESC")
@@ -477,7 +472,41 @@ if (!empty($patient['is_walkin'])) {
     }
 }
 
-// Billing Calculations
+// Billing line items for the read-only patient billing history.
+    // Charges are read from invoice_items because this is the authoritative
+    // record of services, investigations and medicines billed to the patient.
+    $billingItems = null;
+    $billingItemQtyColumn = invoice_item_column_exists($conn, 'qty') ? 'qty' : 'quantity';
+    $billingItemPriceColumn = invoice_item_column_exists($conn, 'unit_price') ? 'unit_price' : 'price';
+    $billingItemTypeSelect = invoice_item_column_exists($conn, 'item_type')
+        ? "ii.item_type"
+        : "NULL AS item_type";
+
+    $billingVisitCondition = ($activeVisitId > 0 && $hasVisitInvoices)
+        ? " AND i.visit_id = " . (int)$activeVisitId
+        : "";
+
+    $billingItems = $conn->query("
+        SELECT
+            ii.id,
+            ii.invoice_id,
+            ii.description,
+            ii.{$billingItemQtyColumn} AS quantity,
+            ii.{$billingItemPriceColumn} AS unit_price,
+            ii.total,
+            {$billingItemTypeSelect},
+            i.created_at AS invoice_date,
+            i.status AS invoice_status,
+            i.visit_id,
+            v.visit_number
+        FROM invoice_items ii
+        INNER JOIN invoices i ON i.id = ii.invoice_id
+        LEFT JOIN visits v ON v.id = i.visit_id
+        WHERE i.patient_id = " . (int)$patient_id . $billingVisitCondition . "
+          AND LOWER(COALESCE(i.status, '')) NOT IN ('cancelled', 'canceled', 'void')
+        ORDER BY i.created_at DESC, ii.id DESC
+    ");
+
     // ==============================================================================
     // 4. BILLING CALCULATIONS
     // ==============================================================================
@@ -674,21 +703,20 @@ if ($patient_id <= 0) {
             <div style="text-align:right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 20px;">
                 <span class="info-label">Primary Consultant</span>
                 <span class="info-value">Dr. <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?></span>
-                <div style="display:flex; gap:8px; justify-content:flex-end;"><a href="/hospital_system/maternity/add.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a><button onclick="showTab('billing')" style="background:#fff; color:var(--primary-blue); border:none; padding:5px 15px; border-radius:5px; cursor:pointer;">Quick Pay</button></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end;"><a href="/hospital_system/maternity/add.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a></div>
             </div>
         </div>
     </div>
 
     <ul class="dashboard-tabs">
         <li onclick="showTab('clinical')" id="tab-clinical" class="active">Clinical Encounter</li>
-        <li onclick="showTab('services')" id="tab-services">Procedures & Billing</li>
+        <li onclick="showTab('services')" id="tab-services">Services</li>
         <li onclick="showTab('prescriptions')" id="tab-prescriptions">Pharmacy & Prescriptions</li>
         <li onclick="showTab('billing')" id="tab-billing">Billing</li>
         <li onclick="showTab('coverage')" id="tab-coverage">Insurance & SHA</li>
     </ul>
 
    <div id="clinical" class="card">
-    <?php if (isset($_GET['payment_success'])): ?><div class="alert alert-success" style="font-weight:600; margin-bottom:20px;"><i class="fas fa-check-circle"></i> Payment successful. The M-Pesa payment has been recorded.</div><?php endif; ?>
     <?php if (isset($_GET['vitals_saved'])): ?><div class="alert alert-success">Vitals saved successfully.</div><?php endif; ?>
     <?php if (isset($_GET['error']) && $_GET['error'] === 'csrf'): ?><div class="alert alert-danger">Security token mismatch. Please retry the action.</div><?php endif; ?>
 
@@ -1000,39 +1028,91 @@ function clearForm() {
             </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
-            <div style="background:#fdfefe; border:1px solid #ddd; padding:25px; border-radius:10px;">
-                <h4><i class="fas fa-cash-register"></i> Payment Collection</h4>
-                <p style="color:#666; font-size:13px;">All patient payments are collected through the Central Cashier. Clinical and patient-facing screens only display the balance.</p>
-                <div style="padding:18px; background:#eef7ff; border-radius:8px; margin-top:18px;">
-                    <strong>Outstanding balance: KSH <?= number_format($amountToPayNow, 2) ?></strong>
-                    <p style="margin:8px 0 15px; color:#555;">The cashier can accept Cash, M-Pesa and other configured payment methods, including partial payments.</p>
-                    <div class="alert alert-info mb-0">
-                        <i class="fas fa-info-circle"></i>
-                        Payment collection is handled centrally by the Cashier. This dashboard only displays the patient's billing and balance.
-                    </div>
+        <div style="background:#fdfefe; border:1px solid #ddd; padding:22px; border-radius:10px; margin-bottom:24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
+                <div>
+                    <h4 style="margin:0; color:var(--secondary-blue);"><i class="fas fa-list"></i> Services & Charges</h4>
+                    <p style="margin:6px 0 0; color:#666; font-size:13px;">
+                        Read-only history of services, investigations and medicines billed during this visit.
+                        Payments are collected centrally by the Cashier.
+                    </p>
                 </div>
+                <div class="badge-info">Central Cashier collects payments</div>
             </div>
 
-            <div>
-                <h4>Invoices & Printing</h4>
+            <div style="overflow-x:auto; margin-top:18px;">
                 <table class="table-custom">
-                    <thead><tr><th>Invoice</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody>
-                        <?php while($inv = $invoices->fetch_assoc()): ?>
+                    <thead>
                         <tr>
-                            <td>#INV-<?= $inv['id'] ?></td>
-                            <td><?= date('d/m/Y', strtotime($inv['created_at'])) ?></td>
-                            <td><span class="badge-info"><?= strtoupper($inv['status']) ?></span></td>
-                            <td>
-                                <a href="/hospital_system/billing/view_invoice.php?id=<?= $inv['id'] ?>" target="_blank">View</a> | 
-                                <a href="/hospital_system/billing/view_invoice.php?id=<?= $inv['id'] ?>&print=1" target="_blank">Print</a>
-                            </td>
+                            <th>Date</th>
+                            <th>Service / Item</th>
+                            <th>Department</th>
+                            <th>Visit</th>
+                            <th>Qty</th>
+                            <th>Unit Price</th>
+                            <th>Amount</th>
+                            <th>Invoice</th>
+                            <th>Status</th>
                         </tr>
-                        <?php endwhile; ?>
+                    </thead>
+                    <tbody>
+                        <?php if ($billingItems && $billingItems->num_rows > 0): ?>
+                            <?php while ($billItem = $billingItems->fetch_assoc()): ?>
+                                <?php
+                                    $itemType = strtolower(trim((string)($billItem['item_type'] ?? '')));
+                                    if ($itemType === '') {
+                                        $descriptionLower = strtolower((string)($billItem['description'] ?? ''));
+                                        if (strpos($descriptionLower, 'lab:') === 0) {
+                                            $itemType = 'lab';
+                                        } elseif (strpos($descriptionLower, 'medication:') === 0 || strpos($descriptionLower, 'medicine:') === 0) {
+                                            $itemType = 'pharmacy';
+                                        } elseif (strpos($descriptionLower, 'radiology:') === 0 || strpos($descriptionLower, 'x-ray:') === 0) {
+                                            $itemType = 'radiology';
+                                        } else {
+                                            $itemType = 'service';
+                                        }
+                                    }
+                                    $departmentLabels = [
+                                        'lab' => 'Laboratory',
+                                        'laboratory' => 'Laboratory',
+                                        'pharmacy' => 'Pharmacy',
+                                        'medicine' => 'Pharmacy',
+                                        'radiology' => 'Radiology',
+                                        'service' => 'Service',
+                                    ];
+                                    $department = $departmentLabels[$itemType] ?? ucwords(str_replace(['_', '-'], ' ', $itemType));
+                                ?>
+                                <tr>
+                                    <td><?= !empty($billItem['invoice_date']) ? date('d M Y H:i', strtotime($billItem['invoice_date'])) : 'N/A' ?></td>
+                                    <td><strong><?= htmlspecialchars($billItem['description'] ?? 'Billed Item') ?></strong></td>
+                                    <td><?= htmlspecialchars($department) ?></td>
+                                    <td><?= htmlspecialchars($billItem['visit_number'] ?? ($activeVisit['visit_number'] ?? '—')) ?></td>
+                                    <td><?= number_format((float)($billItem['quantity'] ?? 1), 2) ?></td>
+                                    <td>KSH <?= number_format((float)($billItem['unit_price'] ?? 0), 2) ?></td>
+                                    <td><strong>KSH <?= number_format((float)($billItem['total'] ?? 0), 2) ?></strong></td>
+                                    <td>#INV-<?= (int)$billItem['invoice_id'] ?></td>
+                                    <td><span class="status-chip <?= strtolower($billItem['invoice_status'] ?? '') === 'paid' ? 'completed' : 'pending' ?>"><?= htmlspecialchars($billItem['invoice_status'] ?? 'Pending') ?></span></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="9" style="text-align:center; color:#666; padding:25px;">
+                                    No billed services or charges are recorded for this visit.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        <div style="background:#f8fbff; border:1px solid var(--border-color); padding:20px; border-radius:10px;">
+            <h4 style="margin-top:0; color:var(--secondary-blue);"><i class="fas fa-info-circle"></i> Payment Status</h4>
+            <p style="margin:0; color:#555; font-size:13px;">
+                Outstanding amounts shown above are for information only. The Patient Dashboard does not accept payments,
+                and invoices are not printed from this screen. Use <strong>Central Cashier</strong> for payment collection
+                and official receipts.
+            </p>
         </div>
     </div>
 
