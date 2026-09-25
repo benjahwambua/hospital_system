@@ -5,7 +5,12 @@ header('Content-Type: application/json');
 ob_start();
 
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../helpers/billing.php';
+
+require_login();
+require_role(['admin','pharmacist']);
 
 $transactionStarted = false;
 
@@ -22,6 +27,12 @@ try {
     $data = json_decode($raw, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
         throw new Exception('Invalid JSON format');
+    }
+
+    $csrfToken = $data['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if (!verify_csrf_token(is_string($csrfToken) ? $csrfToken : null)) {
+        http_response_code(419);
+        throw new Exception('Invalid security token');
     }
 
     if (empty($data['items']) || !is_array($data['items'])) {
