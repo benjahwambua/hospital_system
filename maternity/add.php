@@ -1,7 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+require_role(['admin','doctor','nurse']);
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -111,39 +114,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($actionType === 'save_all') {
-                $stmt = $conn->prepare("INSERT INTO billing (patient_id, item_name, amount, category, status, created_at) VALUES (?, 'Maternity Consultation/Procedure', 500.00, 'Service', 'Unpaid', NOW())");
-                $stmt->bind_param('i', $patientId);
-                $stmt->execute();
-                $stmt->close();
+                $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient','Maternity');
+                $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
+
+                $consultationFee=500.00;
+                $consultItem=add_invoice_item($conn,$invoiceId,'Maternity Consultation/Procedure',1,$consultationFee,'maternity',null);
+                post_invoice_journal($conn,$invoiceId,$patientId,$consultationFee,'Maternity consultation',$consultItem);
 
                 if (!empty($_POST['service_id'])) {
-                    $stmt = $conn->prepare("INSERT INTO billing (patient_id, item_name, amount, category, status, created_at) VALUES (?, ?, ?, 'Service', 'Unpaid', NOW())");
                     foreach ($_POST['service_id'] as $idx => $serviceId) {
-                        if (!empty($serviceId)) {
-                            $serviceName = $_POST['service_name'][$idx] ?? 'Service';
-                            $servicePrice = (float)($_POST['service_price'][$idx] ?? 0);
-                            $stmt->bind_param('isd', $patientId, $serviceName, $servicePrice);
-                            $stmt->execute();
-                        }
+                        $serviceId=(int)$serviceId;
+                        if($serviceId<=0) continue;
+                        $s=$conn->prepare("SELECT service_name,price FROM services_master WHERE id=? AND active=1 LIMIT 1");
+                        if(!$s) throw new Exception('Unable to load maternity service.');
+                        $s->bind_param('i',$serviceId);$s->execute();$service=$s->get_result()->fetch_assoc();$s->close();
+                        if(!$service) throw new Exception('Invalid maternity service selected.');
+                        $servicePrice=(float)$service['price'];
+                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$service['service_name'],1,$servicePrice,'maternity',$serviceId);
+                        post_invoice_journal($conn,$invoiceId,$patientId,$servicePrice,'Maternity service',$itemId);
                     }
-                    $stmt->close();
                 }
 
                 if (!empty($_POST['drug_id'])) {
-                    $stmt = $conn->prepare("INSERT INTO billing (patient_id, item_name, amount, category, status, created_at) VALUES (?, ?, ?, 'Pharmacy', 'Unpaid', NOW())");
                     foreach ($_POST['drug_id'] as $idx => $drugId) {
-                        if (!empty($drugId)) {
-                            $drugName = $_POST['drug_name'][$idx] ?? 'Medicine';
-                            $drugPrice = (float)($_POST['drug_price'][$idx] ?? 0);
-                            $stmt->bind_param('isd', $patientId, $drugName, $drugPrice);
-                            $stmt->execute();
-                        }
+                        $drugId=(int)$drugId;
+                        if($drugId<=0) continue;
+                        $d=$conn->prepare("SELECT drug_name,selling_price FROM pharmacy_stock WHERE id=? LIMIT 1");
+                        if(!$d) throw new Exception('Unable to load maternity medicine.');
+                        $d->bind_param('i',$drugId);$d->execute();$drug=$d->get_result()->fetch_assoc();$d->close();
+                        if(!$drug) throw new Exception('Invalid maternity medicine selected.');
+                        $drugPrice=(float)$drug['selling_price'];
+                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Medicine: '.$drug['drug_name'],1,$drugPrice,'pharmacy',$drugId);
+                        post_invoice_journal($conn,$invoiceId,$patientId,$drugPrice,'Maternity medicine',$itemId);
                     }
-                    $stmt->close();
                 }
-                $success = 'Clinical records saved, consultation charged, and billing posted.';
+                $success='Clinical records saved and all charges posted to the central cashier invoice.';
             } else {
-                $success = 'Clinical records saved successfully (No billing created).';
+                $success='Clinical records saved successfully (No billing created).';
             }
 
             $recordedData = [
