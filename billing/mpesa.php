@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../config/mpesa.php';
+require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
 
 require_role(['admin','cashier']);
@@ -40,9 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
         if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
         $amount = min($amount, $balance);
 
+        $shift=get_open_cashier_shift($conn,(int)$_SESSION['user_id']);
+        if(!$shift) throw new Exception('Open a cashier shift before recording M-Pesa payments.');
         $conn->begin_transaction();
         try {
-            $payment = record_payment($conn, $invoiceId, $amount, 'Mpesa', $receipt);
+            $payment = record_payment($conn, $invoiceId, $amount, 'Mpesa', $receipt,(int)$shift['id']);
             record_manual_mpesa_transaction($conn, $invoiceId, (int)$invoice['patient_id'], $payment['amount'], $phone, $receipt, 'Manually recorded M-Pesa payment');
             post_payment_journal($conn, $invoiceId, $payment['amount'], 'Mpesa', $payment['payment_id']);
             $conn->commit();
@@ -86,7 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
             if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
             if ($stkAmount > $balance) $stkAmount = $balance;
 
-            mpesa_initiate_stk($conn, $invoiceId, (int)$invoice['patient_id'], $stkAmount, $phone);
+            $shift=get_open_cashier_shift($conn,(int)$_SESSION['user_id']);
+            if(!$shift) throw new Exception('Open a cashier shift before initiating an M-Pesa payment.');
+            mpesa_initiate_stk($conn, $invoiceId, (int)$invoice['patient_id'], $stkAmount, $phone,(int)$shift['id']);
             $mpesa_message = 'STK Push sent to ' . htmlspecialchars($phone) . ' for KES ' . number_format($stkAmount, 2) . '. Awaiting customer confirmation.';
         } catch (Throwable $e) {
             $mpesa_error = $e->getMessage();
