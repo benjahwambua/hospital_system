@@ -1007,9 +1007,10 @@ function clearForm() {
                 <div style="padding:18px; background:#eef7ff; border-radius:8px; margin-top:18px;">
                     <strong>Outstanding balance: KSH <?= number_format($amountToPayNow, 2) ?></strong>
                     <p style="margin:8px 0 15px; color:#555;">The cashier can accept Cash, M-Pesa and other configured payment methods, including partial payments.</p>
-                    <a href="/hospital_system/cashier/index.php" class="btn btn-success">
-                        <i class="fas fa-cash-register"></i> Open Central Cashier
-                    </a>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        Payment collection is handled centrally by the Cashier. This dashboard only displays the patient's billing and balance.
+                    </div>
                 </div>
             </div>
 
