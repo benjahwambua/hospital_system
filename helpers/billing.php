@@ -656,7 +656,7 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     if(!$stmt->execute()){ $err=$stmt->error;$stmt->close();throw new Exception('Unable to save payment: '.$err); }
     $paymentId=(int)$stmt->insert_id;
     $stmt->close();
-    $newPaid=$paid+$amount;$newBalance=max($total-$newPaid,0);$newStatus=$newBalance<=0.00001?'paid':($newPaid>0?'partial':'unpaid');
+    $newPaid=$paid+$amount;$newBalance=max($total-$newPaid,0);$newStatus=$newBalance<=0.00001?'Paid':($newPaid>0?'Partially Paid':'Unpaid');
     $update=$conn->prepare("UPDATE invoices SET total=?,paid_amount=?,amount_paid=?,balance=?,payment_status=?,status=?,payment_mode=?,paid_at=CASE WHEN ?='paid' THEN NOW() ELSE paid_at END WHERE id=?");
     if(!$update) throw new Exception('Unable to update invoice: '.$conn->error);
     $update->bind_param('ddddssssi',$total,$newPaid,$newPaid,$newBalance,$newStatus,$newStatus,$method,$newStatus,$invoice_id);
@@ -681,7 +681,7 @@ function refresh_invoice_payment_state($conn, int $invoice_id): array {
     $total=(float)($invoice['total']??0);
     $paid=max(0,min($paid,$total));
     $balance=max($total-$paid,0);
-    $status=$balance<=0.00001?'paid':($paid>0?'partial':'unpaid');
+    $status=$balance<=0.00001?'Paid':($paid>0?'Partially Paid':'Unpaid');
 
     $upd=$conn->prepare("UPDATE invoices SET paid_amount=?, amount_paid=?, balance=?, payment_status=?, status=?, paid_at=CASE WHEN ?='paid' THEN COALESCE(paid_at,NOW()) ELSE NULL END WHERE id=?");
     if(!$upd) throw new Exception('Unable to update invoice reconciliation: '.$conn->error);
