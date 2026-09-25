@@ -79,10 +79,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 if(!$receipt->execute()) throw new Exception('Unable to create GRN: '.$receipt->error); $printId=(int)$receipt->insert_id; $receipt->close();
 
                 $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?)");
-                $pay->bind_param('iiisdd i',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$uid);
-                // mysqli does not accept a space in a bind type string; recreate cleanly.
-                $pay->close();
-                $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?)");
                 $pay->bind_param('iiisddi',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$uid);
                 if(!$pay->execute()) throw new Exception('Unable to create supplier payable: '.$pay->error); $pay->close();
 
