@@ -1,42 +1,30 @@
 <?php
-// auth/login.php
 require_once __DIR__ . '/../config/config.php';
-session_start();
-
-if (!empty($_SESSION['user_id'])) { 
-    header('Location: /hospital_system/dashboard.php'); 
-    exit; 
-}
-
+require_once __DIR__ . '/../includes/session.php';
+if (!empty($_SESSION['user_id'])) { header('Location: /hospital_system/dashboard.php'); exit; }
 $error = '';
-
+$csrfToken = csrf_token();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
-
-    $stmt = $conn->prepare("SELECT id, username, password, full_name, role, is_super FROM users WHERE username = ? LIMIT 1");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result && $result->num_rows === 1) {
-        $u = $result->fetch_assoc();
-        
-        if (password_verify($password, $u['password'])) {
-            session_regenerate_id(true);
-            $_SESSION['user_id'] = $u['id']; 
-            $_SESSION['username'] = $u['username']; 
-            $_SESSION['role'] = $u['role']; 
-            $_SESSION['is_super'] = (int)$u['is_super'];
-            $_SESSION['full_name'] = $u['full_name'];
-
-            header('Location: /hospital_system/dashboard.php'); 
-            exit;
-        } else {
-            $error = "Incorrect credentials. Please try again.";
-        }
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        $error = 'Security token expired. Please refresh the page and try again.';
     } else {
-        $error = "Incorrect credentials. Please try again.";
+        $username = trim((string)($_POST['username'] ?? ''));
+        $password = (string)($_POST['password'] ?? '');
+        $stmt = $conn->prepare("SELECT id, username, password, full_name, role, is_super FROM users WHERE username = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $u = ($result && $result->num_rows === 1) ? $result->fetch_assoc() : null;
+            if ($u && password_verify($password, $u['password'])) {
+                session_regenerate_id(true);
+                $_SESSION['user_id']=(int)$u['id']; $_SESSION['username']=$u['username']; $_SESSION['role']=$u['role'];
+                $_SESSION['is_super']=(int)$u['is_super']; $_SESSION['full_name']=$u['full_name'];
+                $_SESSION['csrf_token']=bin2hex(random_bytes(32));
+                header('Location: /hospital_system/dashboard.php'); exit;
+            }
+        }
+        $error = 'Incorrect credentials. Please try again.';
     }
 }
 ?>
@@ -191,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <form method="post" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, "UTF-8"); ?>">
                 <div class="form-group mb-4">
                     <label class="small font-weight-bold text-muted mb-2">STAFF USERNAME</label>
                     <div class="input-group">
