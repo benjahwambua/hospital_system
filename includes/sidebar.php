@@ -215,10 +215,6 @@ function isParentActive($paths) {
         <a href="/hospital_system/dashboard.php" class="<?= isActive('dashboard.php') ?>">
             <i class="fas fa-th-large icon-main"></i> Dashboard
         </a>
-        <a href="/hospital_system/patients/appointments.php" class="<?= isActive('appointments.php') ?>">
-            <i class="fas fa-calendar-check icon-main"></i> Appointments
-        </a>
-
         <?php if ($isSuperUser || in_array(strtolower($userRole), ['admin', 'cashier', 'receptionist'], true)): ?>
         <div class="menu-title">Front Desk</div>
         <div class="has-submenu <?= isParentActive(['reception/index.php', 'reception_register.php', 'patient_list.php', 'queue/index.php', 'appointments.php']) ?>">
