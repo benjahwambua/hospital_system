@@ -54,7 +54,7 @@ $sql = "
         WHERE p.invoice_id IS NOT NULL
         GROUP BY p.invoice_id
     ) pay ON pay.invoice_id = i.id
-    WHERE DATE(COALESCE(v.visit_date, DATE(i.created_at))) = '{$today}'
+    WHERE DATE(i.created_at) = '{$today}'
       AND (i.visit_id IS NOT NULL OR i.walkin_id IS NOT NULL OR COALESCE(p.is_walkin,0)=1)
       AND COALESCE(items.total, i.total, 0) > COALESCE(pay.paid, 0)
       AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')
