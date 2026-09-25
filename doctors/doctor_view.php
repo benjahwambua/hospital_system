@@ -7,7 +7,11 @@ include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sid
 $doctor_id = $_SESSION['user_id'];
 $patient_id = intval($_GET['patient_id'] ?? 0);
 if (!$patient_id) { echo "<div class='card'>No patient selected</div>"; include __DIR__ . '/../includes/footer.php'; exit; }
-$patient = $conn->query("SELECT * FROM patients WHERE id=$patient_id")->fetch_assoc();
+$patientStmt = $conn->prepare("SELECT * FROM patients WHERE id=? LIMIT 1");
+$patientStmt->bind_param('i', $patient_id);
+$patientStmt->execute();
+$patient = $patientStmt->get_result()->fetch_assoc();
+$patientStmt->close();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST'){
     $complaint = $conn->real_escape_string($_POST['complaint'] ?? '');
