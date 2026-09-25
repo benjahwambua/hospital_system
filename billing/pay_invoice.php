@@ -66,6 +66,8 @@ try{
         $conn->commit();
         if (($_POST['return_to'] ?? '') === 'cashier') {
             header("Location: /hospital_system/cashier/index.php?success=1&paid_invoice=".$id);
+        } elseif (($_POST['return_to'] ?? '') === 'aged_receivables') {
+            header("Location: /hospital_system/cashier/aged_receivables.php?success=1&paid_invoice=".$id);
         } else {
             header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1&mpesa=recorded");
         }
@@ -86,7 +88,9 @@ try{
         echo json_encode(['status'=>'success']);
     }else{
         if (($_POST['return_to'] ?? '') === 'cashier') {
-            header("Location: /hospital_system/cashier/index.php?success=1");
+            header("Location: /hospital_system/cashier/index.php?success=1&paid_invoice=".$id);
+        } elseif (($_POST['return_to'] ?? '') === 'aged_receivables') {
+            header("Location: /hospital_system/cashier/aged_receivables.php?success=1&paid_invoice=".$id);
         } else {
             header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1");
         }
