@@ -36,7 +36,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h2 style="margin:0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 24px;">📋</span> Daily Appointment Register
                 </h2>
-                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Managing patient flow from Registration to Consultation.</p>
+                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Clinical starting point: open an appointment to continue to the patient dashboard and clinical record.</p>
             </div>
 
             <form method="GET" style="display: flex; gap: 0; width: 400px;">
@@ -86,7 +86,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                     </div>
                                 </td>
                                 <td style="padding: 15px 20px; text-align: center;">
-                                    <a href="patient_dashboard.php?id=<?= $row['patient_id'] ?>" 
+                                    <a href="patient_dashboard.php?id=<?= $row['patient_id'] ?>&appointment_id=<?= (int)$row['id'] ?>" 
                                        style="display: inline-block; padding: 10px 20px; background: #059669; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700; transition: transform 0.1s;"
                                        onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'">
                                        SEE PATIENT
