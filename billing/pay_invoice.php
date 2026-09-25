@@ -33,8 +33,8 @@ if(!$invoice) { http_response_code(404); exit("Invoice not found"); }
 
 $conn->begin_transaction();
 try{
-    $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS total_paid FROM payments WHERE invoice_id=?");
-    $paidStmt->bind_param('i',$id);
+    $paidStmt = $conn->prepare("SELECT COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=?),0)-COALESCE((SELECT SUM(amount) FROM payment_refunds WHERE invoice_id=? AND status='Approved'),0) AS total_paid");
+    $paidStmt->bind_param('ii',$id,$id);
     $paidStmt->execute();
     $paidRow = $paidStmt->get_result()->fetch_assoc();
     $paidStmt->close();
