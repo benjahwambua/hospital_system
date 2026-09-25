@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_role(['admin','cashier','accountant']);
 
 $patient_id = intval($_POST['patient_id'] ?? 0);
 $item = trim($_POST['item'] ?? '');
