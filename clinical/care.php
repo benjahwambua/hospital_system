@@ -69,12 +69,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_visit'])) {
         }
 
         $pendingTotal = $pendingLab + $pendingRad + $pendingPharmacy;
+        $outstanding = 0.0;
+        if ($visitId > 0) {
+            $invoiceCheck = $conn->prepare("SELECT id, COALESCE(total,0) AS total FROM invoices WHERE visit_id=? ORDER BY id DESC LIMIT 1");
+            if ($invoiceCheck) {
+                $invoiceCheck->bind_param('i', $visitId);
+                $invoiceCheck->execute();
+                $invoiceRow = $invoiceCheck->get_result()->fetch_assoc();
+                $invoiceCheck->close();
+                if ($invoiceRow) {
+                    $paidCheck = $conn->prepare("SELECT COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=?),0) - COALESCE((SELECT SUM(amount) FROM payment_refunds WHERE invoice_id=? AND status='Approved'),0) AS paid");
+                    if ($paidCheck) {
+                        $invoiceIdForBalance = (int)$invoiceRow['id'];
+                        $paidCheck->bind_param('ii', $invoiceIdForBalance, $invoiceIdForBalance);
+                        $paidCheck->execute();
+                        $paidRow = $paidCheck->get_result()->fetch_assoc();
+                        $paidCheck->close();
+                        $outstanding = max((float)$invoiceRow['total'] - (float)($paidRow['paid'] ?? 0), 0.0);
+                    }
+                }
+            }
+        }
+
         if ($pendingTotal > 0) {
             $parts = [];
             if ($pendingLab) $parts[] = $pendingLab . ' laboratory order(s)';
             if ($pendingRad) $parts[] = $pendingRad . ' radiology order(s)';
             if ($pendingPharmacy) $parts[] = $pendingPharmacy . ' pharmacy order(s)';
             $message = "<div class='alert alert-warning'><strong>Visit cannot be completed yet.</strong> Pending: " . htmlspecialchars(implode(', ', $parts)) . ". Complete the outstanding department work first.</div>";
+        } elseif ($outstanding > 0.009) {
+            $message = "<div class='alert alert-warning'><strong>Visit is ready for billing but cannot be completed yet.</strong> Outstanding balance: KES " . number_format($outstanding, 2) . ". Send the patient to Central Cashier for payment, then complete the visit.</div>";
         } else {
             $stmt = $conn->prepare("UPDATE visits SET status='Completed', updated_at=NOW() WHERE id=? AND patient_id=? AND status <> 'Cancelled'");
             if ($stmt && $stmt->bind_param('ii',$visitId,$patientId) && $stmt->execute()) {
