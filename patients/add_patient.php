@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+$csrfToken = csrf_token();
 
 $err = '';
 $success = '';
