@@ -30,8 +30,17 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $u=$conn->prepare("UPDATE supplier_payables SET paid_amount=?,balance=?,status=?,updated_at=NOW() WHERE id=?");$u->bind_param('ddsi',$newPaid,$newBal,$status,$payableId);$u->execute();$u->close();
     $account=stripos($method,'mpesa')!==false?'M-Pesa':(stripos($method,'bank')!==false?'Bank':'Cash');
     $note="Supplier payment #$paymentId for payable #$payableId";
-    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES ('Accounts Payable',?,0,?,NOW())");$a->bind_param('ds',$amount,$note);$a->execute();$a->close();
-    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?,0,?,?,NOW())");$a->bind_param('sds',$account,$amount,$note);$a->execute();$a->close();
+    $refAp="SPAY-$paymentId-AP"; $refCash="SPAY-$paymentId-$account";
+    $hasRef=false; $cr=$conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'"); $hasRef=($cr&&$cr->num_rows>0);
+    if($hasRef){
+        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES ('Accounts Payable',?,0,?,?,NOW())");
+        $a->bind_param('dss',$amount,$note,$refAp); if(!$a->execute()) throw new Exception('Unable to post AP payment entry: '.$a->error); $a->close();
+        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES (?,0,?,?,NOW())");
+        $a->bind_param('sds',$account,$amount,$refCash); if(!$a->execute()) throw new Exception('Unable to post supplier payment entry: '.$a->error); $a->close();
+    } else {
+        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES ('Accounts Payable',?,0,?,NOW())");$a->bind_param('ds',$amount,$note);$a->execute();$a->close();
+        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?,0,?,?,NOW())");$a->bind_param('sds',$account,$amount,$note);$a->execute();$a->close();
+    }
     $conn->commit();$message='Supplier payment recorded. Payable balance: KES '.number_format($newBal,2).'.';
    }catch(Throwable $e){$conn->rollback();$error=$e->getMessage();}
   }
@@ -45,9 +54,9 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
 <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h3">Supplier Payables & Payments</h2><a href="receive_inventory.php" class="btn btn-outline-primary btn-sm">GRN / Receiving</a></div>
 <?php if($message):?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif;?>
 <?php if($error):?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif;?>
-<div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>Supplier</th><th>PO</th><th>GRN</th><th>Supplier Invoice</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Receive Payment</th></tr></thead><tbody>
+<div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>Supplier</th><th>PO</th><th>GRN</th><th>Supplier Invoice</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due Date</th><th>Receive Payment</th></tr></thead><tbody>
 <?php if($rows&&$rows->num_rows):while($p=$rows->fetch_assoc()):?>
-<tr><td><?=htmlspecialchars($p['supplier_name'])?></td><td>#<?=htmlspecialchars($p['po_id']??'')?></td><td>#<?=htmlspecialchars($p['grn_id']??'')?></td><td><?=htmlspecialchars($p['supplier_invoice_no'])?></td><td>KES <?=number_format($p['amount'],2)?></td><td>KES <?=number_format($p['paid_amount'],2)?></td><td class="font-weight-bold text-danger">KES <?=number_format($p['balance'],2)?></td><td><form method="post" class="form-row"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="payable_id" value="<?=$p['id']?>"><div class="col-md-3"><input name="amount" type="number" step="0.01" min="0.01" max="<?=number_format($p['balance'],2,'.','')?>" value="<?=number_format($p['balance'],2,'.','')?>" class="form-control form-control-sm" required></div><div class="col-md-3"><select name="payment_method" class="form-control form-control-sm"><option>Cash</option><option>M-Pesa</option><option>Bank Transfer</option></select></div><div class="col-md-3"><input name="reference" class="form-control form-control-sm" placeholder="Reference"></div><div class="col-md-3"><button name="pay_supplier" class="btn btn-success btn-sm btn-block">Pay Supplier</button></div></form></td></tr>
-<?php endwhile;else:?><tr><td colspan="8" class="text-center text-muted py-4">No outstanding supplier payables.</td></tr><?php endif;?>
+<tr><td><?=htmlspecialchars($p['supplier_name'])?></td><td>#<?=htmlspecialchars($p['po_id']??'')?></td><td>#<?=htmlspecialchars($p['grn_id']??'')?></td><td><?=htmlspecialchars($p['supplier_invoice_no'])?></td><td>KES <?=number_format($p['amount'],2)?></td><td>KES <?=number_format($p['paid_amount'],2)?></td><td class="font-weight-bold text-danger">KES <?=number_format($p['balance'],2)?></td><td><?=htmlspecialchars($p['due_date']??'—')?></td><td><form method="post" class="form-row"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="payable_id" value="<?=$p['id']?>"><div class="col-md-3"><input name="amount" type="number" step="0.01" min="0.01" max="<?=number_format($p['balance'],2,'.','')?>" value="<?=number_format($p['balance'],2,'.','')?>" class="form-control form-control-sm" required></div><div class="col-md-3"><select name="payment_method" class="form-control form-control-sm"><option>Cash</option><option>M-Pesa</option><option>Bank Transfer</option></select></div><div class="col-md-3"><input name="reference" class="form-control form-control-sm" placeholder="Reference"></div><div class="col-md-3"><button name="pay_supplier" class="btn btn-success btn-sm btn-block">Pay Supplier</button></div></form></td></tr>
+<?php endwhile;else:?><tr><td colspan="9" class="text-center text-muted py-4">No outstanding supplier payables.</td></tr><?php endif;?>
 </tbody></table></div></div></div>
 <?php include __DIR__.'/../includes/footer.php'; ?>
