@@ -82,7 +82,7 @@ undefined
         redirect_with_message('Changes saved for ' . $fullName);
     }
 
-    if (isset($_POST['delete_user'])) {
+undefined
         $deleteId = (int)($_POST['delete_user'] ?? 0);
         $selfId = (int)($_SESSION['user_id'] ?? 0);
 
