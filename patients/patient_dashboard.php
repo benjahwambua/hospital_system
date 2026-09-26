@@ -717,13 +717,31 @@ if (!$recentAppointment) {
     }
 }
 
+$isMaternityPatient = !empty($patient) && empty($patient['is_walkin']) && in_array((string)($patient['clinic_category'] ?? ''), ['ANC','PNC','Maternity'], true);
+
+// Historical encounters are kept separate from the current encounter. Prefer the
+// canonical visits table so older visits cannot be mistaken for today's encounter.
+$encounterHistory = [];
+if ($patient_id > 0 && hms_visits_available($conn)) {
+    $historyStmt = $conn->prepare("SELECT visit_number, visit_date, visit_time, visit_type, clinic_category, status FROM visits WHERE patient_id=? ORDER BY visit_date DESC, visit_time DESC, id DESC LIMIT 15");
+    if ($historyStmt) {
+        $historyStmt->bind_param('i', $patient_id);
+        $historyStmt->execute();
+        $historyResult = $historyStmt->get_result();
+        while ($historyRow = $historyResult->fetch_assoc()) {
+            $encounterHistory[] = $historyRow;
+        }
+        $historyStmt->close();
+    }
+}
+
 $quickActions = [
     ['label'=>'Record Vitals','icon'=>'fa-heartbeat','tab'=>'clinical','allowed'=>can_module_action($conn,'clinical','create')],
     ['label'=>'Clinical Encounter','icon'=>'fa-user-md','tab'=>'clinical','allowed'=>can_module_action($conn,'clinical','create')],
     ['label'=>'Order Service / Lab','icon'=>'fa-flask','tab'=>'services','allowed'=>can_module_action($conn,'clinical','create')],
     ['label'=>'Prescribe Medicine','icon'=>'fa-pills','tab'=>'prescriptions','allowed'=>can_module_action($conn,'clinical','create')],
     ['label'=>'View Billing','icon'=>'fa-file-invoice-dollar','tab'=>'billing','allowed'=>can_module_action($conn,'finance','view')],
-    ['label'=>'Maternity','icon'=>'fa-female','url'=>'/hospital_system/maternity/index.php?patient_id='.(int)$patient_id,'allowed'=>can_module_action($conn,'maternity','view')],
+    ['label'=>'Maternity','icon'=>'fa-female','url'=>'/hospital_system/maternity/index.php?patient_id='.(int)$patient_id,'allowed'=>$isMaternityPatient && can_module_action($conn,'maternity','view')],
 ];
 if ($currentAdmission && can_module_action($conn,'clinical','approve')) {
     $quickActions[] = ['label'=>'Discharge Patient','icon'=>'fa-sign-out-alt','url'=>'/hospital_system/clinical/discharge_patient.php?id='.(int)$currentAdmission['id'],'allowed'=>true];
@@ -867,7 +885,7 @@ if ($patient_id <= 0) {
                 <span class="info-value">Dr. <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?></span>
                 <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
                     <?php if ($canPatientEdit): ?><a href="/hospital_system/patients/edit_patient.php?id=<?= (int)$patient_id ?>" style="background:#e8f1ff; color:#1f5fbf; border:1px solid #cfe0ff; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;"><i class="fas fa-user-edit"></i> Edit Patient</a><?php endif; ?>
-                    <a href="/hospital_system/maternity/index.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a>
+                    <?php if ($isMaternityPatient && can_module_action($conn, 'maternity', 'view')): ?><a href="/hospital_system/maternity/index.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a><?php endif; ?>
                 </div>
             </div>
         </div>
@@ -938,6 +956,34 @@ if ($patient_id <= 0) {
                 <?php if ($balance_due > 0): ?><li><strong>Finance</strong><br>KSH <?= number_format($balance_due,2) ?> outstanding</li><?php else: ?><li><strong>Finance</strong><br>Account currently settled</li><?php endif; ?>
             </ul>
         </div>
+    </div>
+
+    <div class="dashboard-summary-panel" style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <h3 class="dashboard-summary-title"><i class="fas fa-history"></i> Patient History</h3>
+            <span style="font-size:11px;color:#718096;">Historical encounters — current encounter is shown above</span>
+        </div>
+        <?php if ($encounterHistory): ?>
+            <div style="overflow-x:auto;margin-top:12px;">
+                <table class="table-custom" style="margin-top:0;">
+                    <thead><tr><th>Date</th><th>Visit No.</th><th>Type</th><th>Department</th><th>Status</th><th>Context</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($encounterHistory as $history): ?>
+                        <tr>
+                            <td><?= htmlspecialchars(date('d M Y', strtotime((string)$history['visit_date']))) ?><br><small><?= htmlspecialchars((string)($history['visit_time'] ?? '')) ?></small></td>
+                            <td><strong><?= htmlspecialchars((string)$history['visit_number']) ?></strong></td>
+                            <td><?= htmlspecialchars((string)$history['visit_type']) ?></td>
+                            <td><?= htmlspecialchars((string)($history['clinic_category'] ?: 'General')) ?></td>
+                            <td><?= htmlspecialchars((string)$history['status']) ?></td>
+                            <td><?php if ($activeVisit && (string)$history['visit_number'] === (string)$activeVisit['visit_number']): ?><span class="status-chip completed">Current</span><?php else: ?>Historical encounter<?php endif; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php else: ?>
+            <p style="margin:12px 0 0;color:#718096;font-size:13px;">No encounter history is available yet.</p>
+        <?php endif; ?>
     </div>
 
     <ul class="dashboard-tabs">
