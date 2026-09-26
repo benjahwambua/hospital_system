@@ -170,7 +170,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <div class="hms-form-card card shadow mb-4"
+        <div class="hms-form-card card shadow mb-4">
             <div class="card-header">
                 <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-receipt"></i> Record M-Pesa Payment</h6>
             </div>
@@ -203,8 +203,8 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
 
-        <div class="card shadow mb-4">
-            <div class="card-header">
+        <div class="hms-form-card card shadow mb-4">
+            <div class="card-header"><h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-mobile-alt mr-1"></i> M-Pesa STK Push</h6></div>
             <div class="card-body">
                 <?php if ($mpesa_message): ?><div class="alert alert-success"><?= $mpesa_message ?></div><?php endif; ?>
                 <?php if ($mpesa_error): ?><div class="alert alert-danger"><?= htmlspecialchars($mpesa_error) ?></div><?php endif; ?>
@@ -231,7 +231,7 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
 
-        <div class="card shadow mb-4">
+        <div class="hms-form-card card shadow mb-4">
             <div class="card-body">
                 <form method="GET" class="row align-items-end">
                     <div class="col-md-4">
