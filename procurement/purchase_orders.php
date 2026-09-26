@@ -2,11 +2,13 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'procurement', 'view');
 require_role(['admin']);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['approve_po'])) {
+    require_module_access($conn, 'procurement', 'approve');
     if (!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))) die('Invalid security token.');
     $approveId=(int)($_POST['po_id']??0);
     $stmt=$conn->prepare("UPDATE purchase_orders SET status='Approved' WHERE id=? AND status='Pending'");
@@ -215,7 +217,7 @@ $listRes = $listStmt->get_result();
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h3 text-gray-800">Purchase Order History</h2>
-        <a href="create_po.php" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Order</a>
+        <?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Order</a><?php endif; ?>
     </div>
 
     <div class="card shadow mb-3">
@@ -267,11 +269,11 @@ $listRes = $listStmt->get_result();
                             <td>KES <?= number_format((float)$row['total_amount'], 2) ?></td>
                             <td>
                                 <a href="purchase_orders.php?view_id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
-                                <a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a> <form method="post" class="d-inline">
+                                <?php if (can_create($conn, 'procurement')): ?><a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a><?php endif; ?> <?php if (can_approve($conn, 'procurement')): ?><form method="post" class="d-inline">
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
 <input type="hidden" name="po_id" value="<?= (int)$row['id']?>">
 <button name="approve_po" class="btn btn-success btn-sm mt-1" <?=($row['status']??'')!=='Pending'?'disabled':''?>>Approve</button>
-</form>
+</form><?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; else: ?>
