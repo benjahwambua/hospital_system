@@ -2,13 +2,17 @@
 require_once __DIR__ . '/../config/config.php'; 
 require_once __DIR__ . '/../includes/session.php'; 
 require_login(); 
-require_once __DIR__ . '/../includes/auth.php'; 
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
+require_module_access($conn, 'administration', 'create'); 
 require_super(); // Strictly enforced for Super Users only
 
 $msg = '';
 $error = '';
 
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     // Improved Sanitization
     $fullname = trim(filter_input(INPUT_POST, 'full_name', FILTER_SANITIZE_STRING));
     $username = trim(strtolower(filter_input(INPUT_POST, 'username', FILTER_SANITIZE_STRING))); // Usernames usually lowercase
@@ -74,7 +78,9 @@ include __DIR__ . '/../includes/sidebar.php';
                             <div class="alert alert-danger border-0 small"><i class="fas fa-exclamation-triangle mr-2"></i> <?= $error ?></div>
                         <?php endif; ?>
 
-                        <form method="POST" id="addUserForm" onsubmit="return confirmSuperUser()">
+                        <form method="POST"
+                                   id="addUserForm" onsubmit="return confirmSuperUser()">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                             <div class="form-group mb-3">
                                 <label class="small font-weight-bold text-uppercase">Staff Full Name</label>
                                 <input type="text" name="full_name" class="form-control bg-light border-0" placeholder="e.g. John Doe" required value="<?= isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : '' ?>">
