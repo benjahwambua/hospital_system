@@ -651,7 +651,7 @@ if (!empty($patient['is_walkin'])) {
         $paidStmt->close();
     }
 
-    // Prevent negative balances.
+    // Keep the balance aligned with the same encounter/account scope used above.
     $balance_due = max($total_charges - $total_paid, 0.0);
 
     $insuranceCovered = 0.0;
@@ -1345,7 +1345,7 @@ function clearForm() {
                     </button>
                 </div>
                     <p style="margin:6px 0 0; color:#666; font-size:13px;">
-                        Read-only history of services, investigations and medicines billed during this visit.
+                        <?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'Read-only services, investigations and medicines billed during this current encounter.' : 'Read-only historical account of services, investigations and medicines billed to this patient.' ?>
                         Payments are collected centrally by the Cashier.
                     </p>
                 </div>
@@ -1409,7 +1409,7 @@ function clearForm() {
                         <?php else: ?>
                             <tr>
                                 <td colspan="9" style="text-align:center; color:#666; padding:25px;">
-                                    No billed services or charges are recorded for this visit.
+                                    <?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'No billed services or charges are recorded for this encounter.' : 'No billed services or charges are recorded in this patient account.' ?>
                                 </td>
                             </tr>
                         <?php endif; ?>
@@ -1440,8 +1440,8 @@ function clearForm() {
                 </div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-                <div><h1 style="margin:0; color:#007bff; font-size:25px;">Service Statement</h1><div style="font-size:12px; color:#666; margin-top:5px;">Services and charges presented for payment</div></div>
-                <div style="text-align:right; font-size:13px;"><strong>Printed:</strong> <?= date('d-m-Y H:i') ?><br><strong>Patient No.:</strong> <?= htmlspecialchars($patient['patient_number'] ?? '—') ?></div>
+                <div><h1 style="margin:0; color:#007bff; font-size:25px;"><?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'Service Statement' : 'Patient Account Statement' ?></h1><div style="font-size:12px; color:#666; margin-top:5px;"><?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'Services and charges for the current encounter' : 'Historical services, investigations and medicines billed to this patient' ?></div></div>
+                <div style="text-align:right; font-size:13px;"><strong>Printed:</strong> <?= date('d-m-Y H:i') ?><br><strong>Patient No.:</strong> <?= htmlspecialchars($patient['patient_number'] ?? '—') ?><br><strong>Scope:</strong> <?= htmlspecialchars($billingScopeLabel) ?><?php if ($activeVisit): ?><br><strong>Visit No.:</strong> <?= htmlspecialchars($activeVisit['visit_number'] ?? '—') ?><?php endif; ?></div>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px; background:#f8f9fa; border-radius:8px; margin-bottom:22px;">
                 <div><div style="font-size:11px; font-weight:700; color:#666; text-transform:uppercase;">Patient Name</div><div style="font-size:15px; font-weight:600;"><?= htmlspecialchars($patient['full_name']) ?></div></div>
