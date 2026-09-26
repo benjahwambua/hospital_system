@@ -5,6 +5,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_once __DIR__ . '/../config/mpesa.php';
 require_login();
+$canPatientEdit = can_module_action($conn, 'front_desk', 'edit');
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -762,7 +763,10 @@ if ($patient_id <= 0) {
             <div style="text-align:right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 20px;">
                 <span class="info-label">Primary Consultant</span>
                 <span class="info-value">Dr. <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?></span>
-                <div style="display:flex; gap:8px; justify-content:flex-end;"><a href="/hospital_system/maternity/add.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                    <?php if ($canPatientEdit): ?><a href="/hospital_system/patients/edit_patient.php?id=<?= (int)$patient_id ?>" style="background:#e8f1ff; color:#1f5fbf; border:1px solid #cfe0ff; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;"><i class="fas fa-user-edit"></i> Edit Patient</a><?php endif; ?>
+                    <a href="/hospital_system/maternity/add.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a>
+                </div>
             </div>
         </div>
     </div>
