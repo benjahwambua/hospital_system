@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
-require_module_access($conn, 'clinical', 'create');
+require_module_access($conn, 'clinical', 'view');
+
 
 $error = '';
 $success = false;
@@ -19,6 +20,8 @@ $maternity_patients = $conn->query("
 $doctors = $conn->query("SELECT id, full_name FROM users WHERE role = 'Doctor' OR role = 'Admin' ORDER BY full_name ASC");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_module_access($conn, 'clinical', 'create');
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     $p_id    = intval($_POST['patient_id']);
     $doc_id  = intval($_POST['doctor_id']);
     $date    = $conn->real_escape_string($_POST['appointment_date']);
@@ -58,6 +61,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <?php endif; ?>
 
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     
                     <div class="form-group">
