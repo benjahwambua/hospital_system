@@ -710,7 +710,7 @@ $quickActions = [
     ['label'=>'Maternity','icon'=>'fa-female','url'=>'/hospital_system/maternity/index.php?patient_id='.(int)$patient_id,'allowed'=>can_module_action($conn,'maternity','view')],
 ];
 if ($currentAdmission && can_module_action($conn,'clinical','approve')) {
-    $quickActions[] = ['label'=>'Discharge Patient','icon'=>'fa-sign-out-alt','url'=>'/hospital_system/clinical/discharge_patient.php?admission_id='.(int)$currentAdmission['id'],'allowed'=>true];
+    $quickActions[] = ['label'=>'Discharge Patient','icon'=>'fa-sign-out-alt','url'=>'/hospital_system/clinical/discharge_patient.php?id='.(int)$currentAdmission['id'],'allowed'=>true];
 } elseif (!$currentAdmission && can_module_action($conn,'clinical','create')) {
     $quickActions[] = ['label'=>'Admit Patient','icon'=>'fa-bed','url'=>'/hospital_system/clinical/admit_patient.php?patient_id='.(int)$patient_id,'allowed'=>true];
 }
