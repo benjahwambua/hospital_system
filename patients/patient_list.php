@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+$canPatientEdit = can_module_action($conn, 'front_desk', 'edit');
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -316,7 +317,7 @@ $patients = $conn->query("
                     <td><?= date('M d, Y', strtotime($p['created_at'])); ?></td>
                     <td>
                         <a href="/hospital_system/patients/patient_dashboard.php?id=<?= $p['id']; ?>" class="btn btn-primary btn-sm">View</a>
-                        <a href="/hospital_system/patients/edit_patient.php?id=<?= $p['id']; ?>" class="btn btn-warning btn-sm">Edit</a>
+                        <?php if ($canPatientEdit): ?><a href="/hospital_system/patients/edit_patient.php?id=<?= $p['id']; ?>" class="btn btn-warning btn-sm">Edit</a><?php endif; ?>
                         <a href="/hospital_system/patients/appointments.php?id=<?= $p['id']; ?>" class="btn btn-info btn-sm">Schedule</a>
                         <a href="/hospital_system/reports/patient_medical_report.php?id=<?= $p['id']; ?>"target="_blank"class="btn btn-success btn-sm">Print Report</a>
                     </td>
