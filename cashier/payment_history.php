@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
+require_module_access($conn, 'finance', 'view');
 
 $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
 $isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
@@ -171,9 +172,9 @@ include __DIR__ . '/../includes/sidebar.php';
        href="/hospital_system/billing/view_invoice.php?id=<?= (int)$payment['invoice_id'] ?>&print=1">
         <i class="fas fa-print"></i> View & Print Invoice
     </a>
-    <a class="btn btn-sm btn-outline-danger" href="/hospital_system/cashier/refund.php?id=<?= (int)$payment['id'] ?>">
+    <?php if(can_approve($conn, 'finance')): ?><a class="btn btn-sm btn-outline-danger" href="/hospital_system/cashier/refund.php?id=<?= (int)$payment['id'] ?>">
         <i class="fas fa-undo"></i> Refund
-    </a>
+    </a><?php endif; ?>
 </td>
                                 </tr>
                             <?php endforeach; ?>
