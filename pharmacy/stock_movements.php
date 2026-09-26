@@ -6,12 +6,13 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
-require_module_access($conn, 'pharmacy', 'edit');
+require_module_access($conn, 'pharmacy', 'view');
 require_role(['admin','pharmacist']);
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 
 // Handle Form Stock Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_stock_submit'])) {
+    require_module_access($conn, 'pharmacy', 'edit');
     if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) { die('Invalid security token.'); }
     $stock_id     = intval($_POST['stock_id']);
     $new_quantity = intval($_POST['new_quantity']);
