@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 require_once __DIR__ . '/../includes/auth.php';
+require_module_access($conn, 'clinical', 'edit');
 require_role(['admin','doctor','nurse']);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
