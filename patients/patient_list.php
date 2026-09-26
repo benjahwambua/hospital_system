@@ -318,7 +318,7 @@ $patients = $conn->query("
                     <td>
                         <a href="/hospital_system/patients/patient_dashboard.php?id=<?= $p['id']; ?>" class="btn btn-primary btn-sm">View</a>
                         <?php if ($canPatientEdit): ?><a href="/hospital_system/patients/edit_patient.php?id=<?= $p['id']; ?>" class="btn btn-warning btn-sm">Edit</a><?php endif; ?>
-                        <a href="/hospital_system/patients/appointments.php?id=<?= $p['id']; ?>" class="btn btn-info btn-sm">Schedule</a>
+                        <a href="/hospital_system/appointments/appointments.php?patient_id=<?= $p['id']; ?>" class="btn btn-info btn-sm">Schedule</a>
                         <a href="/hospital_system/reports/patient_medical_report.php?id=<?= $p['id']; ?>"target="_blank"class="btn btn-success btn-sm">Print Report</a>
                     </td>
                 </tr>
