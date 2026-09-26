@@ -1,4 +1,4 @@
-<?php
+<style>...</style><?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
@@ -64,15 +64,15 @@ include __DIR__ . '/../includes/sidebar.php';
 <div class="content-wrapper" style="padding: 30px; background: #f8fafc; min-height: 100vh;">
     <div style="max-width: 1200px; margin: auto;">
         
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px;background:#fff;padding:22px 24px;border-radius:14px;border:1px solid #e7edf4;box-shadow:0 5px 18px rgba(31,45,61,.06);">
             <div>
                 <h2 style="margin:0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 24px;">📋</span> Daily Appointment Register
                 </h2>
-                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Appointments remain open until the patient appears. Reception can close an appointment only after the patient has appeared.</p>\n            <?php if ($notice): ?><div style="margin-top:10px;color:#166534;"><?= htmlspecialchars($notice) ?></div><?php endif; ?>\n            <?php if ($error): ?><div style="margin-top:10px;color:#991b1b;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+                <p style="margin:5px 0 0;color:#64748b;font-size:14px;">Appointments remain open until the patient appears. Once the patient appears, the appointment can be closed after the clinical encounter.</p><div style="margin-top:12px;display:flex;gap:8px;"><a href="../appointments/appointments.php<?=isset($_GET["id"])?"?patient_id=".(int)$_GET["id"]:""?>" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1"></i> Schedule Appointment</a></div>\n            <?php if ($notice): ?><div style="margin-top:10px;color:#166534;"><?= htmlspecialchars($notice) ?></div><?php endif; ?>\n            <?php if ($error): ?><div style="margin-top:10px;color:#991b1b;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             </div>
 
-            <form method="GET" style="display: flex; gap: 0; width: 400px;">
+            <form method="GET" style="display:flex;gap:0;width:400px;">
                 <input type="text" name="q" placeholder="Search name or patient ID..." value="<?= htmlspecialchars($search) ?>" 
                        style="flex: 1; padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 8px 0 0 8px; outline: none; font-size: 14px;">
                 <button type="submit" style="padding: 12px 20px; background: #2563eb; color: white; border: none; border-radius: 0 8px 8px 0; cursor: pointer; font-weight: 600;">
