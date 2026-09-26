@@ -160,10 +160,7 @@ include __DIR__ . '/../includes/sidebar.php';
 </style>
 
 <div class="hms-form-page"><div class="hms-form-shell">
-    <div class="hms-form-hero"><div><div class="hms-form-kicker">Procurement · Purchasing</div><h1>Create New Purchase Order</h1><p>Build a purchase order from approved pharmacy and laboratory inventory items.</p></div><a href="purchase_orders.php" class="btn btn-light border">Cancel</a></div><div style="display:none">
-        <h2 class="h3 text-gray-800">Create New Purchase Order</h2>
-        <a href="purchase_orders.php" class="btn btn-secondary btn-sm">Cancel</a>
-    </div>
+    <div class="hms-form-hero"><div><div class="hms-form-kicker">Procurement · Purchasing</div><h1>Create New Purchase Order</h1><p>Build a purchase order from approved pharmacy and laboratory inventory items.</p></div><a href="purchase_orders.php" class="btn btn-light border">Cancel</a></div>
 
     <?php if ($error !== ''): ?>
         <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
