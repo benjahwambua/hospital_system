@@ -15,17 +15,17 @@ if ($patientId > 0) {
 
 $canCreate = can_module_action($conn,'maternity','create');
 $total=0;$deliveries=0;$babies=0;$upcoming=0;
-if($q=$conn->query("SELECT COUNT(*) c FROM maternity")) $total=(int)$q->fetch_assoc()['c'];
-if($q=$conn->query("SELECT COUNT(*) c FROM maternity_delivery")) $deliveries=(int)$q->fetch_assoc()['c'];
-if($q=$conn->query("SELECT COUNT(*) c FROM maternity_baby")) $babies=(int)$q->fetch_assoc()['c'];
+if($q=$conn->query("SELECT COUNT(*) c FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity')")) $total=(int)$q->fetch_assoc()['c'];
+if($q=$conn->query("SELECT COUNT(*) c FROM maternity_delivery md JOIN maternity m ON m.id=md.maternity_id JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity')")) $deliveries=(int)$q->fetch_assoc()['c'];
+if($q=$conn->query("SELECT COUNT(*) c FROM maternity_baby mb JOIN maternity m ON m.id=mb.maternity_id JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity')")) $babies=(int)$q->fetch_assoc()['c'];
 if($q=$conn->query("SELECT COUNT(*) c FROM appointments a JOIN patients p ON p.id=a.patient_id WHERE a.appointment_date>=NOW() AND p.clinic_category IN ('ANC','PNC','Maternity') AND COALESCE(a.status,'') NOT IN ('Cancelled','Completed')")) $upcoming=(int)$q->fetch_assoc()['c'];
 
 $records = null;
 if ($patientId > 0) {
-    $rs = $conn->prepare("SELECT m.id,m.patient_id,m.anc_number,m.expected_delivery,m.gravida,m.parity,m.created_at,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? ORDER BY m.created_at DESC LIMIT 12");
+    $rs = $conn->prepare("SELECT m.id,m.patient_id,m.anc_number,m.expected_delivery,m.gravida,m.parity,m.created_at,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? AND p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY m.created_at DESC LIMIT 12");
     $rs->bind_param('i',$patientId); $rs->execute(); $records=$rs->get_result(); $rs->close();
 } else {
-    $records=$conn->query("SELECT m.id,m.patient_id,m.anc_number,m.expected_delivery,m.gravida,m.parity,m.created_at,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id ORDER BY m.created_at DESC LIMIT 12");
+    $records=$conn->query("SELECT m.id,m.patient_id,m.anc_number,m.expected_delivery,m.gravida,m.parity,m.created_at,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY m.created_at DESC LIMIT 12");
 }
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
