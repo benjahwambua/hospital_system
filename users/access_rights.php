@@ -3,6 +3,9 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_login();
+require_module_access($conn, 'administration', 'view');
+require_super();
 undefined
 
 if (!has_access_control_tables($conn)) {
@@ -14,6 +17,7 @@ $csrf=$_SESSION['csrf_token'];
 $message=''; $error='';
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
+    require_module_access($conn, 'administration', 'edit');
     if (!hash_equals($csrf,$_POST['csrf_token'] ?? '')) {
         $error='Invalid security token.';
     } else {
