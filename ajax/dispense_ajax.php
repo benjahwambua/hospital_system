@@ -10,6 +10,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../helpers/billing.php';
 
 require_login();
+require_module_access($conn, 'pharmacy', 'approve');
 require_role(['admin','pharmacist']);
 
 $transactionStarted = false;
