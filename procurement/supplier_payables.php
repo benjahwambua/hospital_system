@@ -3,6 +3,7 @@ require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/session.php';
 require_once __DIR__.'/../includes/auth.php';
 require_login();
+require_module_access($conn, 'procurement', 'view');
 require_role(['admin']);
 
 if(empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
@@ -11,6 +12,7 @@ $csrf=$_SESSION['csrf_token']; $message=''; $error='';
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!hash_equals($csrf,(string)($_POST['csrf_token']??''))){$error='Invalid security token.';}
  elseif(isset($_POST['pay_supplier'])){
+  require_module_access($conn, 'procurement', 'create');
   $payableId=(int)($_POST['payable_id']??0); $amount=(float)($_POST['amount']??0);
   $method=trim((string)($_POST['payment_method']??'Cash')); $reference=trim((string)($_POST['reference']??'')); $notes=trim((string)($_POST['notes']??''));
   if($payableId<=0||$amount<=0) $error='Select a payable and enter a valid amount.';
@@ -61,7 +63,7 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
 <?php if($error):?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif;?>
 <div class="card shadow"><div class="card-body table-responsive"><table class="table table-bordered table-hover"><thead class="thead-light"><tr><th>Supplier</th><th>PO</th><th>GRN</th><th>Supplier Invoice</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due Date</th><th>Receive Payment</th></tr></thead><tbody>
 <?php if($rows&&$rows->num_rows):while($p=$rows->fetch_assoc()):?>
-<tr><td><?=htmlspecialchars($p['supplier_name'])?></td><td>#<?=htmlspecialchars($p['po_id']??'')?></td><td>#<?=htmlspecialchars($p['grn_id']??'')?></td><td><?=htmlspecialchars($p['supplier_invoice_no'])?></td><td>KES <?=number_format($p['amount'],2)?></td><td>KES <?=number_format($p['paid_amount'],2)?></td><td class="font-weight-bold text-danger">KES <?=number_format($p['balance'],2)?></td><td><?=htmlspecialchars($p['due_date']??'—')?></td><td><form method="post" class="form-row"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="payable_id" value="<?=$p['id']?>"><div class="col-md-3"><input name="amount" type="number" step="0.01" min="0.01" max="<?=number_format($p['balance'],2,'.','')?>" value="<?=number_format($p['balance'],2,'.','')?>" class="form-control form-control-sm" required></div><div class="col-md-3"><select name="payment_method" class="form-control form-control-sm"><option>Cash</option><option>M-Pesa</option><option>Bank Transfer</option></select></div><div class="col-md-3"><input name="reference" class="form-control form-control-sm" placeholder="Reference"></div><div class="col-md-3"><button name="pay_supplier" class="btn btn-success btn-sm btn-block">Pay Supplier</button></div></form></td></tr>
+<tr><td><?=htmlspecialchars($p['supplier_name'])?></td><td>#<?=htmlspecialchars($p['po_id']??'')?></td><td>#<?=htmlspecialchars($p['grn_id']??'')?></td><td><?=htmlspecialchars($p['supplier_invoice_no'])?></td><td>KES <?=number_format($p['amount'],2)?></td><td>KES <?=number_format($p['paid_amount'],2)?></td><td class="font-weight-bold text-danger">KES <?=number_format($p['balance'],2)?></td><td><?=htmlspecialchars($p['due_date']??'—')?></td><td><form method="post" class="form-row"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="payable_id" value="<?=$p['id']?>"><div class="col-md-3"><input name="amount" type="number" step="0.01" min="0.01" max="<?=number_format($p['balance'],2,'.','')?>" value="<?=number_format($p['balance'],2,'.','')?>" class="form-control form-control-sm" required></div><div class="col-md-3"><select name="payment_method" class="form-control form-control-sm"><option>Cash</option><option>M-Pesa</option><option>Bank Transfer</option></select></div><div class="col-md-3"><input name="reference" class="form-control form-control-sm" placeholder="Reference"></div><div class="col-md-3"><?php if(can_create($conn, 'procurement')): ?><button name="pay_supplier" class="btn btn-success btn-sm btn-block">Pay Supplier</button><?php else: ?><span class="text-muted small">Payment permission required</span><?php endif; ?></div></form></td></tr>
 <?php endwhile;else:?><tr><td colspan="9" class="text-center text-muted py-4">No outstanding supplier payables.</td></tr><?php endif;?>
 </tbody></table></div></div></div>
 <?php include __DIR__.'/../includes/footer.php'; ?>
