@@ -289,14 +289,19 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'maternity')): ?>
-        <div class="has-submenu <?= isParentActive(['maternity/add.php', 'deliveries.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['maternity/index.php','maternity/add.php','maternity/antenatal.php','maternity/postnatal.php','maternity/deliveries.php','maternity/admissions.php','maternity/stats.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-baby icon-main"></i> Maternity
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
-                <a href="/hospital_system/maternity/add.php" class="<?= isActive('maternity/add.php') ?>"><i class="fas fa-baby-carriage"></i> New Entry</a>
-                <a href="/hospital_system/maternity/deliveries.php" class="<?= isActive('deliveries.php') ?>"><i class="fas fa-child"></i> Deliveries</a>
+                <a href="/hospital_system/maternity/index.php" class="<?= isActive('maternity/index.php') ?>"><i class="fas fa-th-large"></i> Maternity Dashboard</a>
+                <a href="/hospital_system/maternity/add.php" class="<?= isActive('maternity/add.php') ?>"><i class="fas fa-notes-medical"></i> ANC / Labour / PNC</a>
+                <a href="/hospital_system/maternity/antenatal.php" class="<?= isActive('maternity/antenatal.php') ?>"><i class="fas fa-heartbeat"></i> Antenatal (ANC)</a>
+                <a href="/hospital_system/maternity/postnatal.php" class="<?= isActive('maternity/postnatal.php') ?>"><i class="fas fa-female"></i> Postnatal (PNC)</a>
+                <a href="/hospital_system/maternity/deliveries.php" class="<?= isActive('maternity/deliveries.php') ?>"><i class="fas fa-baby"></i> Deliveries</a>
+                <a href="/hospital_system/maternity/admissions.php" class="<?= isActive('maternity/admissions.php') ?>"><i class="fas fa-procedures"></i> Admissions</a>
+                <a href="/hospital_system/maternity/stats.php" class="<?= isActive('maternity/stats.php') ?>"><i class="fas fa-chart-bar"></i> Reports</a>
             </div>
         </div>
         <?php endif; ?>
