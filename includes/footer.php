@@ -18,6 +18,8 @@
 <script>
 document.addEventListener("DOMContentLoaded", function(){
   const sidebar=document.querySelector(".sidebar");
+  const navToggle=document.querySelector(".mobile-nav-toggle");
+  if(navToggle && sidebar){ navToggle.addEventListener("click",()=>sidebar.classList.toggle("mobile-open")); }
   const toggles=document.querySelectorAll(".menu-toggle");
   toggles.forEach(toggle=>toggle.addEventListener("click",function(e){
     e.preventDefault();
