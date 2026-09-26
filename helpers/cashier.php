@@ -40,21 +40,27 @@ function open_cashier_shift($conn, int $cashierId, float $openingCash = 0.0, ?st
     }
 }
 
+function cashier_shift_column_exists($conn,string $column): bool {
+    $safe=$conn->real_escape_string($column);
+    $q=$conn->query("SHOW COLUMNS FROM cashier_shifts LIKE '{$safe}'");
+    return $q && $q->num_rows>0;
+}
+
 function cashier_shift_totals($conn, int $shiftId): array {
     $totals = ['cash'=>0.0, 'mpesa'=>0.0, 'other'=>0.0, 'total'=>0.0];
     if ($shiftId <= 0) return $totals;
 
-    $stmt=$conn->prepare("SELECT p.method,
-        COALESCE(SUM(p.amount),0) - COALESCE(SUM(CASE WHEN r.status='Approved' THEN r.amount ELSE 0 END),0) AS total
-        FROM payments p LEFT JOIN payment_refunds r ON r.payment_id=p.id
-        WHERE p.cashier_shift_id=? GROUP BY p.method");
+    $stmt=$conn->prepare("SELECT p.id, p.method, p.amount,
+        COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.payment_id=p.id AND r.status='Approved'),0) AS refunded
+        FROM payments p
+        WHERE p.cashier_shift_id=? ORDER BY p.id ASC");
     if ($stmt) {
         $stmt->bind_param('i',$shiftId);
         $stmt->execute();
         $res=$stmt->get_result();
         while($row=$res->fetch_assoc()){
             $method=strtolower(trim((string)$row['method']));
-            $amount=(float)$row['total'];
+            $amount=max((float)$row['amount']-(float)$row['refunded'],0);
             if(strpos($method,'mpesa')!==false) $totals['mpesa'] += $amount;
             elseif(strpos($method,'cash')!==false) $totals['cash'] += $amount;
             else $totals['other'] += $amount;
@@ -69,16 +75,16 @@ function close_cashier_shift($conn, int $shiftId, int $cashierId, float $closing
     if ($shiftId <= 0 || $cashierId <= 0) throw new Exception('Invalid cashier shift.');
     if ($closingCash < 0) throw new Exception('Closing cash cannot be negative.');
 
-    $stmt=$conn->prepare("SELECT * FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1 FOR UPDATE");
-    if(!$stmt) throw new Exception('Unable to load cashier shift: '.$conn->error);
-    $stmt->bind_param('ii',$shiftId,$cashierId);
-    $stmt->execute();
-    $shift=$stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if(!$shift) throw new Exception('Open cashier shift not found.');
-
     $conn->begin_transaction();
     try {
+        // Lock the shift only after the transaction has started.
+        $stmt=$conn->prepare("SELECT * FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1 FOR UPDATE");
+        if(!$stmt) throw new Exception('Unable to load cashier shift: '.$conn->error);
+        $stmt->bind_param('ii',$shiftId,$cashierId);
+        $stmt->execute();
+        $shift=$stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if(!$shift) throw new Exception('Open cashier shift not found.');
         // Re-lock the shift inside the transaction before calculating totals.
         $stmt=$conn->prepare("SELECT * FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1 FOR UPDATE");
         if(!$stmt) throw new Exception('Unable to lock cashier shift: '.$conn->error);
@@ -90,9 +96,14 @@ function close_cashier_shift($conn, int $shiftId, int $cashierId, float $closing
         $expected=(float)$shift['opening_cash']+$totals['cash'];
         $variance=$closingCash-$expected;
 
-        $upd=$conn->prepare("UPDATE cashier_shifts SET closed_at=NOW(), closing_cash=?, expected_cash=?, cash_variance=?, closing_notes=?, status='Closed' WHERE id=? AND status='Open'");
-    if(!$upd) throw new Exception('Unable to close cashier shift: '.$conn->error);
-    $upd->bind_param('dddsi',$closingCash,$expected,$variance,$notes,$shiftId);
+        $set=['closed_at=NOW()','closing_cash=?','expected_cash=?','cash_variance=?','closing_notes=?','status=\'Closed\''];
+        $types='ddds'; $values=[$closingCash,$expected,$variance,$notes];
+        if(cashier_shift_column_exists($conn,'expected_mpesa')){$set[]='expected_mpesa=?';$types.='d';$values[]=$totals['mpesa'];}
+        if(cashier_shift_column_exists($conn,'expected_other')){$set[]='expected_other=?';$types.='d';$values[]=$totals['other'];}
+        $sql="UPDATE cashier_shifts SET ".implode(', ',$set)." WHERE id=? AND status='Open'";
+        $upd=$conn->prepare($sql);
+        if(!$upd) throw new Exception('Unable to close cashier shift: '.$conn->error);
+        $types.='i';$values[]=$shiftId;$upd->bind_param($types,...$values);
     if(!$upd->execute()){ $err=$upd->error; $upd->close(); throw new Exception('Unable to close cashier shift: '.$err); }
     $upd->close();
         $conn->commit();
