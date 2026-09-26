@@ -47,12 +47,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                             if ($visitId<=0) throw new Exception('Unable to create the inpatient patient visit.');
 
                             $status='Admitted';
+                            $wardCanonical='Maternity Ward';
                             $admitDate=date('Y-m-d H:i:s');
                             $userId=(int)($_SESSION['user_id']??0);
                             $admissionStmt=$conn->prepare("INSERT INTO admissions (patient_id,visit_id,ward_name,bed_number,admit_date,reason,admitted_by,attending_doctor,created_by,status) VALUES (?,?,?,?,?,?,?,?,?,?)");
                             if (!$admissionStmt) throw new Exception('Unable to prepare clinical admission: '.$conn->error);
                             $admissionStmt->bind_param('iisisisiss',$pid,$visitId,$wardCanonical,$bed,$admitDate,$note,$userId,$doctor,$userId,$status);
-                            $wardCanonical='Maternity Ward';
                             if (!$admissionStmt->execute()) throw new Exception('Unable to create clinical admission: '.$admissionStmt->error);
                             $admissionId=(int)$admissionStmt->insert_id; $admissionStmt->close();
 
