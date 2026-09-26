@@ -69,7 +69,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h2 style="margin:0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 24px;">📋</span> Daily Appointment Register
                 </h2>
-                <p style="margin:5px 0 0;color:#64748b;font-size:14px;">Appointments remain open until the patient appears. Once the patient appears, the appointment can be closed after the clinical encounter.</p><div style="margin-top:12px;display:flex;gap:8px;"><a href="../appointments/appointments.php<?=isset($_GET["id"])?"?patient_id=".(int)$_GET["id"]:""?>" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1"></i> Schedule Appointment</a></div>\n            <?php if ($notice): ?><div style="margin-top:10px;color:#166534;"><?= htmlspecialchars($notice) ?></div><?php endif; ?>\n            <?php if ($error): ?><div style="margin-top:10px;color:#991b1b;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+                <p style="margin:5px 0 0;color:#64748b;font-size:14px;">Appointments remain open until the patient appears. Once the patient appears, the appointment can be closed after the clinical encounter.</p><div style="margin-top:12px;display:flex;gap:8px;"><a href="../appointments/appointments.php<?=isset($_GET["id"])?"?patient_id=".(int)$_GET["id"]:""?>" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1"></i> Schedule Appointment</a></div>            <?php if ($notice): ?><div style="margin-top:10px;color:#166534;"><?= htmlspecialchars($notice) ?></div><?php endif; ?>            <?php if ($error): ?><div style="margin-top:10px;color:#991b1b;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             </div>
 
             <form method="GET" style="display:flex;gap:0;width:400px;">
@@ -89,7 +89,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Appointment Slot</th>
                         <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Assigned Clinician</th>
                         <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Visit Reason</th>
-                        <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Status</th>\n                        <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Action</th>
+                        <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Status</th>                        <th style="padding: 18px 20px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
