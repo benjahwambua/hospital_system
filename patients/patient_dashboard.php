@@ -45,8 +45,18 @@ if ($patient_id > 0 && $appointment_id > 0) {
             if (($col['Field'] ?? '') === 'visit_id') { $hasAppointmentVisit = true; break; }
         }
         if ($hasAppointmentVisit && !empty($activeAppointment['visit_id'])) {
-            $activeVisitId = (int)$activeAppointment['visit_id'];
-        } else {
+            // Never treat a completed/closed/cancelled encounter as the current encounter.
+            $linkedVisitStmt = $conn->prepare("SELECT id FROM visits WHERE id=? AND patient_id=? AND status IN ('Open','In Progress') LIMIT 1");
+            if ($linkedVisitStmt) {
+                $linkedVisitId = (int)$activeAppointment['visit_id'];
+                $linkedVisitStmt->bind_param('ii', $linkedVisitId, $patient_id);
+                $linkedVisitStmt->execute();
+                $linkedVisit = $linkedVisitStmt->get_result()->fetch_assoc();
+                $linkedVisitStmt->close();
+                $activeVisitId = $linkedVisit ? $linkedVisitId : 0;
+            }
+        }
+        if ($activeVisitId <= 0) {
             $activeVisitId = get_or_create_current_visit($conn, $patient_id, 'Outpatient', $activeAppointment['clinic_category'] ?? 'General', (int)($activeAppointment['doctor_id'] ?? 0));
             if ($hasAppointmentVisit && $activeVisitId > 0) {
                 $linkStmt = $conn->prepare("UPDATE appointments SET visit_id = ? WHERE id = ? AND patient_id = ?");
