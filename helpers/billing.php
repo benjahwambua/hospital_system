@@ -783,9 +783,13 @@ function refund_payment($conn, int $paymentId, float $amount, string $reason, st
 
     $method=$refundMethod==='Original'?(string)$payment['method']:$refundMethod;
     $method=str_replace(['-','_'],' ',trim($method));
-    if(!in_array(strtolower($method),['cash','mpesa','m pesa','bank','bank transfer','transfer'],true) && $refundMethod!=='Original'){
+    $methodKey=strtolower(preg_replace('/\\s+/','',$method));
+    if(!in_array($methodKey,['cash','mpesa','bank','banktransfer','transfer'],true)){
         throw new Exception('Invalid refund method.');
     }
+    if($methodKey==='mpesa') $method='Mpesa';
+    elseif($methodKey==='banktransfer' || $methodKey==='transfer') $method='Bank';
+    elseif($methodKey==='cash') $method='Cash';
     $reference=trim((string)($reference??''));
     if($reference==='') $reference=null;
     if($reference!==null){
@@ -805,8 +809,8 @@ function refund_payment($conn, int $paymentId, float $amount, string $reason, st
     $refundId=(int)$ins->insert_id; $ins->close();
 
     $account='Cash';
-    if(stripos($method,'mpesa')!==false) $account='M-Pesa';
-    elseif(stripos($method,'bank')!==false || stripos($method,'transfer')!==false) $account='Bank';
+    if($methodKey==='mpesa') $account='M-Pesa';
+    elseif(in_array($methodKey,['bank','banktransfer','transfer'],true)) $account='Bank';
     $note='Payment refund #'.$refundId.' for Invoice #'.$payment['invoice_id'];
     post_journal_entry($conn,'Accounts Receivable',$amount,0,$note,(int)$payment['invoice_id'],'REF-'.$refundId.'-AR');
     post_journal_entry($conn,$account,0,$amount,$note,(int)$payment['invoice_id'],'REF-'.$refundId.'-'.strtoupper(str_replace(' ','',$account)));
