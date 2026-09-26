@@ -207,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$ancList = $conn->query('SELECT m.id as mid, p.full_name, m.anc_number FROM maternity m JOIN patients p ON p.id = m.patient_id ORDER BY p.full_name ASC');
+$ancList = $conn->query('SELECT m.id as mid, p.full_name, m.anc_number FROM maternity m JOIN patients p ON p.id = m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity') AND COALESCE(p.is_walkin,0)=0 ORDER BY p.full_name ASC');
 $record = null;
 $previousVisit = null;
 $nextAppointment = null;
