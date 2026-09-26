@@ -1,60 +1,7 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../includes/session.php';
-require_login();
-
-$maternity_id = intval($_GET['id'] ?? 0);
-if (!$maternity_id) { header('Location: index.php'); exit; }
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $visit_type = $conn->real_escape_string($_POST['visit_type']);
-  $bp = $conn->real_escape_string($_POST['bp'] ?? '');
-  $temp = $conn->real_escape_string($_POST['temp'] ?? '');
-  $pulse = $conn->real_escape_string($_POST['pulse'] ?? '');
-  $weight = $conn->real_escape_string($_POST['weight'] ?? '');
-  $fhr = $conn->real_escape_string($_POST['fetal_heart_rate'] ?? '');
-  $cervix = $conn->real_escape_string($_POST['cervix'] ?? '');
-  $membrane = $conn->real_escape_string($_POST['membrane_status'] ?? '');
-  $drugs = $conn->real_escape_string($_POST['drugs_given'] ?? '');
-  $notes = $conn->real_escape_string($_POST['notes'] ?? '');
-
-  $stmt = $conn->prepare("INSERT INTO maternity_visits (maternity_id, visit_type, bp, temp, pulse, weight, fetal_heart_rate, cervix, membrane_status, drugs_given, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-  $stmt->bind_param("issssssssss", $maternity_id, $visit_type, $bp, $temp, $pulse, $weight, $fhr, $cervix, $membrane, $drugs, $notes);
-  $stmt->execute();
-  $stmt->close();
-
-  audit('maternity_visit', "maternity_id={$maternity_id},type={$visit_type}");
-  header("Location: view.php?id={$maternity_id}");
-  exit;
-}
-
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-
-$m = $conn->query("SELECT m.*, p.full_name FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id={$maternity_id}")->fetch_assoc();
-?>
-
-<div class="main">
-  <div class="page-title">Add Visit — <?= htmlspecialchars($m['full_name']) ?></div>
-  <div class="card" style="max-width:900px;">
-    <form method="post">
-      <div style="display:flex;gap:8px;">
-        <div style="flex:1"><label>Visit Type</label><select name="visit_type" class="form-control"><option>ANC</option><option>PNC</option><option>Labour</option></select></div>
-        <div style="flex:1"><label>BP</label><input name="bp" class="form-control"></div>
-        <div style="flex:1"><label>Temp</label><input name="temp" class="form-control"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <div style="flex:1"><label>Pulse</label><input name="pulse" class="form-control"></div>
-        <div style="flex:1"><label>Weight</label><input name="weight" class="form-control"></div>
-        <div style="flex:1"><label>Fetal HR</label><input name="fetal_heart_rate" class="form-control"></div>
-      </div>
-      <label style="margin-top:8px">Cervix</label><input name="cervix" class="form-control">
-      <label style="margin-top:8px">Membrane status</label><input name="membrane_status" class="form-control">
-      <label style="margin-top:8px">Drugs given</label><textarea name="drugs_given" class="form-control"></textarea>
-      <label style="margin-top:8px">Notes</label><textarea name="notes" class="form-control"></textarea>
-      <div style="margin-top:12px"><button class="btn" type="submit">Save Visit</button></div>
-    </form>
-  </div>
-</div>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_login();require_module_access($conn,'maternity','view');
+$id=max(0,(int)($_GET['id']??0));if(!$id){header('Location:index.php');exit;}
+$stmt=$conn->prepare("SELECT m.*,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? LIMIT 1");$stmt->bind_param('i',$id);$stmt->execute();$m=$stmt->get_result()->fetch_assoc();$stmt->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
+$vis=$conn->prepare("SELECT * FROM maternity_visits WHERE maternity_id=? ORDER BY created_at DESC LIMIT 100");$vis->bind_param('i',$id);$vis->execute();$visits=$vis->get_result();$vis->close();
+include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';?>
+<div class="main-content"><div class="container-fluid pt-4"><div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h4 mb-1 text-gray-800"><i class="fas fa-history text-primary mr-2"></i>Maternity Visit History</h2><p class="text-muted mb-0"><?=htmlspecialchars($m['full_name'])?> · <?=htmlspecialchars($m['patient_number'])?> · <?=htmlspecialchars($m['anc_number'])?></p></div><div><a href="view.php?id=<?=$id?>" class="btn btn-outline-primary mr-2">Open Record</a><a href="index.php" class="btn btn-light">Maternity Dashboard</a></div></div><div class="card shadow-sm"><div class="card-header bg-white"><strong>Clinical Timeline</strong></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Date</th><th>Type</th><th>BP</th><th>Temp</th><th>Pulse</th><th>Weight</th><th>FHR</th><th>Cervix</th><th>Notes</th></tr></thead><tbody><?php if($visits&&$visits->num_rows):while($v=$visits->fetch_assoc()):?><tr><td><?=htmlspecialchars(date('d M Y H:i',strtotime($v['created_at'])))?></td><td><span class="badge badge-info"><?=htmlspecialchars($v['visit_type'])?></span></td><td><?=htmlspecialchars($v['bp'])?></td><td><?=htmlspecialchars($v['temp'])?></td><td><?=htmlspecialchars($v['pulse'])?></td><td><?=htmlspecialchars($v['weight'])?></td><td><?=htmlspecialchars($v['fetal_heart_rate'])?></td><td><?=htmlspecialchars($v['cervix'])?></td><td><?=nl2br(htmlspecialchars($v['notes']))?></td></tr><?php endwhile;else:?><tr><td colspan="9" class="text-center text-muted py-5">No maternity visits recorded.</td></tr><?php endif;?></tbody></table></div></div></div></div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
