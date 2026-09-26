@@ -59,7 +59,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 include __DIR__ . "/../includes/header.php";
 include __DIR__ . "/../includes/sidebar.php";
-?>
+?><style>
+.hms-form-page{padding:26px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 60px)}
+.hms-form-shell{max-width:1450px;margin:0 auto}
+.hms-form-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:21px 24px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:18px}
+.hms-form-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;font-weight:700;color:#6c7a91;margin-bottom:4px}
+.hms-form-hero h1{font-size:24px;font-weight:700;color:#25324a;margin:0 0 5px}.hms-form-hero p{margin:0;color:#718096;font-size:14px}
+.hms-form-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}
+.hms-form-card .card-header{background:#fff;border-bottom:1px solid #edf0f5;padding:16px 20px;color:#25324a;font-weight:700}
+.hms-form-card .card-body{padding:21px}
+.hms-form-page label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667085;margin-bottom:6px}
+.hms-form-page .form-control{border:1px solid #d8dee8;border-radius:8px;background:#fff;color:#344054;min-height:42px;padding:10px 12px}
+.hms-form-page .form-control:focus{border-color:#4c84ff;box-shadow:0 0 0 3px rgba(76,132,255,.10);outline:0}
+.hms-form-page textarea.form-control{min-height:auto}.hms-form-page .btn{border-radius:8px;font-weight:700}
+.hms-form-page hr{border-color:#edf0f5}.hms-form-page .table{margin-bottom:0}.hms-form-page .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
+@media(max-width:767px){.hms-form-page{padding:18px 12px 35px}.hms-form-hero{align-items:flex-start;flex-direction:column}}
+</style>
 
 <style>
     /* Elevated Card Design */
@@ -124,7 +139,7 @@ include __DIR__ . "/../includes/sidebar.php";
         margin-bottom: 8px;
     }
 </style>
-<div class="container-fluid px-4">
+<div class="hms-form-page"><div class="hms-form-shell">
     <div class="d-sm-flex align-items-center justify-content-between mb-4 mt-3">
         <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-pills text-primary mr-2"></i> Inventory Procurement</h1>
         <nav aria-label="breadcrumb">
@@ -143,7 +158,7 @@ include __DIR__ . "/../includes/sidebar.php";
 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
         <div class="row">
             <div class="col-xl-8 col-lg-7">
-                <div class="card shadow mb-4">
+                <div class="hms-form-card card shadow mb-4">
                     <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
                         <h6 class="m-0 font-weight-bold text-primary">Medicine & Stock Specifications</h6>
                     </div>
@@ -176,7 +191,7 @@ include __DIR__ . "/../includes/sidebar.php";
                     </div>
                 </div>
 
-                <div class="card shadow mb-4 border-bottom-primary">
+                <div class="hms-form-card card shadow mb-4 border-bottom-primary">
                     <div class="card-header py-3 bg-white">
                         <h6 class="m-0 font-weight-bold text-success">Financials & Pricing</h6>
                     </div>
@@ -248,4 +263,4 @@ function updateSupplierName(select) {
 }
 </script>
 
-<?php include __DIR__ . "/../includes/footer.php"; ?>
+</div></div><?php include __DIR__ . "/../includes/footer.php"; ?>
