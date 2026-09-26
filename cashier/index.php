@@ -77,7 +77,10 @@ if ($result) {
         }
     }
 }
-$todayPayments = $conn->query("SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) AS total FROM payments p WHERE DATE(p.created_at)=CURDATE()");
+$todayPayments = $conn->query("SELECT COALESCE(SUM(p.amount),0) - COALESCE(SUM(CASE WHEN r.status='Approved' THEN r.amount ELSE 0 END),0) AS total
+    FROM payments p
+    LEFT JOIN payment_refunds r ON r.payment_id=p.id
+    WHERE DATE(p.created_at)=CURDATE()");
 $collectedToday = $todayPayments ? (float)($todayPayments->fetch_assoc()['total'] ?? 0) : 0.0;
 
 $cashierId = (int)($_SESSION['user_id'] ?? 0);
