@@ -41,7 +41,16 @@ try{
     $paidRow = $paidStmt->get_result()->fetch_assoc();
     $paidStmt->close();
     $paid = (float)($paidRow['total_paid'] ?? 0);
-    $remaining=max((float)($invoice['total'] ?? 0)-$paid,0);
+    $invoiceTotal=(float)($invoice['total'] ?? 0);
+    $itemTotalStmt=$conn->prepare("SELECT COALESCE(SUM(total),0) AS items_total FROM invoice_items WHERE invoice_id=?");
+    if($itemTotalStmt){
+        $itemTotalStmt->bind_param('i',$id);
+        $itemTotalStmt->execute();
+        $itemTotal=(float)($itemTotalStmt->get_result()->fetch_assoc()['items_total'] ?? 0);
+        $itemTotalStmt->close();
+        if($itemTotal>0) $invoiceTotal=$itemTotal;
+    }
+    $remaining=max($invoiceTotal-$paid,0);
 
     // M-Pesa is recorded manually by receipt code. STK Push is optional
     // and is handled separately from this payment-recording endpoint.
