@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
-require_module_access($conn, 'laboratory', 'approve');
+require_module_access($conn, 'laboratory', 'view');
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];
@@ -11,11 +11,13 @@ $csrfToken=$_SESSION['csrf_token'];
 // Handle Lab Result Submission
 // -------------------------
 if (isset($_POST['save_lab_result'])) {
+    $action = ($_POST['result_action'] ?? 'save');
+    require_module_access($conn, 'laboratory', $action === 'complete' ? 'approve' : 'edit');
     if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) { $error='Invalid security token.'; }
     else {
         $record_id = intval($_POST['record_id']);
         $findings = $_POST['findings'] ?? '';
-        $status = 'Completed';
+        $status = ($action === 'complete') ? 'Completed' : 'Pending';
 
         $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ?");
         $stmt->bind_param("ssi", $findings, $status, $record_id);
