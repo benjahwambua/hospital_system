@@ -6,7 +6,6 @@ require_once __DIR__ . '/../includes/permissions.php';
 require_login();
 require_module_access($conn, 'administration', 'view');
 require_super();
-undefined
 
 if (!has_access_control_tables($conn)) {
     http_response_code(500);
@@ -31,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $del=$conn->prepare("DELETE FROM user_module_access WHERE user_id=?");
             $del->bind_param('i',$uid); $del->execute(); $del->close();
 
-            $ins=$conn->prepare("INSERT INTO user_module_access (user_id,module_id,can_view,can_create,can_edit,can_delete,can_approve) VALUES (?,?,1,?,?,?,?,?)");
+            $ins=$conn->prepare("INSERT INTO user_module_access (user_id,module_id,can_view,can_create,can_edit,can_delete,can_approve) VALUES (?,?,1,?,?,?,?)");
             foreach ($selected as $mid) {
                 $create=!empty($_POST['create'][$mid])?1:0;
                 $edit=!empty($_POST['edit'][$mid])?1:0;
