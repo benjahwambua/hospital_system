@@ -846,15 +846,37 @@ if ($patient_id <= 0) {
     .service-print-table { width:100%; border-collapse:collapse; }
     .service-print-table th { background:#007bff; color:#fff; padding:11px; text-align:left; }
     .service-print-table td { padding:10px; border-bottom:1px solid #eee; }
-    @media print {@page{size:A4 portrait;margin:12mm;}
-        header, footer, nav, aside, .sidebar, .navbar, .dashboard-tabs,
-        .header-section, #clinical, #services, #prescriptions, #billing, #coverage,
-        .main-footer, .service-screen { display:none !important; }
-        body { background:#fff !important; }
-        .service-print-area { display:block !important; }
-        .service-print-card { max-width:none !important; width:100% !important; padding:0 !important; margin:0 !important; }
-        .service-print-table th { background:#007bff !important; color:#fff !important;
-            -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    @media print {
+        @page { size:A4 portrait; margin:12mm; }
+        html, body { background:#fff !important; }
+        body * { visibility:hidden !important; }
+        .service-print-area,
+        .service-print-area * { visibility:visible !important; }
+        .service-print-area {
+            display:block !important;
+            position:absolute !important;
+            left:0 !important;
+            top:0 !important;
+            width:100% !important;
+            margin:0 !important;
+            padding:0 !important;
+            background:#fff !important;
+        }
+        .service-print-card {
+            max-width:none !important;
+            width:100% !important;
+            padding:0 !important;
+            margin:0 !important;
+            box-shadow:none !important;
+        }
+        .service-print-table { width:100% !important; border-collapse:collapse !important; }
+        .service-print-table th {
+            background:#007bff !important;
+            color:#fff !important;
+            -webkit-print-color-adjust:exact;
+            print-color-adjust:exact;
+        }
+        .service-print-table tr { break-inside:avoid; page-break-inside:avoid; }
     }
 
     @media (max-width: 992px) {
