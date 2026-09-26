@@ -782,8 +782,20 @@ function refund_payment($conn, int $paymentId, float $amount, string $reason, st
     if($userId<=0) $userId=(int)($_SESSION['user_id']??0);
 
     $method=$refundMethod==='Original'?(string)$payment['method']:$refundMethod;
+    $method=str_replace(['-','_'],' ',trim($method));
+    if(!in_array(strtolower($method),['cash','mpesa','m pesa','bank','bank transfer','transfer'],true) && $refundMethod!=='Original'){
+        throw new Exception('Invalid refund method.');
+    }
     $reference=trim((string)($reference??''));
     if($reference==='') $reference=null;
+    if($reference!==null){
+        $dup=$conn->prepare("SELECT id FROM payment_refunds WHERE reference=? AND status='Approved' LIMIT 1");
+        if($dup){
+            $dup->bind_param('s',$reference);$dup->execute();
+            if($dup->get_result()->fetch_assoc()){ $dup->close(); throw new Exception('This refund reference has already been used.'); }
+            $dup->close();
+        }
+    }
 
     $ins=$conn->prepare("INSERT INTO payment_refunds (payment_id,invoice_id,patient_id,amount,refund_method,reference,reason,status,refunded_by,created_at) VALUES (?,?,?,?,?,?,?,'Approved',?,NOW())");
     if(!$ins) throw new Exception('Unable to create refund. Run database/financial_core_phase2.sql first.');
