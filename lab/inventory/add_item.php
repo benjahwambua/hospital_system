@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__.'/../../config/config.php'; require_once __DIR__.'/../../includes/session.php'; require_once __DIR__.'/../../includes/auth.php'; require_login(); require_role(['admin','lab']);
+require_once __DIR__.'/../../config/config.php'; require_once __DIR__.'/../../includes/session.php'; require_once __DIR__.'/../../includes/auth.php'; require_login(); require_module_access($conn, 'laboratory', 'create'); require_role(['admin','lab']);
 if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32)); $csrf=$_SESSION['csrf_token']; $error=''; $success='';
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!hash_equals($csrf,(string)($_POST['csrf_token']??'')))$error='Invalid security token.';
