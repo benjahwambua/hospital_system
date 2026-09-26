@@ -1,5 +1,9 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_login();
+require_module_access($conn, 'administration', 'view');
+require_super();
 undefined
 
 if (empty($_SESSION['csrf_token'])) {
@@ -23,6 +27,8 @@ function count_super_users(mysqli $conn): int
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $postAction = isset($_POST['delete_user']) ? 'delete' : 'edit';
+    require_module_access($conn, 'administration', $postAction);
     $postedToken = $_POST['csrf_token'] ?? '';
     if (!hash_equals($csrfToken, $postedToken)) {
         redirect_with_message('Security token mismatch. Please try again.');
