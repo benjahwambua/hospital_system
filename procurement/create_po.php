@@ -142,10 +142,25 @@ $stockRes = null;
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
-?>
+?><style>
+.hms-form-page{padding:26px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 60px)}
+.hms-form-shell{max-width:1450px;margin:0 auto}
+.hms-form-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:21px 24px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:18px}
+.hms-form-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;font-weight:700;color:#6c7a91;margin-bottom:4px}
+.hms-form-hero h1{font-size:24px;font-weight:700;color:#25324a;margin:0 0 5px}.hms-form-hero p{margin:0;color:#718096;font-size:14px}
+.hms-form-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}
+.hms-form-card .card-header{background:#fff;border-bottom:1px solid #edf0f5;padding:16px 20px;color:#25324a;font-weight:700}
+.hms-form-card .card-body{padding:21px}
+.hms-form-page label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667085;margin-bottom:6px}
+.hms-form-page .form-control{border:1px solid #d8dee8;border-radius:8px;background:#fff;color:#344054;min-height:42px;padding:10px 12px}
+.hms-form-page .form-control:focus{border-color:#4c84ff;box-shadow:0 0 0 3px rgba(76,132,255,.10);outline:0}
+.hms-form-page textarea.form-control{min-height:auto}.hms-form-page .btn{border-radius:8px;font-weight:700}
+.hms-form-page hr{border-color:#edf0f5}.hms-form-page .table{margin-bottom:0}.hms-form-page .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
+@media(max-width:767px){.hms-form-page{padding:18px 12px 35px}.hms-form-hero{align-items:flex-start;flex-direction:column}}
+</style>
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="hms-form-page"><div class="hms-form-shell">
+    <div class="hms-form-hero"><div><div class="hms-form-kicker">Procurement · Purchasing</div><h1>Create New Purchase Order</h1><p>Build a purchase order from approved pharmacy and laboratory inventory items.</p></div><a href="purchase_orders.php" class="btn btn-light border">Cancel</a></div><div style="display:none">
         <h2 class="h3 text-gray-800">Create New Purchase Order</h2>
         <a href="purchase_orders.php" class="btn btn-secondary btn-sm">Cancel</a>
     </div>
@@ -156,7 +171,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
     <form method="POST" id="po-form">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-        <div class="card shadow mb-4">
+        <div class="hms-form-card card shadow mb-4">
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6 form-group">
@@ -316,4 +331,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+</div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
