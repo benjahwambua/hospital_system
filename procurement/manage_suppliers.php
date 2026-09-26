@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'procurement', 'view');
 require_role(['admin']);
@@ -47,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msgType = 'danger';
     } else {
         $supplierId = (int)($_POST['supplier_id'] ?? 0);
+        require_module_access($conn, 'procurement', $supplierId > 0 ? 'edit' : 'create');
         $name = trim((string)($_POST['name'] ?? ''));
         $contact = trim((string)($_POST['contact_person'] ?? ''));
         $email = trim((string)($_POST['email'] ?? ''));
