@@ -142,7 +142,7 @@ include __DIR__ . '/../includes/sidebar.php';
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="h4 text-gray-800 font-weight-bold">Quick-Edit Staff Table</h2>
-            <a href="add_users.php" class="btn btn-primary btn-sm px-3 shadow-sm">Add New User</a>
+undefined
         </div>
 
         <?php if(isset($_GET['msg'])): ?>
