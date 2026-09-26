@@ -1,42 +1,5 @@
 <?php
-require_once "../includes/config.php";
-require_once "../includes/header.php";
-require_once "../includes/sidebar.php";
-
-// Fetch admissions
-$sql = "SELECT m.id, p.full_name, m.admission_date, m.ward, m.status 
-        FROM maternity_admissions m
-        JOIN patients p ON p.id = m.patient_id
-        ORDER BY m.id DESC";
-
-$result = $conn->query($sql);
-?>
-<div class="page-header">
-    <h1>Maternity Admissions</h1>
-    <a href="new_admission.php" class="btn btn-primary">New Admission</a>
-</div>
-
-<table class="table">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Patient</th>
-            <th>Date</th>
-            <th>Ward</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php while ($row = $result->fetch_assoc()): ?>
-        <tr>
-            <td><?php echo $row['id']; ?></td>
-            <td><?php echo htmlspecialchars($row['full_name']); ?></td>
-            <td><?php echo $row['admission_date']; ?></td>
-            <td><?php echo htmlspecialchars($row['ward']); ?></td>
-            <td><?php echo htmlspecialchars($row['status']); ?></td>
-        </tr>
-        <?php endwhile; ?>
-    </tbody>
-</table>
-
-<?php require_once "../includes/footer.php"; ?>
+require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_login();require_module_access($conn,'maternity','view');$canCreate=can_module_action($conn,'maternity','create');
+$r=$conn->query("SELECT a.id,a.patient_id,a.admission_date,a.ward,a.status,a.note,p.full_name,p.patient_number FROM maternity_admissions a JOIN patients p ON p.id=a.patient_id ORDER BY a.id DESC LIMIT 200");
+include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';?>
+<div class="main-content"><div class="container-fluid pt-4"><div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h4 mb-1 text-gray-800"><i class="fas fa-procedures text-primary mr-2"></i>Maternity Admissions</h2><p class="text-muted mb-0">Track maternal admissions separately from the general inpatient workflow.</p></div><?php if($canCreate):?><a href="new_admission.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i>New Admission</a><?php endif;?></div><div class="card shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Patient</th><th>Admission Date</th><th>Ward</th><th>Status</th><th>Notes</th></tr></thead><tbody><?php if($r&&$r->num_rows):while($a=$r->fetch_assoc()):?><tr><td><strong><?=htmlspecialchars($a['full_name'])?></strong><br><small><?=htmlspecialchars($a['patient_number'])?></small></td><td><?=htmlspecialchars($a['admission_date'])?></td><td><?=htmlspecialchars($a['ward'])?></td><td><span class="badge badge-<?=strtolower($a['status']??'')==='admitted'?'success':'secondary'?>"><?=htmlspecialchars($a['status']??'')?></span></td><td><?=htmlspecialchars($a['note']??'')?></td></tr><?php endwhile;else:?><tr><td colspan="5" class="text-center text-muted py-5">No maternity admissions found.</td></tr><?php endif;?></tbody></table></div></div></div></div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
