@@ -133,6 +133,7 @@ if ($patient_id <= 0) {
 
     // Handle Next Appointment Booking
     if(isset($_POST['book_appointment'])) {
+        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to book appointments.'); }
         $app_date = $_POST['appointment_date'];
         $app_time = $_POST['appointment_time'];
         $reason = $_POST['reason'] ?? 'Follow-up';
@@ -148,6 +149,7 @@ if ($patient_id <= 0) {
 
     // Handle vitals retake / edit
     if (isset($_POST['save_vitals'])) {
+        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to record vitals.'); }
         $vitalId = max(0, (int)($_POST['vital_id'] ?? 0));
         $temperature = trim((string)($_POST['temperature'] ?? ''));
         $bp = trim((string)($_POST['bp'] ?? ''));
@@ -191,6 +193,7 @@ if ($patient_id <= 0) {
 
     // Handle Prescription with Price Override
     if(isset($_POST['add_prescription_stock'])) {
+        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to prescribe medicines.'); }
         $medicine_id = intval($_POST['medicine_id']);
         $qty = intval($_POST['quantity']);
         $price_override = floatval($_POST['selling_price']); 
@@ -284,6 +287,7 @@ if ($patient_id <= 0) {
 
     // Handle Service/Billing Item Add
     if(isset($_POST['add_service'])){
+        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to add services.'); }
         $service_id=intval($_POST['service_id']);
         $price=floatval($_POST['price']);
         if($service_id>0 && $price>=0){
@@ -330,6 +334,7 @@ if ($patient_id <= 0) {
 
     // Existing Lab Request Handler
     if(isset($_POST['add_lab_request'])){
+        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to order laboratory services.'); }
         $service_id=intval($_POST['service_id']);
         $price=floatval($_POST['price']);
         $instructions=$_POST['lab_instructions'] ?? '';
@@ -362,6 +367,7 @@ if ($patient_id <= 0) {
 
     // Handle External Referral
     if(isset($_POST['add_referral'])){
+        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to create referrals.'); }
         $referred_facility = $_POST['referred_facility'] ?? '';
         $referred_doctor = $_POST['referred_doctor'] ?? '';
         $specialty = $_POST['specialty'] ?? '';
