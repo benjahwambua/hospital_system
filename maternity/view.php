@@ -1,149 +1,16 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../includes/session.php';
-require_login();
-
-$id = intval($_GET['id'] ?? 0);
-if (!$id) die('Invalid ID');
-
-$stmt = $conn->prepare("SELECT m.*, p.full_name, p.hospital_number FROM maternity m LEFT JOIN patients p ON p.id=m.patient_id WHERE m.id=?");
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$m = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-if (!$m) die('Record not found');
-
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-?>
-
-<div class="main">
-  <div class="page-title">Maternity — <?= htmlspecialchars($m['full_name']) ?></div>
-
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <strong><?= htmlspecialchars($m['full_name']) ?></strong><br>
-        HN: <?= htmlspecialchars($m['hospital_number']) ?><br>
-        ANC#: <?= htmlspecialchars($m['anc_number']) ?>
-      </div>
-      <div>
-        <a class="btn" href="/hospital_system/patients/print_maternity_summary.php?patient_id=<?= $m['patient_id'] ?>" target="_blank">Print Summary</a>
-      </div>
-    </div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:1fr 380px;gap:18px;margin-top:18px;">
-    <div>
-      <div class="card">
-        <h4>Record</h4>
-        <table class="table">
-          <tr><td>Gravida</td><td><?= htmlspecialchars($m['gravida']) ?></td></tr>
-          <tr><td>Parity</td><td><?= htmlspecialchars($m['parity']) ?></td></tr>
-          <tr><td>LMP</td><td><?= htmlspecialchars($m['last_menstrual_period']) ?></td></tr>
-          <tr><td>EDD</td><td><?= htmlspecialchars($m['expected_delivery']) ?></td></tr>
-          <tr><td>Notes</td><td><?= nl2br(htmlspecialchars($m['antenatal_notes'])) ?></td></tr>
-        </table>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <h4>Start Labour / Add Delivery Details</h4>
-        <form action="save_delivery.php" method="post">
-          <input type="hidden" name="maternity_id" value="<?= $m['id'] ?>">
-          <label>Delivery time</label>
-          <input type="datetime-local" name="delivery_time" class="form-control">
-
-          <label style="margin-top:8px">Delivery mode</label>
-          <select name="delivery_mode" class="form-control">
-            <option>Normal</option>
-            <option>CS</option>
-            <option>Assisted</option>
-          </select>
-
-          <label style="margin-top:8px">Primary Doctor (user id)</label>
-          <input name="primary_doctor" class="form-control" placeholder="doctor user id">
-
-          <label style="margin-top:8px">Mother condition</label>
-          <input name="mother_condition" class="form-control">
-
-          <label style="margin-top:8px">Complications / Notes</label>
-          <textarea name="notes" class="form-control"></textarea>
-
-          <div style="margin-top:10px"><button class="btn" type="submit">Save Delivery</button></div>
-        </form>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <h4>Add Baby</h4>
-        <form action="save_baby.php" method="post">
-          <input type="hidden" name="maternity_id" value="<?= $m['id'] ?>">
-          <label>Baby Number</label>
-          <input name="baby_number" class="form-control" value="1">
-
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <div style="flex:1"><label>Gender</label><input name="gender" class="form-control"></div>
-            <div style="flex:1"><label>Weight (kg)</label><input name="weight" class="form-control" type="number" step="0.01"></div>
-            <div style="flex:1"><label>APGAR</label><input name="apgar" class="form-control"></div>
-          </div>
-
-          <label style="margin-top:8px">Notes</label>
-          <textarea name="notes" class="form-control"></textarea>
-
-          <div style="margin-top:10px"><button class="btn" type="submit">Add Baby</button></div>
-        </form>
-      </div>
-
-    </div>
-
-    <div>
-      <div class="card">
-        <h5>Visit History</h5>
-        <?php
-        $vis = $conn->query("SELECT * FROM maternity_visits WHERE maternity_id={$m['id']} ORDER BY created_at DESC LIMIT 20");
-        if ($vis->num_rows === 0) echo '<div class="muted">No visits</div>';
-        else {
-          echo '<table class="table"><thead><tr><th>Date</th><th>Type</th><th>BP</th><th>FHR</th></tr></thead><tbody>';
-          while ($v = $vis->fetch_assoc()) {
-            echo '<tr><td>'.htmlspecialchars($v['created_at']).'</td><td>'.htmlspecialchars($v['visit_type']).'</td><td>'.htmlspecialchars($v['bp']).'</td><td>'.htmlspecialchars($v['fetal_heart_rate']).'</td></tr>';
-          }
-          echo '</tbody></table>';
-        }
-        ?>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <h5>Delivery History</h5>
-        <?php
-        $d = $conn->query("SELECT * FROM maternity_delivery WHERE maternity_id={$m['id']} ORDER BY created_at DESC LIMIT 5");
-        if ($d->num_rows === 0) echo '<div class="muted">No deliveries recorded</div>';
-        else {
-          echo '<ul style="list-style:none;padding:0">';
-          while ($r2 = $d->fetch_assoc()) {
-            echo '<li style="padding:8px;border-bottom:1px solid #eee;"><strong>'.htmlspecialchars($r2['delivery_mode']).'</strong><div style="font-size:13px;color:#666;">'.htmlspecialchars($r2['created_at']).' — '.htmlspecialchars($r2['mother_condition']).'</div></li>';
-          }
-          echo '</ul>';
-        }
-        ?>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <h5>Babies</h5>
-        <?php
-        $bb = $conn->query("SELECT * FROM maternity_baby WHERE maternity_id={$m['id']} ORDER BY created_at ASC");
-        if ($bb->num_rows === 0) echo '<div class="muted">No baby records</div>';
-        else {
-          echo '<table class="table"><thead><tr><th>#</th><th>Gender</th><th>Weight</th><th>APGAR</th></tr></thead><tbody>';
-          while ($b = $bb->fetch_assoc()) {
-            echo '<tr><td>'.htmlspecialchars($b['baby_number']).'</td><td>'.htmlspecialchars($b['gender']).'</td><td>'.htmlspecialchars($b['weight']).'</td><td>'.htmlspecialchars($b['apgar']).'</td></tr>';
-          }
-          echo '</tbody></table>';
-        }
-        ?>
-      </div>
-
-    </div>
-  </div>
-
-</div>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_login();require_module_access($conn,'maternity','view');
+$id=max(0,(int)($_GET['id']??0));if(!$id){header('Location:index.php');exit;}
+$s=$conn->prepare("SELECT m.*,p.id patient_id,p.full_name,p.patient_number,p.phone,p.date_of_birth FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
+$vis=$conn->prepare("SELECT * FROM maternity_visits WHERE maternity_id=? ORDER BY created_at DESC LIMIT 20");$vis->bind_param('i',$id);$vis->execute();$visits=$vis->get_result();$vis->close();
+$del=$conn->prepare("SELECT * FROM maternity_delivery WHERE maternity_id=? ORDER BY created_at DESC LIMIT 10");$del->bind_param('i',$id);$del->execute();$deliveries=$del->get_result();$del->close();
+$bab=$conn->prepare("SELECT * FROM maternity_baby WHERE maternity_id=? ORDER BY created_at DESC LIMIT 20");$bab->bind_param('i',$id);$bab->execute();$babies=$bab->get_result();$bab->close();
+$canCreate=can_module_action($conn,'maternity','create');$canEdit=can_module_action($conn,'maternity','edit');
+include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';?>
+<div class="main-content"><div class="container-fluid pt-4">
+<div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h4 mb-1 text-gray-800"><i class="fas fa-baby text-primary mr-2"></i>Maternity Patient Record</h2><p class="text-muted mb-0"><?=htmlspecialchars($m['full_name'])?> · <?=htmlspecialchars($m['patient_number'])?> · ANC <?=htmlspecialchars($m['anc_number'])?></p></div><div><?php if($canEdit):?><a href="edit.php?id=<?=$id?>" class="btn btn-outline-primary mr-2"><i class="fas fa-edit mr-1"></i>Edit ANC Profile</a><?php endif;?><a href="../patients/patient_dashboard.php?id=<?=$m['patient_id']?>" class="btn btn-light">Patient Dashboard</a></div></div>
+<div class="row mb-4"><div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body"><small class="text-muted">ANC Number</small><div class="h5 mb-0"><?=htmlspecialchars($m['anc_number'])?></div></div></div></div><div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body"><small class="text-muted">Gravida / Parity</small><div class="h5 mb-0"><?=htmlspecialchars((string)$m['gravida'])?> / <?=htmlspecialchars((string)$m['parity'])?></div></div></div></div><div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body"><small class="text-muted">LMP</small><div class="h5 mb-0"><?=!empty($m['last_menstrual_period'])?htmlspecialchars(date('d M Y',strtotime($m['last_menstrual_period']))):'—'?></div></div></div></div><div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body"><small class="text-muted">Expected Delivery</small><div class="h5 mb-0 text-primary"><?=!empty($m['expected_delivery'])?htmlspecialchars(date('d M Y',strtotime($m['expected_delivery']))):'—'?></div></div></div></div></div>
+<div class="card shadow-sm mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center"><strong>Maternal Profile</strong><div><?php if($canCreate):?><a href="add.php?id=<?=$id?>" class="btn btn-sm btn-primary mr-1">New Visit</a><a href="deliveries.php" class="btn btn-sm btn-outline-primary">Record Delivery</a><?php endif;?></div></div><div class="card-body"><div class="row"><div class="col-md-4"><small class="text-muted d-block">Patient</small><strong><?=htmlspecialchars($m['full_name'])?></strong></div><div class="col-md-4"><small class="text-muted d-block">Phone</small><?=htmlspecialchars($m['phone']??'—')?></div><div class="col-md-4"><small class="text-muted d-block">Date of Birth</small><?=!empty($m['date_of_birth'])?htmlspecialchars($m['date_of_birth']):'—'?></div></div><?php if(!empty($m['antenatal_notes'])):?><hr><small class="text-muted d-block">Antenatal Notes</small><div><?=nl2br(htmlspecialchars($m['antenatal_notes']))?></div><?php endif;?></div></div>
+<div class="row"><div class="col-lg-8 mb-4"><div class="card shadow-sm h-100"><div class="card-header bg-white d-flex justify-content-between"><strong>Clinical Visits</strong><a href="visit_history.php?id=<?=$id?>" class="small">View all</a></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Date</th><th>Type</th><th>BP</th><th>Weight</th><th>FHR</th><th>Notes</th></tr></thead><tbody><?php if($visits&&$visits->num_rows):while($v=$visits->fetch_assoc()):?><tr><td><?=htmlspecialchars(date('d M Y H:i',strtotime($v['created_at'])))?></td><td><span class="badge badge-info"><?=htmlspecialchars($v['visit_type'])?></span></td><td><?=htmlspecialchars($v['bp'])?></td><td><?=htmlspecialchars($v['weight'])?></td><td><?=htmlspecialchars($v['fetal_heart_rate'])?></td><td><?=nl2br(htmlspecialchars($v['notes']))?></td></tr><?php endwhile;else:?><tr><td colspan="6" class="text-center text-muted py-4">No visits recorded.</td></tr><?php endif;?></tbody></table></div></div></div></div>
+<div class="col-lg-4 mb-4"><div class="card shadow-sm mb-4"><div class="card-header bg-white"><strong>Deliveries</strong></div><div class="card-body p-0"><table class="table table-sm mb-0"><tbody><?php if($deliveries&&$deliveries->num_rows):while($d=$deliveries->fetch_assoc()):?><tr><td><?=htmlspecialchars(date('d M Y',strtotime($d['delivery_time']??$d['created_at'])))?></td><td><?=htmlspecialchars($d['delivery_mode'])?></td></tr><?php endwhile;else:?><tr><td class="text-muted">No deliveries recorded.</td></tr><?php endif;?></tbody></table></div></div><div class="card shadow-sm"><div class="card-header bg-white"><strong>Newborns</strong></div><div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>#</th><th>Sex</th><th>Weight</th><th>APGAR</th></tr></thead><tbody><?php if($babies&&$babies->num_rows):while($b=$babies->fetch_assoc()):?><tr><td><?=htmlspecialchars($b['baby_number'])?></td><td><?=htmlspecialchars($b['gender'])?></td><td><?=htmlspecialchars($b['weight'])?></td><td><?=htmlspecialchars($b['apgar'])?></td></tr><?php endwhile;else:?><tr><td colspan="4" class="text-center text-muted">No newborn records.</td></tr><?php endif;?></tbody></table></div></div></div></div>
+</div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
