@@ -52,6 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         try {
             $patientId = max(0, (int)($_POST['patient_id'] ?? 0));
             $actionType = $_POST['action'];
+            if ($patientId <= 0 || $maternityId <= 0) throw new Exception('A registered maternity patient is required.');
+            $patientCheck = $conn->prepare("SELECT m.patient_id FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND m.patient_id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");
+            if (!$patientCheck) throw new Exception('Unable to validate maternity patient.');
+            $patientCheck->bind_param('ii', $maternityId, $patientId);
+            $patientCheck->execute();
+            $validMaternityPatient = $patientCheck->get_result()->fetch_assoc();
+            $patientCheck->close();
+            if (!$validMaternityPatient) throw new Exception('This patient is not registered for maternity care.');
             $visitType = trim((string)($_POST['visit_type'] ?? 'ANC'));
             $bp = trim((string)($_POST['bp'] ?? ''));
             $temp = trim((string)($_POST['temp'] ?? ''));
@@ -213,7 +221,7 @@ $previousVisit = null;
 $nextAppointment = null;
 $recentVisits = null;
 if ($maternityId > 0) {
-    $stmt = $conn->prepare('SELECT m.*, p.id as pid, p.full_name, p.patient_number FROM maternity m JOIN patients p ON p.id = m.patient_id WHERE m.id = ? LIMIT 1');
+    $stmt = $conn->prepare("SELECT m.*, p.id as pid, p.full_name, p.patient_number FROM maternity m JOIN patients p ON p.id = m.patient_id WHERE m.id = ? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");
     $stmt->bind_param('i', $maternityId);
     $stmt->execute();
     $record = $stmt->get_result()->fetch_assoc();
