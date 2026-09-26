@@ -4,6 +4,11 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'clinical', 'view');
+$canClinicalCreate=can_module_action($conn,'clinical','create');
+$canLabView=can_module_action($conn,'laboratory','view');
+$canRadiologyView=can_module_action($conn,'radiology','view');
+$canPharmacyView=can_module_action($conn,'pharmacy','view');
+$canAdministrationView=can_module_action($conn,'administration','view');
 
 $todayVisits=0; $inProgress=0; $admitted=0; $pendingLab=0; $pendingRad=0; $pendingRx=0;
 if (hms_visits_available($conn)) {
@@ -62,9 +67,9 @@ include __DIR__ . '/../includes/sidebar.php';
     <a class="metric-card" href="../patients/appointments.php"><div class="metric-top"><span>Today's Visits</span><span class="metric-icon"><i class="fas fa-users"></i></span></div><div class="metric-value"><?= $todayVisits ?></div></a>
     <a class="metric-card" href="../patients/patient_list.php"><div class="metric-top"><span>In Progress</span><span class="metric-icon"><i class="fas fa-user-md"></i></span></div><div class="metric-value"><?= $inProgress ?></div></a>
     <a class="metric-card" href="ward_management.php"><div class="metric-top"><span>Admitted</span><span class="metric-icon"><i class="fas fa-bed"></i></span></div><div class="metric-value"><?= $admitted ?></div></a>
-    <a class="metric-card" href="../lab/lab_results.php"><div class="metric-top"><span>Pending Lab</span><span class="metric-icon"><i class="fas fa-vial"></i></span></div><div class="metric-value"><?= $pendingLab ?></div></a>
-    <a class="metric-card" href="../radiology/radiology_requests.php"><div class="metric-top"><span>Pending Radiology</span><span class="metric-icon"><i class="fas fa-x-ray"></i></span></div><div class="metric-value"><?= $pendingRad ?></div></a>
-    <a class="metric-card" href="../pharmacy/dispensing_queue.php"><div class="metric-top"><span>Pending Pharmacy</span><span class="metric-icon"><i class="fas fa-pills"></i></span></div><div class="metric-value"><?= $pendingRx ?></div></a>
+    <?php if($canLabView): ?><a class="metric-card" href="../lab/lab_results.php"><div class="metric-top"><span>Pending Lab</span><span class="metric-icon"><i class="fas fa-vial"></i></span></div><div class="metric-value"><?= $pendingLab ?></div></a>
+    <?php if($canRadiologyView): ?><a class="metric-card" href="../radiology/radiology_requests.php"><div class="metric-top"><span>Pending Radiology</span><span class="metric-icon"><i class="fas fa-x-ray"></i></span></div><div class="metric-value"><?= $pendingRad ?></div></a>
+    <?php if($canPharmacyView): ?><a class="metric-card" href="../pharmacy/dispensing_queue.php"><div class="metric-top"><span>Pending Pharmacy</span><span class="metric-icon"><i class="fas fa-pills"></i></span></div><div class="metric-value"><?= $pendingRx ?></div></a><?php endif; ?>
   </div>
 
   <div class="dashboard-grid">
@@ -77,9 +82,9 @@ include __DIR__ . '/../includes/sidebar.php';
           <div class="workflow-step"><div class="num">3</div><h3>Clinical Care</h3><p>Document assessment, orders, prescriptions, investigations and follow-up.</p><span class="badge badge-info">Patient Dashboard</span></div>
         </div>
         <div class="queue-grid">
-          <div class="queue-item"><strong><?= $pendingLab ?></strong><span>Laboratory items awaiting completion</span></div>
-          <div class="queue-item"><strong><?= $pendingRad ?></strong><span>Radiology items awaiting completion</span></div>
-          <div class="queue-item"><strong><?= $pendingRx ?></strong><span>Prescriptions awaiting dispensing</span></div>
+          <?php if($canLabView): ?><div class="queue-item"><strong><?= $pendingLab ?></strong><span>Laboratory items awaiting completion</span></div><?php endif; ?>
+          <?php if($canRadiologyView): ?><div class="queue-item"><strong><?= $pendingRad ?></strong><span>Radiology items awaiting completion</span></div><?php endif; ?>
+          <?php if($canPharmacyView): ?><div class="queue-item"><strong><?= $pendingRx ?></strong><span>Prescriptions awaiting dispensing</span></div><?php endif; ?>
         </div>
       </div>
     </div>
