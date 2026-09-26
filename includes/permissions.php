@@ -57,7 +57,8 @@ function can_module_action(mysqli $conn, string $moduleKey, string $action='view
     $column = [
         'view'=>'can_view','create'=>'can_create','edit'=>'can_edit',
         'delete'=>'can_delete','approve'=>'can_approve'
-    ][$action] ?? 'can_view';
+    ][$action] ?? null;
+    if ($column === null) return false;
     $uid=(int)($_SESSION['user_id'] ?? 0);
     $role=strtolower((string)($_SESSION['role'] ?? ''));
     if ($uid<=0) return false;
@@ -66,7 +67,7 @@ function can_module_action(mysqli $conn, string $moduleKey, string $action='view
         $countStmt->bind_param('i',$uid); $countStmt->execute();
         $n=(int)($countStmt->get_result()->fetch_assoc()['n'] ?? 0); $countStmt->close();
         if ($n===0) {
-            if ($action==='view') return can_access_module($conn,$moduleKey);
+            // Preserve legacy role-based access until explicit assignments are created.
             return can_access_module($conn,$moduleKey);
         }
     }
@@ -76,8 +77,24 @@ function can_module_action(mysqli $conn, string $moduleKey, string $action='view
     $stmt->execute();
     $row=$stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return !empty($row['allowed']);
+    $allowed = !empty($row['allowed']);
+    // Every non-view action requires module visibility as well.
+    if ($allowed && $action !== 'view') {
+        $viewStmt=$conn->prepare("SELECT can_view FROM user_module_access uma JOIN access_modules am ON am.id=uma.module_id WHERE uma.user_id=? AND am.module_key=? AND am.active=1 LIMIT 1");
+        if (!$viewStmt) return false;
+        $viewStmt->bind_param('is',$uid,$moduleKey);
+        $viewStmt->execute();
+        $viewRow=$viewStmt->get_result()->fetch_assoc();
+        $viewStmt->close();
+        $allowed=!empty($viewRow['can_view']);
+    }
+    return $allowed;
 }
+
+function can_create(mysqli $conn, string $moduleKey): bool { return can_module_action($conn,$moduleKey,'create'); }
+function can_edit(mysqli $conn, string $moduleKey): bool { return can_module_action($conn,$moduleKey,'edit'); }
+function can_delete(mysqli $conn, string $moduleKey): bool { return can_module_action($conn,$moduleKey,'delete'); }
+function can_approve(mysqli $conn, string $moduleKey): bool { return can_module_action($conn,$moduleKey,'approve'); }
 
 function require_module_access(mysqli $conn, string $moduleKey, string $action='view'): void {
     if (!can_module_action($conn,$moduleKey,$action)) {
