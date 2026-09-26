@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login(); 
 require_once __DIR__ . '/../includes/auth.php'; 
+require_module_access($conn, 'finance_admin', 'create');
 require_role(['admin','accountant']); 
 
 include __DIR__ . '/../includes/header.php'; 
