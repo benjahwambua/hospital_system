@@ -3,6 +3,8 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_module_access($conn, 'pharmacy', 'edit');
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) { die('Invalid security token.'); }
 
 /* Get medicine ID */
 $id = intval($_GET['id'] ?? 0);
@@ -46,6 +48,7 @@ include __DIR__ . '/../includes/sidebar.php';
     <?php endif; ?>
 
     <form method="POST" class="form-card form-compact">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
         <label>Medicine Name</label>
         <input type="text" value="<?= htmlspecialchars($medicine['drug_name']) ?>" readonly>
 
