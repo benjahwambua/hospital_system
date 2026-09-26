@@ -2,12 +2,14 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'radiology', 'view');
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token']; $message='';
 $hasVisit=$conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'") && $conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'")->num_rows>0;
 
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_radiology_result'])){
+ require_module_access($conn, 'radiology', 'approve');
  if(!hash_equals($csrfToken,$_POST['csrf_token']??'')){ $message='Invalid security token.'; }
  else{
   $id=(int)($_POST['record_id']??0); $findings=trim($_POST['findings']??'');
@@ -33,7 +35,7 @@ include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sid
 <?php if($jobs && $jobs->num_rows): while($j=$jobs->fetch_assoc()): ?><tr>
 <td><?=htmlspecialchars($j['created_at'])?></td><td><strong><?=htmlspecialchars($j['full_name'])?></strong><br><small><?=htmlspecialchars($j['patient_number'])?></small></td>
 <td><?=htmlspecialchars($j['visit_number']??'Legacy')?></td><td><?=htmlspecialchars($j['service_name'])?><br><span class="badge badge-<?=($j['status']==='Completed'?'success':'warning')?>"><?=htmlspecialchars($j['status']??'Pending')?></span></td>
-<form method="post"><td><textarea name="findings" class="form-control" rows="2" placeholder="Radiologist findings..."><?=htmlspecialchars($j['results']??'')?></textarea></td><td><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="record_id" value="<?=$j['id']?>"><button name="save_radiology_result" class="btn btn-sm btn-success">Save & Close</button></td></form>
+<form method="post"><td><textarea name="findings" class="form-control" rows="2" placeholder="Radiologist findings..."><?=htmlspecialchars($j['results']??'')?></textarea></td><td><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="record_id" value="<?=$j['id']?>"><?php if(can_approve($conn, 'radiology')): ?><button name="save_radiology_result" class="btn btn-sm btn-success">Save & Close</button><?php else: ?><span class="text-muted small">Approval permission required</span><?php endif; ?></td></form>
 </tr><?php endwhile; else: ?><tr><td colspan="6" class="text-center text-muted py-4">No radiology orders found.</td></tr><?php endif; ?>
 </tbody></table></div></div></div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
