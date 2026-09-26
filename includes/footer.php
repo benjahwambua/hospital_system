@@ -3,6 +3,8 @@
 ?>
 </main>
 </div>
+<!-- Final HMS design layer: loaded after page-level styles so shared controls remain visually consistent. -->
+<link rel="stylesheet" href="<?php echo $ASSETS_PATH; ?>/css/style.css">
 <footer class="site-footer">
   <div class="footer-flex">
     <div class="footer-brand">
