@@ -5,6 +5,8 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'clinical', 'edit');
 require_role(['admin','doctor','nurse']);
+require_once __DIR__ . '/../helpers/billing.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); echo json_encode(['success'=>false,'message'=>'Invalid security token.']); exit; }
 
 $response = ['success'=>false,'message'=>'Invalid request'];
 
@@ -20,15 +22,13 @@ if($_SERVER['REQUEST_METHOD']=='POST'){
             $stmt->close();
 
             if($charge>0){
-                $stmt = $conn->prepare("INSERT INTO billing(patient_id,item,amount,paid,created_at) VALUES(?,?,?,0,NOW())");
-                $item = "Treatment: $treatment";
-                $stmt->bind_param("isd",$patient_id,$item,$charge);
-                $stmt->execute();
-                $stmt->close();
+                $visitId=get_or_create_current_visit($conn,$patient_id,'Outpatient','Clinical');
+                $invoiceId=get_or_create_visit_invoice($conn,$patient_id,$visitId);
+                $itemId=add_invoice_item($conn,$invoiceId,"Treatment: ".$treatment,1,$charge,'treatment',null);
+                post_invoice_journal($conn,$invoiceId,$patient_id,$charge,'Clinical treatment',$itemId);
             }
-
             $response['success']=true;
-            $response['message']="Treatment saved & charged successfully.";
+            $response['message']=$charge>0?"Treatment saved and added to the central invoice.":"Treatment saved successfully.";
         }else{
             $response['message']="Failed to save treatment.";
         }
