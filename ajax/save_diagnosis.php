@@ -5,6 +5,8 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'clinical', 'edit');
 require_role(['admin','doctor']);
+require_once __DIR__ . '/../helpers/billing.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); echo json_encode(['success'=>false,'message'=>'Invalid security token.']); exit; }
 
 $response = ['success'=>false,'message'=>'Invalid request'];
 
@@ -21,13 +23,12 @@ if($_SERVER['REQUEST_METHOD']=='POST'){
         if($stmt->execute()){
             $stmt->close();
 
-            // Add billing if procedure charge exists
             if($procedure_charge>0){
-                $stmt = $conn->prepare("INSERT INTO billing(patient_id,item,amount,paid,created_at) VALUES(?,?,?,0,NOW())");
-                $item = "Procedure: $procedures";
-                $stmt->bind_param("isd",$patient_id,$item,$procedure_charge);
-                $stmt->execute();
-                $stmt->close();
+                $visitId=get_or_create_current_visit($conn,$patient_id,'Outpatient','Clinical');
+                $invoiceId=get_or_create_visit_invoice($conn,$patient_id,$visitId);
+                $description=$procedures!=='' ? "Procedure: ".$procedures : "Clinical procedure";
+                $itemId=add_invoice_item($conn,$invoiceId,$description,1,$procedure_charge,'procedure',null);
+                post_invoice_journal($conn,$invoiceId,$patient_id,$procedure_charge,'Clinical procedure',$itemId);
             }
 
             $response['success']=true;
