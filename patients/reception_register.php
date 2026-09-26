@@ -123,6 +123,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        // Walk-in treatment is never a maternity registration. Maternity/ANC/PNC
+        // patients must go through full registration so a proper maternity record exists.
+        if ($isWalkin && in_array($clinicalType, $genderRestrictedDepartments, true)) {
+            $errors[] = 'Walk-in treatment cannot be registered as Maternity, ANC or PNC. Please use Full Registration for maternity care.';
+        }
+    }
+
+    if (!$errors) {
         $conn->begin_transaction();
 
         try {
@@ -408,7 +416,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                                     <?php foreach (['Primary Services' => ['General' => 'General Consultation', 'Emergency' => 'Emergency / Trauma', 'OPD' => 'OPD (Outpatient Department)'], 'Maternity Services' => ['Maternity' => 'Maternity Unit', 'ANC' => 'Antenatal Care (ANC)', 'PNC' => 'Postnatal Care (PNC)'], 'Specialty Services' => ['Immunization' => 'Immunization', 'Family Planning' => 'Family Planning', 'SGBV' => 'SGBV (Gender-Based Violence)', 'CCC' => 'Comprehensive Care Clinic (CCC)', 'Nutrition' => 'Nutrition Services', 'Dental' => 'Dental Services', 'Physiotherapy' => 'Physiotherapy / Rehabilitation']] as $groupLabel => $options): ?>
                                         <optgroup label="<?= htmlspecialchars($groupLabel) ?>">
                                             <?php foreach ($options as $value => $label): ?>
-                                                <option value="<?= htmlspecialchars($value) ?>" <?= (($_POST['clinic_category'] ?? 'General') === $value) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                                                <option value="<?= htmlspecialchars($value) ?>" data-maternity="<?= in_array($value, ['Maternity','ANC','PNC'], true) ? '1' : '0' ?>" <?= (($_POST['clinic_category'] ?? 'General') === $value) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                                             <?php endforeach; ?>
                                         </optgroup>
                                     <?php endforeach; ?>
@@ -510,6 +518,18 @@ function checkMaternity(val) {
 }
 
 function toggleMode(mode) {
+    const clinicalTypeSelect = document.getElementById('clinicalTypeSelect');
+    if (clinicalTypeSelect) {
+        Array.from(clinicalTypeSelect.options).forEach(function(option) {
+            const isMaternity = option.getAttribute('data-maternity') === '1';
+            option.disabled = mode === 'walkin' && isMaternity;
+        });
+        if (mode === 'walkin' && ['Maternity','ANC','PNC'].includes(clinicalTypeSelect.value)) {
+            clinicalTypeSelect.value = 'General';
+        }
+        checkMaternity(clinicalTypeSelect.value);
+    }
+
     const nokSection = document.getElementById('fullRegistrationFields');
     const idExtraFields = document.getElementById('idExtraFields');
     const genderField = document.getElementById('genderField');
