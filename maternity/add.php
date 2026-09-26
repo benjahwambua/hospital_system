@@ -149,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $d->bind_param('i',$drugId);$d->execute();$drug=$d->get_result()->fetch_assoc();$d->close();
                         if(!$drug) throw new Exception('Invalid maternity medicine selected.');
                         $drugPrice=(float)$drug['selling_price'];
+                        $drugQty = 1;
                         $visitId = $visitId ?? get_or_create_current_visit($conn,$patientId,'Outpatient','Maternity');
                         $instructions = trim((string)($_POST['drug_instructions'][$idx] ?? 'As directed'));
                         $prescriptionId = 0;
@@ -156,12 +157,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $pstmt=$conn->prepare("INSERT INTO prescriptions (patient_id,medicine_id,quantity,unit_price,invoice_id,visit_id,frequency,created_at) VALUES (?,?,?,?,?,?,?,NOW())");
                             if(!$pstmt) throw new Exception('Unable to prepare maternity prescription.');
                             $zeroInvoice=0;
-                            $pstmt->bind_param('iiidiis',$patientId,$drugId,1,$drugPrice,$zeroInvoice,$visitId,$instructions);
+                            $pstmt->bind_param('iiidiis',$patientId,$drugId,$drugQty,$drugPrice,$zeroInvoice,$visitId,$instructions);
                         } else {
                             $pstmt=$conn->prepare("INSERT INTO prescriptions (patient_id,medicine_id,quantity,unit_price,invoice_id,frequency,created_at) VALUES (?,?,?,?,?,?,NOW())");
                             if(!$pstmt) throw new Exception('Unable to prepare maternity prescription.');
                             $zeroInvoice=0;
-                            $pstmt->bind_param('iiidis',$patientId,$drugId,1,$drugPrice,$zeroInvoice,$instructions);
+                            $pstmt->bind_param('iiidis',$patientId,$drugId,$drugQty,$drugPrice,$zeroInvoice,$instructions);
                         }
                         if(!$pstmt->execute()) { $err=$pstmt->error; $pstmt->close(); throw new Exception('Unable to save maternity prescription: '.$err); }
                         $prescriptionId=(int)$pstmt->insert_id;$pstmt->close();
