@@ -18,6 +18,7 @@ function require_login(): void {
         $module = null;
         $moduleMap = [
             'patients/reception_register.php' => ['front_desk','create'],
+            'patients/edit_patient.php' => ['front_desk','edit'],
             'reception/' => ['front_desk','view'],
             'patients/' => ['clinical','view'],
             'clinical/' => ['clinical','view'],
