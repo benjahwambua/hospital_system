@@ -3,8 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
-require_login();
-require_super();
+undefined
 
 if (!has_access_control_tables($conn)) {
     http_response_code(500);
