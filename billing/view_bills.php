@@ -5,6 +5,9 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'finance_admin', 'view');
 require_role(['admin']);
+$canFinanceEdit = can_module_action($conn, 'finance_admin', 'edit');
+$canFinanceDelete = can_module_action($conn, 'finance_admin', 'delete');
+$canFinanceCreate = can_module_action($conn, 'finance', 'create');
 
 // --- 1. ADMIN CORRECTION HANDLER (With Basic CSRF/Role Protection) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id'])) {
@@ -44,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id']))
         $conn->rollback();
         $_SESSION['error'] = "Critical Error: " . $e->getMessage();
     }
-    header("Location: billing_management.php");
+    header("Location: view_bills.php");
     exit();
 }
 
@@ -348,18 +351,18 @@ include __DIR__ . '/../includes/sidebar.php';
                                                 <a class="dropdown-item" href="/hospital_system/billing/print_invoice.php?id=<?= $row['id'] ?>" target="_blank">
                                                     <i class="fas fa-print"></i> Print Invoice
                                                 </a>
-                                                <a class="dropdown-item" href="/hospital_system/billing/view_invoice.php?id=<?= $row['id'] ?>&edit=1">
+                                                <?php if ($canFinanceEdit): ?><a class="dropdown-item" href="/hospital_system/billing/view_invoice.php?id=<?= $row['id'] ?>&edit=1">
                                                     <i class="fas fa-edit"></i> Edit Invoice
-                                                </a>
-                                                <?php if ($row['display_status'] !== 'Paid'): ?>
+                                                </a><?php endif; ?>
+                                                <?php if ($canFinanceCreate && $row['display_status'] !== 'Paid'): ?>
                                                     <a class="dropdown-item" href="#" onclick="markAsPaid(<?= $row['id'] ?>)">
                                                         <i class="fas fa-check"></i> Mark as Paid
                                                     </a>
                                                 <?php endif; ?>
                                                 <div class="dropdown-divider"></div>
-                                                <a class="dropdown-item text-danger" href="#" onclick="confirmDelete(<?= $row['id'] ?>)">
+                                                <?php if ($canFinanceDelete): ?><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(<?= $row['id'] ?>)">
                                                     <i class="fas fa-trash"></i> Delete Invoice
-                                                </a>
+                                                </a><?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -375,6 +378,7 @@ include __DIR__ . '/../includes/sidebar.php';
 </div>
 
 <form id="deleteForm" method="POST" style="display:none;">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
     <input type="hidden" name="delete_invoice_id" id="delete_id_input">
 </form>
 
@@ -405,7 +409,7 @@ function markAsPaid(id) {
         
         const methodInput = document.createElement('input');
         methodInput.type = 'hidden';
-        methodInput.name = 'payment_method';
+        methodInput.name = 'payment_mode';
         methodInput.value = 'Cash';
         
         const markPaidInput = document.createElement('input');
