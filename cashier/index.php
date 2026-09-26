@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
+require_module_access($conn, 'finance', 'view');
 
 $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
 $isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
