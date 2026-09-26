@@ -745,6 +745,12 @@ function refresh_invoice_payment_state($conn, int $invoice_id): array {
     $paid=(float)($paidStmt->get_result()->fetch_assoc()['paid']??0); $paidStmt->close();
 
     $total=(float)($invoice['total']??0);
+    $itemStmt=$conn->prepare("SELECT COALESCE(SUM(total),0) items_total FROM invoice_items WHERE invoice_id=?");
+    if($itemStmt){
+        $itemStmt->bind_param('i',$invoice_id); $itemStmt->execute();
+        $itemTotal=(float)($itemStmt->get_result()->fetch_assoc()['items_total']??0); $itemStmt->close();
+        if($itemTotal>0) $total=$itemTotal;
+    }
     $paid=max(0,min($paid,$total));
     $balance=max($total-$paid,0);
     $status=$balance<=0.00001?'Paid':($paid>0?'Partially Paid':'Unpaid');
