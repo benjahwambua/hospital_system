@@ -8,6 +8,7 @@ require_role(['admin']);
 
 // --- 1. ADMIN CORRECTION HANDLER (With Basic CSRF/Role Protection) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id'])) {
+    require_module_access($conn, 'finance_admin', 'delete');
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
 
     $del_id = (int)$_POST['delete_invoice_id'];
