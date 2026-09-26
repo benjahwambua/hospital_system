@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_with_message('Security token mismatch. Please try again.');
     }
 
-    if (isset($_POST['inline_save'])) {
+undefined
         $uid = (int)($_POST['user_id'] ?? 0);
         $fullName = trim($_POST['full_name'] ?? '');
         $role = trim($_POST['role'] ?? '');
