@@ -495,6 +495,25 @@ if ($patient_id <= 0) {
     $stock = $conn->query("SELECT id, drug_name, quantity, selling_price FROM pharmacy_stock WHERE quantity > 0 ORDER BY drug_name");
 
 
+    // Maternity data is scoped strictly to this patient dashboard.
+    $maternityRecord = null;
+    $maternityVisits = [];
+    $maternityDeliveries = [];
+    $maternityAdmission = null;
+    $matStmt = $conn->prepare("SELECT m.*, p.full_name, p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? ORDER BY m.id DESC LIMIT 1");
+    if ($matStmt) {
+        $matStmt->bind_param('i', $patient_id); $matStmt->execute(); $maternityRecord=$matStmt->get_result()->fetch_assoc(); $matStmt->close();
+    }
+    if ($maternityRecord) {
+        $mid=(int)$maternityRecord['id'];
+        $mv=$conn->prepare("SELECT * FROM maternity_visits WHERE maternity_id=? ORDER BY created_at DESC LIMIT 10");
+        if ($mv) { $mv->bind_param('i',$mid); $mv->execute(); $maternityVisits=$mv->get_result()->fetch_all(MYSQLI_ASSOC); $mv->close(); }
+        $md=$conn->prepare("SELECT d.*, b.gender AS baby_gender, b.weight AS baby_weight, b.apgar, b.alive FROM maternity_delivery d LEFT JOIN maternity_baby b ON b.maternity_id=d.maternity_id AND b.created_at>=d.created_at WHERE d.maternity_id=? ORDER BY d.created_at DESC LIMIT 10");
+        if ($md) { $md->bind_param('i',$mid); $md->execute(); $maternityDeliveries=$md->get_result()->fetch_all(MYSQLI_ASSOC); $md->close(); }
+        $ma=$conn->prepare("SELECT ma.*, a.admission_id, a.visit_id, a.admission_date, a.ward_name, a.bed_number, a.status AS clinical_status FROM maternity_admissions ma LEFT JOIN admissions a ON a.id=ma.admission_id WHERE ma.patient_id=? ORDER BY ma.id DESC LIMIT 1");
+        if ($ma) { $ma->bind_param('i',$patient_id); $ma->execute(); $maternityAdmission=$ma->get_result()->fetch_assoc(); $ma->close(); }
+    }
+
     // Walk-in requested service
 // Prefer the actual service already attached to the walk-in (for example a lab test).
 // Reception walk-ins fall back to the selected clinic/service category stored on the patient.
@@ -765,7 +784,7 @@ if ($patient_id <= 0) {
                 <span class="info-value">Dr. <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?></span>
                 <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
                     <?php if ($canPatientEdit): ?><a href="/hospital_system/patients/edit_patient.php?id=<?= (int)$patient_id ?>" style="background:#e8f1ff; color:#1f5fbf; border:1px solid #cfe0ff; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;"><i class="fas fa-user-edit"></i> Edit Patient</a><?php endif; ?>
-                    <a href="/hospital_system/maternity/add.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a>
+                    <a href="/hospital_system/maternity/index.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a>
                 </div>
             </div>
         </div>
@@ -775,7 +794,7 @@ if ($patient_id <= 0) {
         <li onclick="showTab('clinical')" id="tab-clinical" class="active">Clinical Encounter</li>
         <li onclick="showTab('services')" id="tab-services">Services</li>
         <li onclick="showTab('prescriptions')" id="tab-prescriptions">Pharmacy & Prescriptions</li>
-        <li onclick="showTab('billing')" id="tab-billing">Billing</li>
+        <li onclick="showTab('billing')" id="tab-billing">Billing</li>\n        <li onclick="showTab('maternity')" id="tab-maternity">Maternity</li>
         <li onclick="showTab('coverage')" id="tab-coverage">Insurance & SHA</li>
     </ul>
 
@@ -1226,6 +1245,30 @@ function clearForm() {
             </div>
             <div class="stamp-note">Stamp and sign after verification before presenting this statement for payment.</div>
         </div>
+    </div>
+
+    <div id="maternity" class="card" style="display:none;">
+        <h3>Maternity Care</h3>
+        <p style="color:#666; margin-top:-8px; margin-bottom:20px;">Maternity information for this patient only. Open the full maternity workspace to record or review maternal and newborn care.</p>
+        <?php if ($maternityRecord): ?>
+        <div class="sub-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:15px;flex-wrap:wrap;">
+                <div><h3 style="margin:0;color:var(--primary-blue);"><?= htmlspecialchars($maternityRecord['anc_number'] ?? 'Maternity Record') ?></h3>
+                    <p style="margin:6px 0 0;color:#666;">Gravida <?= htmlspecialchars((string)$maternityRecord['gravida']) ?> · Parity <?= htmlspecialchars((string)$maternityRecord['parity']) ?> · EDD <?= !empty($maternityRecord['expected_delivery']) ? htmlspecialchars(date('d M Y',strtotime($maternityRecord['expected_delivery']))) : 'Not set' ?></p>
+                </div>
+                <a class="btn btn-primary" href="/hospital_system/maternity/index.php?patient_id=<?= (int)$patient_id ?>">Open Maternity Record</a>
+            </div>
+        </div>
+        <div class="coverage-grid">
+            <div class="coverage-card"><h4>ANC / PNC Visits</h4><div class="coverage-value"><?= count($maternityVisits) ?></div><div class="coverage-subtext">Recent maternity clinical visits</div></div>
+            <div class="coverage-card"><h4>Deliveries</h4><div class="coverage-value"><?= count($maternityDeliveries) ?></div><div class="coverage-subtext">Delivery records on file</div></div>
+            <div class="coverage-card"><h4>Admission</h4><div class="coverage-value"><?= $maternityAdmission ? htmlspecialchars($maternityAdmission['status'] ?? $maternityAdmission['clinical_status'] ?? 'Recorded') : 'None' ?></div><div class="coverage-subtext"><?= $maternityAdmission && !empty($maternityAdmission['bed_number']) ? 'Bed '.(int)$maternityAdmission['bed_number'] : 'No maternity admission recorded' ?></div></div>
+            <div class="coverage-card"><h4>Newborns</h4><div class="coverage-value"><?php $babyCount=0; $bc=$conn->prepare("SELECT COUNT(*) c FROM maternity_baby WHERE maternity_id=?"); if($bc){$bc->bind_param('i',$mid);$bc->execute();$babyCount=(int)($bc->get_result()->fetch_assoc()['c']??0);$bc->close();} echo $babyCount; ?></div><div class="coverage-subtext">Newborn records linked to this maternity record</div></div>
+        </div>
+        <?php if ($maternityVisits): ?><div class="sub-card"><h4 style="margin-top:0;color:var(--secondary-blue);">Recent Maternity Visits</h4><div style="overflow-x:auto;"><table class="table-custom"><thead><tr><th>Date</th><th>Type</th><th>BP</th><th>Weight</th><th>Notes</th></tr></thead><tbody><?php foreach($maternityVisits as $mv): ?><tr><td><?= htmlspecialchars(date('d M Y H:i',strtotime($mv['created_at']))) ?></td><td><?= htmlspecialchars($mv['visit_type']) ?></td><td><?= htmlspecialchars($mv['bp']) ?></td><td><?= htmlspecialchars($mv['weight']) ?></td><td><?= htmlspecialchars($mv['notes']) ?></td></tr><?php endforeach; ?></tbody></table></div></div><?php endif; ?>
+        <?php else: ?>
+        <div class="sub-card"><h4 style="margin-top:0;color:var(--secondary-blue);">No Maternity Record</h4><p style="color:#666;">This patient does not have a maternity record yet.</p><a class="btn btn-primary" href="/hospital_system/maternity/add.php?patient_id=<?= (int)$patient_id ?>">Start Maternity Record</a></div>
+        <?php endif; ?>
     </div>
 
     <div id="coverage" class="card" style="display:none;">
