@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
+require_module_access($conn, 'finance_admin', 'view');
 require_role(['admin']);
 
 // --- 1. ADMIN CORRECTION HANDLER (With Basic CSRF/Role Protection) ---
