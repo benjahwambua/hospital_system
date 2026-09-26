@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 require_once __DIR__ . '/../includes/auth.php';
+require_module_access($conn, 'clinical', 'edit');
 require_role(['admin','doctor','nurse']);
 
 // Detect whether vitals has a status column so the queue query remains compatible.
