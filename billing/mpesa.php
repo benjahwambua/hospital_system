@@ -5,6 +5,7 @@ require_once __DIR__ . '/../config/mpesa.php';
 require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
 
+require_module_access($conn, 'finance', 'create');
 require_role(['admin','cashier']);
 
 $mpesa_message = '';
@@ -37,7 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
         $paid = (float)($paidStmt->get_result()->fetch_assoc()['paid'] ?? 0);
         $paidStmt->close();
 
-        $balance = max((float)$invoice['total'] - $paid, 0);
+        $itemStmt=$conn->prepare("SELECT COALESCE(SUM(total),0) items_total FROM invoice_items WHERE invoice_id=?");
+        $itemTotal=0;
+        if($itemStmt){$itemStmt->bind_param('i',$invoiceId);$itemStmt->execute();$itemTotal=(float)($itemStmt->get_result()->fetch_assoc()['items_total']??0);$itemStmt->close();}
+        $invoiceTotal=$itemTotal>0?$itemTotal:(float)$invoice['total'];
+        $balance = max($invoiceTotal - $paid, 0);
         if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
         $amount = min($amount, $balance);
 
@@ -78,14 +83,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
             $stmt->close();
             if (!$invoice) throw new Exception('Invoice not found.');
 
-            $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE invoice_id=?");
+            $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount),0)-COALESCE((SELECT SUM(amount) FROM payment_refunds WHERE invoice_id=? AND status='Approved'),0) AS paid FROM payments WHERE invoice_id=?");
             if (!$paidStmt) throw new Exception('Unable to calculate invoice balance.');
-            $paidStmt->bind_param('i', $invoiceId);
+            $paidStmt->bind_param('ii', $invoiceId, $invoiceId);
             $paidStmt->execute();
             $paid = (float)($paidStmt->get_result()->fetch_assoc()['paid'] ?? 0);
             $paidStmt->close();
 
-            $balance = max((float)$invoice['total'] - $paid, 0);
+            $itemStmt=$conn->prepare("SELECT COALESCE(SUM(total),0) items_total FROM invoice_items WHERE invoice_id=?");
+            $itemTotal=0;
+            if($itemStmt){$itemStmt->bind_param('i',$invoiceId);$itemStmt->execute();$itemTotal=(float)($itemStmt->get_result()->fetch_assoc()['items_total']??0);$itemStmt->close();}
+            $invoiceTotal=$itemTotal>0?$itemTotal:(float)$invoice['total'];
+            $balance = max($invoiceTotal - $paid, 0);
             if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
             if ($stkAmount > $balance) $stkAmount = $balance;
 
