@@ -174,12 +174,17 @@ if ($patient_id <= 0) {
         if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to prescribe medicines.'); }
         $medicine_id = intval($_POST['medicine_id']);
         $qty = intval($_POST['quantity']);
-        $price_override = floatval($_POST['selling_price']); 
-        $instructions = $_POST['dosage_instructions'] ?? '';
+        $instructions = trim((string)($_POST['dosage_instructions'] ?? ''));
 
-        $stock = $conn->query("SELECT drug_name, selling_price FROM pharmacy_stock WHERE id = $medicine_id")->fetch_assoc();
-        $unit_price = max($price_override, 0);
-        if ($unit_price <= 0 && $stock) $unit_price = (float)$stock['selling_price'];
+        $stockStmt = $conn->prepare("SELECT drug_name, selling_price FROM pharmacy_stock WHERE id = ? LIMIT 1");
+        if (!$stockStmt) throw new Exception('Unable to load medicine pricing.');
+        $stockStmt->bind_param('i', $medicine_id);
+        $stockStmt->execute();
+        $stock = $stockStmt->get_result()->fetch_assoc();
+        $stockStmt->close();
+        if (!$stock) throw new Exception('Selected medicine was not found in pharmacy stock.');
+        // Clinical staff prescribe quantity; the approved pharmacy selling price is authoritative.
+        $unit_price = (float)$stock['selling_price'];
         $invoice_total = $qty * $unit_price;
 
         $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'General', (int)($patient['doctor_id'] ?? 0));
