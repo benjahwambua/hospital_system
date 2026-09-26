@@ -36,6 +36,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'&&isset($_POST['confirm_discharge'])){
     if(!$u||!$u->execute()||$u->affected_rows!==1)throw new Exception('Admission could not be discharged.');if($u)$u->close();
     if(!empty($admission['visit_id'])){$v=$conn->prepare("UPDATE visits SET status='Completed',updated_at=NOW() WHERE id=? AND patient_id=? AND status<>'Cancelled'");if($v){$v->bind_param('ii',$admission['visit_id'],$admission['patient_id']);$v->execute();$v->close();}}
     $a=$conn->prepare("UPDATE appointments SET status='Closed' WHERE patient_id=? AND COALESCE(visit_id,0)=? AND status NOT IN ('Closed','Cancelled','Completed')");if($a&&isset($admission['visit_id'])){$a->bind_param('ii',$admission['patient_id'],$admission['visit_id']);$a->execute();$a->close();}
+    $mcol=$conn->query("SHOW COLUMNS FROM maternity_admissions LIKE 'admission_id'");
+    if($mcol && $mcol->num_rows>0){
+     $m=$conn->prepare("UPDATE maternity_admissions SET status='Discharged' WHERE admission_id=? AND status<>'Discharged'");
+     if($m){$m->bind_param('i',$admissionId);$m->execute();$m->close();}
+    }
     if(function_exists('audit'))audit('patient_discharge',"admission_id={$admissionId},patient_id={$admission['patient_id']}");
     $conn->commit();$_SESSION['msg_success']='Patient discharged successfully.';header('Location: ward_management.php?status=discharged');exit;
    }catch(Throwable $e){$conn->rollback();error_log('Discharge Error: '.$e->getMessage());$message="<div class='alert alert-danger'>Unable to complete discharge. No changes were saved.</div>";}
