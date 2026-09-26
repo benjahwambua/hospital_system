@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_once __DIR__ . '/../includes/auth.php';
+require_module_access($conn, 'maternity', 'create');
 require_role(['admin','doctor','nurse']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
