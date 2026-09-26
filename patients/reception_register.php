@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nextOfKinName = trim((string)($_POST['next_of_kin_name'] ?? ''));
     $nextOfKinPhone = trim((string)($_POST['next_of_kin_phone'] ?? ''));
     $doctorId = max(0, (int)($_POST['doctor_id'] ?? 0));
-    $clinicalType = trim((string)($_POST['clinic_category'] ?? 'General'));
+    $clinicalType = trim((string)($_POST['clinic_category'] ?? ($_GET['clinic_category'] ?? 'General')));
 
     // Clinical observations are captured once, authoritatively in Clinical Care → Triage & Vitals.
     // Reception only handles demographics, registration and visit/queue creation.
