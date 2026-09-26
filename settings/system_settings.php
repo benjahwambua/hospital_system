@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 undefined
 
 $message = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+undefined
     $categories = ['general', 'billing', 'clinical', 'pharmacy', 'mpesa', 'users'];
     $updateStmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
     $insertStmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
