@@ -137,6 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
 
                 if (!empty($_POST['drug_id'])) {
+                    // Maternity medicines follow the same workflow as the main
+                    // clinical pathway: prescribe -> pharmacy queue -> dispense.
+                    // Stock and the medicine charge are posted only when Pharmacy
+                    // actually dispenses the item.
                     foreach ($_POST['drug_id'] as $idx => $drugId) {
                         $drugId=(int)$drugId;
                         if($drugId<=0) continue;
@@ -145,8 +149,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $d->bind_param('i',$drugId);$d->execute();$drug=$d->get_result()->fetch_assoc();$d->close();
                         if(!$drug) throw new Exception('Invalid maternity medicine selected.');
                         $drugPrice=(float)$drug['selling_price'];
-                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Medicine: '.$drug['drug_name'],1,$drugPrice,'pharmacy',$drugId);
-                        post_invoice_journal($conn,$invoiceId,$patientId,$drugPrice,'Maternity medicine',$itemId);
+                        $visitId = $visitId ?? get_or_create_current_visit($conn,$patientId,'Outpatient','Maternity');
+                        $instructions = trim((string)($_POST['drug_instructions'][$idx] ?? 'As directed'));
+                        $prescriptionId = 0;
+                        if (ensure_prescription_visit_column($conn) && $visitId > 0) {
+                            $pstmt=$conn->prepare("INSERT INTO prescriptions (patient_id,medicine_id,quantity,unit_price,invoice_id,visit_id,frequency,created_at) VALUES (?,?,?,?,?,?,?,NOW())");
+                            if(!$pstmt) throw new Exception('Unable to prepare maternity prescription.');
+                            $zeroInvoice=0;
+                            $pstmt->bind_param('iiidiis',$patientId,$drugId,1,$drugPrice,$zeroInvoice,$visitId,$instructions);
+                        } else {
+                            $pstmt=$conn->prepare("INSERT INTO prescriptions (patient_id,medicine_id,quantity,unit_price,invoice_id,frequency,created_at) VALUES (?,?,?,?,?,?,NOW())");
+                            if(!$pstmt) throw new Exception('Unable to prepare maternity prescription.');
+                            $zeroInvoice=0;
+                            $pstmt->bind_param('iiidis',$patientId,$drugId,1,$drugPrice,$zeroInvoice,$instructions);
+                        }
+                        if(!$pstmt->execute()) { $err=$pstmt->error; $pstmt->close(); throw new Exception('Unable to save maternity prescription: '.$err); }
+                        $prescriptionId=(int)$pstmt->insert_id;$pstmt->close();
+
+                        if ($conn->query("SHOW TABLES LIKE 'pharmacy_queue'")->num_rows > 0) {
+                            $q=$conn->prepare("SELECT id FROM pharmacy_queue WHERE prescription_id=? AND status='pending' LIMIT 1");
+                            if($q){$q->bind_param('i',$prescriptionId);$q->execute();$queued=$q->get_result()->fetch_assoc();$q->close();
+                                if(!$queued){
+                                    $hasVisitQueue=$conn->query("SHOW COLUMNS FROM pharmacy_queue LIKE 'visit_id'");
+                                    if($hasVisitQueue && $hasVisitQueue->num_rows>0 && $visitId>0){
+                                        $q=$conn->prepare("INSERT INTO pharmacy_queue (prescription_id,patient_id,medicine_id,quantity,status,visit_id,created_at) VALUES (?,?,?,?, 'pending',?,NOW())");
+                                        $q->bind_param('iiiii',$prescriptionId,$patientId,$drugId,1,$visitId);
+                                    } else {
+                                        $q=$conn->prepare("INSERT INTO pharmacy_queue (prescription_id,patient_id,medicine_id,quantity,status,created_at) VALUES (?,?,?,?,'pending',NOW())");
+                                        $q->bind_param('iiii',$prescriptionId,$patientId,$drugId,1);
+                                    }
+                                    if(!$q || !$q->execute()) { $err=$q?$q->error:$conn->error; if($q)$q->close(); throw new Exception('Unable to send maternity prescription to Pharmacy: '.$err); }
+                                    $q->close();
+                                }
+                            }
+                        }
                     }
                 }
                 $success='Clinical records saved and all charges posted to the central cashier invoice.';
