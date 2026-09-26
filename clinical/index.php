@@ -67,8 +67,8 @@ include __DIR__ . '/../includes/sidebar.php';
     <a class="metric-card" href="../patients/appointments.php"><div class="metric-top"><span>Today's Visits</span><span class="metric-icon"><i class="fas fa-users"></i></span></div><div class="metric-value"><?= $todayVisits ?></div></a>
     <a class="metric-card" href="../patients/patient_list.php"><div class="metric-top"><span>In Progress</span><span class="metric-icon"><i class="fas fa-user-md"></i></span></div><div class="metric-value"><?= $inProgress ?></div></a>
     <a class="metric-card" href="ward_management.php"><div class="metric-top"><span>Admitted</span><span class="metric-icon"><i class="fas fa-bed"></i></span></div><div class="metric-value"><?= $admitted ?></div></a>
-    <?php if($canLabView): ?><a class="metric-card" href="../lab/lab_results.php"><div class="metric-top"><span>Pending Lab</span><span class="metric-icon"><i class="fas fa-vial"></i></span></div><div class="metric-value"><?= $pendingLab ?></div></a>
-    <?php if($canRadiologyView): ?><a class="metric-card" href="../radiology/radiology_requests.php"><div class="metric-top"><span>Pending Radiology</span><span class="metric-icon"><i class="fas fa-x-ray"></i></span></div><div class="metric-value"><?= $pendingRad ?></div></a>
+    <?php if($canLabView): ?><a class="metric-card" href="../lab/lab_results.php"><div class="metric-top"><span>Pending Lab</span><span class="metric-icon"><i class="fas fa-vial"></i></span></div><div class="metric-value"><?= $pendingLab ?></div></a><?php endif; ?>
+    <?php if($canRadiologyView): ?><a class="metric-card" href="../radiology/radiology_requests.php"><div class="metric-top"><span>Pending Radiology</span><span class="metric-icon"><i class="fas fa-x-ray"></i></span></div><div class="metric-value"><?= $pendingRad ?></div></a><?php endif; ?>
     <?php if($canPharmacyView): ?><a class="metric-card" href="../pharmacy/dispensing_queue.php"><div class="metric-top"><span>Pending Pharmacy</span><span class="metric-icon"><i class="fas fa-pills"></i></span></div><div class="metric-value"><?= $pendingRx ?></div></a><?php endif; ?>
   </div>
 
