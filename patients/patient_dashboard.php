@@ -100,30 +100,7 @@ if ($patient_id <= 0) {
         }
     }
 
-    $conn->query("CREATE TABLE IF NOT EXISTS external_referrals (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        patient_id INT NOT NULL,
-        referred_facility VARCHAR(200) NOT NULL,
-        referred_doctor VARCHAR(150) DEFAULT NULL,
-        specialty VARCHAR(150) DEFAULT NULL,
-        reason VARCHAR(255) NOT NULL,
-        urgency ENUM('Routine', 'Urgent', 'Emergency') NOT NULL DEFAULT 'Routine',
-        notes TEXT DEFAULT NULL,
-        status ENUM('Pending', 'Accepted', 'Completed', 'Cancelled') NOT NULL DEFAULT 'Pending',
-        created_by INT DEFAULT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )");
-    // Consultation billing is created only for registered patients.
-    // Walk-in patients are explicitly exempt; clean up any legacy KES 200
-    // consultation charge that may have been created before this rule was fixed.
-    if (!empty($patient['is_walkin'])) {
-        remove_walkin_consultation_charge($conn, $patient_id);
-    } else {
-        ensure_registered_consultation_charge($conn, $patient_id, 200.00);
-    }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // No schema creation or billing is performed merely by viewing the dashboard.\n    // These operations belong to migrations and transactional encounter workflows.\n\n    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedToken = $_POST['csrf_token'] ?? '';
         if (!hash_equals($csrfToken, $postedToken)) {
             header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&error=csrf");
@@ -149,8 +126,9 @@ if ($patient_id <= 0) {
 
     // Handle vitals retake / edit
     if (isset($_POST['save_vitals'])) {
-        if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to record vitals.'); }
         $vitalId = max(0, (int)($_POST['vital_id'] ?? 0));
+        $vitalAction = $vitalId > 0 ? 'edit' : 'create';
+        if (!can_module_action($conn, 'clinical', $vitalAction)) { throw new Exception('You do not have permission to '.($vitalId > 0 ? 'edit' : 'record').' vitals.'); }
         $temperature = trim((string)($_POST['temperature'] ?? ''));
         $bp = trim((string)($_POST['bp'] ?? ''));
         $weight = trim((string)($_POST['weight'] ?? ''));
