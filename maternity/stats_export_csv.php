@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn,'maternity','view');
 
 header('Content-Type: text/csv');
 header('Content-Disposition: attachment; filename="maternity_deliveries.csv"');
