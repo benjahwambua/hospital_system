@@ -95,11 +95,11 @@ include __DIR__.'/../includes/sidebar.php';
 <tr>
 <td class="font-weight-bold"><?=htmlspecialchars($m['module_name'])?></td>
 <td class="text-muted small"><?=htmlspecialchars($m['description']??'')?></td>
-<td class="text-center"><input type="checkbox" name="modules[]" value="<?=$m['id']?>" <?=!empty($a['can_view'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" name="create[<?=$m['id']?>]" value="1" <?=!empty($a['can_create'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" name="edit[<?=$m['id']?>]" value="1" <?=!empty($a['can_edit'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" name="delete[<?=$m['id']?>]" value="1" <?=!empty($a['can_delete'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" name="approve[<?=$m['id']?>]" value="1" <?=!empty($a['can_approve'])?'checked':''?>></td>
+<td class="text-center"><input type="checkbox" class="perm-view" name="modules[]" value="<?=$m['id']?>" data-module="<?=$m['id']?>" <?=!empty($a['can_view'])?'checked':''?>></td>
+<td class="text-center"><input type="checkbox" class="perm-action" name="create[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_create'])?'checked':''?>></td>
+<td class="text-center"><input type="checkbox" class="perm-action" name="edit[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_edit'])?'checked':''?>></td>
+<td class="text-center"><input type="checkbox" class="perm-action" name="delete[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_delete'])?'checked':''?>></td>
+<td class="text-center"><input type="checkbox" class="perm-action" name="approve[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_approve'])?'checked':''?>></td>
 </tr>
 <?php endwhile; ?>
 </tbody></table></div>
@@ -109,4 +109,21 @@ include __DIR__.'/../includes/sidebar.php';
 </form>
 <?php endif; ?>
 </div></div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function syncActionPermissions() {
+        document.querySelectorAll('.perm-view').forEach(function (view) {
+            const moduleId = view.dataset.module;
+            document.querySelectorAll('.perm-action[data-view="' + moduleId + '"]').forEach(function (action) {
+                action.disabled = !view.checked;
+                if (!view.checked) action.checked = false;
+            });
+        });
+    }
+    document.querySelectorAll('.perm-view').forEach(function (view) {
+        view.addEventListener('change', syncActionPermissions);
+    });
+    syncActionPermissions();
+});
+</script>
 <?php include __DIR__.'/../includes/footer.php'; ?>
