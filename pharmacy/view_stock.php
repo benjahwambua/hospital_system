@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'pharmacy', 'view');
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -41,6 +42,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
 
 /* Handle deletion on the same page */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
+    require_module_access($conn, 'pharmacy', 'delete');
     $postedToken = $_POST['csrf_token'] ?? '';
     if (!hash_equals($csrfToken, $postedToken)) {
         $errorMessage = 'Security token mismatch. Please refresh and try again.';
@@ -140,13 +142,13 @@ include __DIR__ . '/../includes/sidebar.php';
                             </a>
                             <a href="adjust_price.php?id=<?= (int)$row['id']; ?>" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i> Adjust Price</a>
                             <a href="stock_take.php?id=<?= (int)$row['id']; ?>" class="btn btn-info btn-sm"><i class="fa fa-boxes"></i> Stock Take</a>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this medicine?');">
+                            <?php if (can_module_action($conn, 'pharmacy', 'delete')): ?><form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this medicine?');">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                 <input type="hidden" name="delete_id" value="<?= (int)$row['id'] ?>">
                                 <button type="submit" class="btn btn-danger btn-sm">
                                     <i class="fa fa-trash"></i> Delete
                                 </button>
-                            </form>
+                            </form><?php endif; ?>
                         </td>
                     </tr>
                 <?php endwhile; ?>
