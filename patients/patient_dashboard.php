@@ -679,6 +679,42 @@ $activeVisit = null;
 $activeVisitRes = $conn->prepare("SELECT id, visit_number, visit_type, clinic_category, visit_date, visit_time, status FROM visits WHERE patient_id=? AND visit_date=CURDATE() AND status IN ('Open','In Progress') ORDER BY id DESC LIMIT 1");
 if ($activeVisitRes) { $activeVisitRes->bind_param('i', $patient_id); $activeVisitRes->execute(); $activeVisit = $activeVisitRes->get_result()->fetch_assoc(); $activeVisitRes->close(); }
 
+// Patient Dashboard command-centre context.
+// Keep this summary read-only; specialist modules remain responsible for transactions.
+$currentAdmission = null;
+$admissionStmt = $conn->prepare("SELECT id, admission_date, ward_name, bed_number, status, attending_doctor FROM admissions WHERE patient_id=? AND status='Admitted' ORDER BY id DESC LIMIT 1");
+if ($admissionStmt) {
+    $admissionStmt->bind_param('i', $patient_id);
+    $admissionStmt->execute();
+    $currentAdmission = $admissionStmt->get_result()->fetch_assoc();
+    $admissionStmt->close();
+}
+
+$recentAppointment = $activeAppointment;
+if (!$recentAppointment) {
+    $appointmentStmt = $conn->prepare("SELECT a.*, u.full_name AS doctor_name FROM appointments a LEFT JOIN users u ON u.id=a.doctor_id WHERE a.patient_id=? AND COALESCE(a.status,'') NOT IN ('Cancelled','Closed') ORDER BY a.appointment_date DESC, a.appointment_time DESC, a.id DESC LIMIT 1");
+    if ($appointmentStmt) {
+        $appointmentStmt->bind_param('i', $patient_id);
+        $appointmentStmt->execute();
+        $recentAppointment = $appointmentStmt->get_result()->fetch_assoc();
+        $appointmentStmt->close();
+    }
+}
+
+$quickActions = [
+    ['label'=>'Record Vitals','icon'=>'fa-heartbeat','tab'=>'clinical','allowed'=>can_module_action($conn,'clinical','create')],
+    ['label'=>'Clinical Encounter','icon'=>'fa-user-md','tab'=>'clinical','allowed'=>can_module_action($conn,'clinical','create')],
+    ['label'=>'Order Service / Lab','icon'=>'fa-flask','tab'=>'services','allowed'=>can_module_action($conn,'clinical','create')],
+    ['label'=>'Prescribe Medicine','icon'=>'fa-pills','tab'=>'prescriptions','allowed'=>can_module_action($conn,'clinical','create')],
+    ['label'=>'View Billing','icon'=>'fa-file-invoice-dollar','tab'=>'billing','allowed'=>can_module_action($conn,'finance','view')],
+    ['label'=>'Maternity','icon'=>'fa-female','url'=>'/hospital_system/maternity/index.php?patient_id='.(int)$patient_id,'allowed'=>can_module_action($conn,'maternity','view')],
+];
+if ($currentAdmission && can_module_action($conn,'clinical','approve')) {
+    $quickActions[] = ['label'=>'Discharge Patient','icon'=>'fa-sign-out-alt','url'=>'/hospital_system/clinical/discharge_patient.php?admission_id='.(int)$currentAdmission['id'],'allowed'=>true];
+} elseif (!$currentAdmission && can_module_action($conn,'clinical','create')) {
+    $quickActions[] = ['label'=>'Admit Patient','icon'=>'fa-bed','url'=>'/hospital_system/clinical/admit_patient.php?patient_id='.(int)$patient_id,'allowed'=>true];
+}
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
@@ -740,6 +776,37 @@ if ($patient_id <= 0) {
     .coverage-form textarea { min-height:100px; resize:vertical; }
     .coverage-form .full-width { grid-column:1 / -1; }
     .coverage-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+    /* Patient Dashboard command-centre layer. Existing patient header/tabs remain unchanged. */
+    .patient-command-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 18px;}
+    .patient-command-card{background:#fff;border:1px solid var(--border-color);border-radius:10px;padding:16px 18px;box-shadow:0 2px 10px rgba(0,0,0,.04);min-height:94px;box-sizing:border-box;}
+    .patient-command-card .command-label{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#6c7a89;margin-bottom:7px;}
+    .patient-command-card .command-value{font-size:15px;font-weight:750;color:var(--secondary-blue);line-height:1.35;}
+    .patient-command-card .command-meta{font-size:12px;color:#667085;margin-top:5px;line-height:1.4;}
+    .patient-command-card.alert-card{border-left:4px solid #dc3545;}
+    .patient-command-card.alert-card .command-value{color:#a61b29;}
+    .patient-command-card.ok-card{border-left:4px solid #28a745;}
+    .patient-command-card.info-card{border-left:4px solid var(--primary-blue);}
+    .dashboard-command-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.7fr);gap:18px;margin-bottom:18px;}
+    .dashboard-summary-panel{background:#fff;border:1px solid var(--border-color);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+    .dashboard-summary-title{margin:0;color:var(--secondary-blue);font-size:15px;}
+    .dashboard-summary-title i{color:var(--primary-blue);margin-right:7px;}
+    .dashboard-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;}
+    .dashboard-summary-item{background:#f8fbff;border:1px solid #e5eef8;border-radius:8px;padding:11px 12px;}
+    .dashboard-summary-item .summary-label{font-size:10px;text-transform:uppercase;font-weight:800;color:#718096;display:block;margin-bottom:4px;}
+    .dashboard-summary-item .summary-value{font-size:13px;font-weight:700;color:#26364a;line-height:1.35;}
+    .dashboard-quick-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+    .dashboard-quick-actions a,.dashboard-quick-actions button{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:7px;border:1px solid #d6e3f2;background:#f8fbff;color:var(--secondary-blue);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;}
+    .dashboard-quick-actions a:hover,.dashboard-quick-actions button:hover{background:var(--accent-blue);border-color:#a9c9e8;}
+    .dashboard-quick-actions .primary-action{background:var(--primary-blue);border-color:var(--primary-blue);color:#fff;}
+    .dashboard-quick-actions .primary-action:hover{background:var(--secondary-blue);color:#fff;}
+    .dashboard-timeline{margin:0;padding:0;list-style:none;}
+    .dashboard-timeline li{position:relative;padding:0 0 13px 22px;border-left:2px solid #d9e7f5;margin-left:5px;font-size:12px;color:#596579;}
+    .dashboard-timeline li:last-child{border-left-color:transparent;padding-bottom:0;}
+    .dashboard-timeline li:before{content:"";position:absolute;left:-6px;top:1px;width:10px;height:10px;border-radius:50%;background:var(--primary-blue);border:2px solid #fff;box-shadow:0 0 0 1px #a9c9e8;}
+    .dashboard-timeline strong{color:#26364a;}
+    @media (max-width:1100px){.patient-command-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.dashboard-command-row{grid-template-columns:1fr;}}
+    @media (max-width:768px){.patient-command-grid,.dashboard-summary-grid{grid-template-columns:1fr;}}
+    
     .service-print-area { display:none; }
     .service-print-card { max-width:980px; margin:0 auto; background:#fff; padding:30px; box-sizing:border-box; }
     .service-print-table { width:100%; border-collapse:collapse; }
@@ -787,6 +854,73 @@ if ($patient_id <= 0) {
                     <a href="/hospital_system/maternity/index.php?patient_id=<?= (int)$patient_id ?>" style="background:#ffecf3; color:#c2185b; border:none; padding:5px 12px; border-radius:5px; text-decoration:none; font-size:12px; font-weight:700;">Maternity Visit</a>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="patient-command-grid">
+        <div class="patient-command-card <?= $activeVisit ? 'info-card' : '' ?>">
+            <div class="command-label">Current Encounter</div>
+            <div class="command-value"><?= $activeVisit ? htmlspecialchars($activeVisit['visit_number']) : 'No open encounter' ?></div>
+            <div class="command-meta"><?= $activeVisit ? htmlspecialchars($activeVisit['visit_type'].' · '.($activeVisit['clinic_category'] ?: 'General').' · '.$activeVisit['status']) : 'Start an encounter when the patient is seen.' ?></div>
+        </div>
+        <div class="patient-command-card <?= $currentAdmission ? 'alert-card' : 'ok-card' ?>">
+            <div class="command-label">Admission Status</div>
+            <div class="command-value"><?= $currentAdmission ? 'Currently Admitted' : 'Not Admitted' ?></div>
+            <div class="command-meta"><?= $currentAdmission ? htmlspecialchars(($currentAdmission['ward_name'] ?: 'Ward').' · Bed '.($currentAdmission['bed_number'] ?: '—')) : 'No active inpatient admission.' ?></div>
+        </div>
+        <div class="patient-command-card <?= $balance_due > 0 ? 'alert-card' : 'ok-card' ?>">
+            <div class="command-label">Outstanding Balance</div>
+            <div class="command-value">KSH <?= number_format($balance_due,2) ?></div>
+            <div class="command-meta"><?= htmlspecialchars($currentPayerLabel) ?> · Co-pay estimate KSH <?= number_format($currentCopayEstimate,2) ?></div>
+        </div>
+        <div class="patient-command-card <?= $recentAppointment ? 'info-card' : 'ok-card' ?>">
+            <div class="command-label">Appointment</div>
+            <div class="command-value"><?= $recentAppointment ? htmlspecialchars(date('d M Y',strtotime($recentAppointment['appointment_date']))) : 'No active appointment' ?></div>
+            <div class="command-meta"><?= $recentAppointment ? htmlspecialchars(($recentAppointment['appointment_time'] ?? '').' · '.($recentAppointment['status'] ?? 'Scheduled')) : 'No pending appointment found.' ?></div>
+        </div>
+    </div>
+
+    <div class="dashboard-command-row">
+        <div class="dashboard-summary-panel">
+            <h3 class="dashboard-summary-title"><i class="fas fa-notes-medical"></i> Clinical Snapshot</h3>
+            <div class="dashboard-summary-grid">
+                <div class="dashboard-summary-item">
+                    <span class="summary-label">Latest Vitals</span>
+                    <span class="summary-value"><?= $latestVital ? 'BP '.htmlspecialchars($latestVital['bp'] ?? '—').' · Pulse '.htmlspecialchars($latestVital['pulse'] ?? '—').' · Temp '.htmlspecialchars($latestVital['temperature'] ?? '—') : 'No vitals recorded' ?></span>
+                </div>
+                <div class="dashboard-summary-item">
+                    <span class="summary-label">Latest Diagnosis</span>
+                    <span class="summary-value"><?= htmlspecialchars($encounter['diagnosis'] ?? 'No diagnosis recorded') ?></span>
+                </div>
+                <div class="dashboard-summary-item <?= !empty($encounter['allergies']) ? 'alert-card' : '' ?>">
+                    <span class="summary-label">Allergies</span>
+                    <span class="summary-value"><?= !empty($encounter['allergies']) ? htmlspecialchars($encounter['allergies']) : 'No allergy documented' ?></span>
+                </div>
+            </div>
+            <div class="dashboard-quick-actions">
+                <?php foreach ($quickActions as $action): ?>
+                    <?php if (!empty($action['allowed'])): ?>
+                        <?php if (!empty($action['url'])): ?>
+                            <a href="<?= htmlspecialchars($action['url']) ?>" class="primary-action"><i class="fas <?= htmlspecialchars($action['icon']) ?>"></i><?= htmlspecialchars($action['label']) ?></a>
+                        <?php else: ?>
+                            <button type="button" onclick="showTab('<?= htmlspecialchars($action['tab']) ?>')"><i class="fas <?= htmlspecialchars($action['icon']) ?>"></i><?= htmlspecialchars($action['label']) ?></button>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <div class="dashboard-summary-panel">
+            <h3 class="dashboard-summary-title"><i class="fas fa-route"></i> Patient Journey</h3>
+            <ul class="dashboard-timeline">
+                <li><strong>Registration</strong><br><?= htmlspecialchars($patient['patient_number'] ?? 'Patient record') ?></li>
+                <?php if ($recentAppointment): ?><li><strong>Appointment</strong><br><?= htmlspecialchars(($recentAppointment['appointment_date'] ?? '').' '.($recentAppointment['appointment_time'] ?? '')) ?></li><?php endif; ?>
+                <?php if ($activeVisit): ?><li><strong>Current Visit</strong><br><?= htmlspecialchars($activeVisit['visit_number'].' · '.$activeVisit['status']) ?></li><?php endif; ?>
+                <?php if ($latestVital): ?><li><strong>Vitals</strong><br><?= htmlspecialchars(date('d M Y H:i',strtotime($latestVital['created_at']))) ?></li><?php endif; ?>
+                <?php if ($encounter): ?><li><strong>Clinical Encounter</strong><br><?= htmlspecialchars($encounter['diagnosis'] ?? 'Clinical record available') ?></li><?php endif; ?>
+                <?php if ($currentAdmission): ?><li><strong>Inpatient</strong><br><?= htmlspecialchars(($currentAdmission['ward_name'] ?? 'Ward').' · Bed '.($currentAdmission['bed_number'] ?? '—')) ?></li><?php endif; ?>
+                <?php if ($balance_due > 0): ?><li><strong>Finance</strong><br>KSH <?= number_format($balance_due,2) ?> outstanding</li><?php else: ?><li><strong>Finance</strong><br>Account currently settled</li><?php endif; ?>
+            </ul>
         </div>
     </div>
 
