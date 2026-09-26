@@ -1,37 +1,8 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../includes/session.php';
-require_login();
-require_once __DIR__ . '/../includes/auth.php';
-require_module_access($conn, 'finance', 'create');
-require_role(['admin','cashier','accountant']);
-
-$maternity_id = intval($_GET['id'] ?? 0);
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $item = $conn->real_escape_string($_POST['item']);
-  $amount = floatval($_POST['amount']);
-  $stmt = $conn->prepare("INSERT INTO maternity_billing (maternity_id, item, amount) VALUES (?,?,?)");
-  $stmt->bind_param("isd", $_POST['maternity_id'], $item, $amount);
-  $stmt->execute();
-  audit('maternity_bill', "maternity_id={$_POST['maternity_id']},item={$item},amount={$amount}");
-  header("Location: view.php?id=".$_POST['maternity_id']);
-  exit;
-}
-
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-?>
-
-<div class="main">
-  <div class="page-title">Add Maternity Charge</div>
-  <div class="card" style="max-width:700px">
-    <form method="post">
-      <input type="hidden" name="maternity_id" value="<?= $maternity_id ?>">
-      <label>Item</label><input name="item" class="form-control" required>
-      <label style="margin-top:8px">Amount</label><input name="amount" type="number" step="0.01" class="form-control" required>
-      <div style="margin-top:12px"><button class="btn">Add</button></div>
-    </form>
-  </div>
-</div>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_once __DIR__ . '/../helpers/billing.php';require_login();require_module_access($conn,'finance','create');require_role(['admin','cashier','accountant']);
+$id=max(0,(int)($_GET['id']??$_POST['maternity_id']??0));if(!$id){header('Location:index.php');exit;}
+$s=$conn->prepare("SELECT m.patient_id,p.full_name,m.anc_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
+if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32));$csrfToken=$_SESSION['csrf_token'];$error='';
+if($_SERVER['REQUEST_METHOD']==='POST'){if(!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))){$error='Security token mismatch.';}else{$item=trim((string)($_POST['item']??''));$amount=round((float)($_POST['amount']??0),2);if($item===''||$amount<=0)$error='Charge description and a positive amount are required.';else{$conn->begin_transaction();try{$visitId=get_or_create_current_visit($conn,(int)$m['patient_id'],'Outpatient','Maternity');$invoiceId=get_or_create_visit_invoice($conn,(int)$m['patient_id'],$visitId);$itemId=add_invoice_item($conn,$invoiceId,$item,1,$amount,'maternity',null);post_invoice_journal($conn,$invoiceId,(int)$m['patient_id'],$amount,'Maternity manual charge',$itemId);if(function_exists('audit'))audit('maternity_charge',"maternity_id={$id},amount={$amount}");$conn->commit();header("Location:view.php?id={$id}&charge=1");exit;}catch(Throwable $e){$conn->rollback();$error=$e->getMessage();}}}}
+include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';?>
+<div class="main-content"><div class="container-fluid pt-4"><div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h4 mb-1 text-gray-800"><i class="fas fa-file-invoice-dollar text-primary mr-2"></i>Add Maternity Charge</h2><p class="text-muted mb-0"><?=htmlspecialchars($m['full_name'])?> · <?=htmlspecialchars($m['anc_number'])?></p></div><a href="view.php?id=<?=$id?>" class="btn btn-light">Back to Record</a></div><?php if($error):?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif;?><div class="card shadow-sm" style="max-width:800px"><div class="card-header bg-white"><strong>Central Invoice Charge</strong></div><div class="card-body"><div class="alert alert-info">This charge is posted to the patient's central invoice and is collected by Central Cashier. It is not stored in a separate maternity billing ledger.</div><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="maternity_id" value="<?=$id?>"><div class="form-group"><label>Charge Description</label><input name="item" class="form-control" required></div><div class="form-group"><label>Amount (KSH)</label><input name="amount" type="number" step="0.01" min="0.01" class="form-control" required></div><button class="btn btn-primary"><i class="fas fa-plus mr-1"></i>Add to Central Invoice</button></form></div></div></div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
