@@ -3,266 +3,69 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
-
-if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-$csrfToken = $_SESSION['csrf_token'];
+require_module_access($conn, 'clinical', 'create');
 require_once __DIR__ . '/../includes/auth.php';
-require_role(['admin', 'doctor', 'nurse', 'receptionist']);
+require_role(['admin','doctor','nurse','receptionist']);
 
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
+$csrfToken=$_SESSION['csrf_token']; $message='';
+$preWard=trim((string)($_GET['ward']??''));
+$preBed=(int)($_GET['bed']??0);
 
-$message = "";
+$wards=['General Ward (Male)','General Ward (Female)','Maternity Ward','Pediatric Ward','ICU'];
 
-// Capture Ward and Bed from URL
-$pre_ward = $_GET['ward'] ?? '';
-$pre_bed  = $_GET['bed'] ?? '';
-
-// Handle Form Submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
-        $message = "<div class='alert alert-danger'>Invalid security token. Please try again.</div>";
-    } else {
-        $patient_id = intval($_POST['patient_id'] ?? 0);
-        $ward_name = trim($_POST['ward_name'] ?? '');
-        $bed_number = intval($_POST['bed_number'] ?? 0);
-        $admit_date = trim($_POST['admit_date'] ?? '');
-        $reason = trim($_POST['reason'] ?? '');
-        $attending_doc = trim($_POST['attending_doctor'] ?? '');
-        $current_user_id = (int)($_SESSION['user_id'] ?? 0);
-
-        if ($patient_id <= 0 || $bed_number <= 0 || $ward_name === '' || $reason === '' || $attending_doc === '') {
-            $message = "<div class='alert alert-danger'>Complete all required admission details.</div>";
-        } else {
-            $check_stmt = $conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' LIMIT 1");
-            $check_stmt->bind_param("si", $ward_name, $bed_number);
-            $check_stmt->execute();
-            $occupied = $check_stmt->get_result()->fetch_assoc();
-            $check_stmt->close();
-
-            $existingPatient = $conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1");
-            $existingPatient->bind_param('i', $patient_id);
-            $existingPatient->execute();
-            $alreadyAdmitted = $existingPatient->get_result()->fetch_assoc();
-            $existingPatient->close();
-
-            if ($occupied) {
-                $message = "<div class='alert alert-danger'><strong>Bed Conflict:</strong> Bed ".(int)$bed_number." in ".htmlspecialchars($ward_name)." is currently occupied.</div>";
-            } elseif ($alreadyAdmitted) {
-                $message = "<div class='alert alert-warning'>This patient is already admitted. Review the current admission before creating another one.</div>";
-            } else {
-                $visitId = get_or_create_current_visit($conn, $patient_id, 'Inpatient', $ward_name);
-                $hasAdmissionVisit = false;
-                $vc = $conn->query("SHOW COLUMNS FROM admissions LIKE 'visit_id'");
-                if ($vc && $vc->num_rows > 0) $hasAdmissionVisit = true;
-
-                $status = 'Admitted';
-                if ($hasAdmissionVisit && $visitId > 0) {
-                    $stmt = $conn->prepare("INSERT INTO admissions (patient_id, visit_id, ward_name, bed_number, admit_date, reason, admitted_by, attending_doctor, created_by, status) VALUES (?,?,?,?,?,?,?,?,?,?)");
-                    $stmt->bind_param("iisisisiss", $patient_id, $visitId, $ward_name, $bed_number, $admit_date, $reason, $current_user_id, $attending_doc, $current_user_id, $status);
-                } else {
-                    $stmt = $conn->prepare("INSERT INTO admissions (patient_id, ward_name, bed_number, admit_date, reason, admitted_by, attending_doctor, created_by, status) VALUES (?,?,?,?,?,?,?,?,?)");
-                    $stmt->bind_param("isisisiss", $patient_id, $ward_name, $bed_number, $admit_date, $reason, $current_user_id, $attending_doc, $current_user_id, $status);
-                }
-
-                if ($stmt && $stmt->execute()) {
-                    if ($visitId > 0) {
-                        $v = $conn->prepare("UPDATE visits SET visit_type='Inpatient', clinic_category=?, status='In Progress', updated_at=NOW() WHERE id=? AND patient_id=?");
-                        if ($v) { $v->bind_param('sii', $ward_name, $visitId, $patient_id); $v->execute(); $v->close(); }
-                    }
-                    $message = "<div class='alert alert-success'><strong>Patient admitted successfully.</strong> Bed ".(int)$bed_number." in ".htmlspecialchars($ward_name)." is now occupied. <a href='ward_management.php' class='alert-link ml-2'>View Ward</a></div>";
-                } else {
-                    $message = "<div class='alert alert-danger'>Unable to complete admission: ".htmlspecialchars($stmt ? $stmt->error : $conn->error)."</div>";
-                }
-                if ($stmt) $stmt->close();
-            }
-        }
-    }
+if($_SERVER['REQUEST_METHOD']==='POST'){
+ if(!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))){$message="<div class='alert alert-danger'>Invalid security token. Please refresh and try again.</div>";}
+ else{
+  $patientId=(int)($_POST['patient_id']??0); $ward=trim((string)($_POST['ward_name']??'')); $bed=(int)($_POST['bed_number']??0);
+  $admitDate=trim((string)($_POST['admit_date']??'')); $reason=trim((string)($_POST['reason']??'')); $doctor=trim((string)($_POST['attending_doctor']??'')); $userId=(int)($_SESSION['user_id']??0);
+  if($patientId<=0||!in_array($ward,$wards,true)||$bed<1||$reason===''||$doctor===''){$message="<div class='alert alert-danger'>Complete all required admission details.</div>";}
+  else{
+   $s=$conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' LIMIT 1");$s->bind_param('si',$ward,$bed);$s->execute();$occupied=$s->get_result()->fetch_assoc();$s->close();
+   $s=$conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1");$s->bind_param('i',$patientId);$s->execute();$already=$s->get_result()->fetch_assoc();$s->close();
+   if($occupied)$message="<div class='alert alert-danger'><strong>Bed unavailable.</strong> Bed {$bed} in ".htmlspecialchars($ward)." is occupied.</div>";
+   elseif($already)$message="<div class='alert alert-warning'>This patient already has an active admission.</div>";
+   else{
+    $visitId=get_or_create_current_visit($conn,$patientId,'Inpatient',$ward);
+    $hasVisitColumn=false;$vc=$conn->query("SHOW COLUMNS FROM admissions LIKE 'visit_id'");if($vc&&$vc->num_rows)$hasVisitColumn=true;
+    $status='Admitted';
+    if($hasVisitColumn&&$visitId>0){$s=$conn->prepare("INSERT INTO admissions (patient_id,visit_id,ward_name,bed_number,admit_date,reason,admitted_by,attending_doctor,created_by,status) VALUES (?,?,?,?,?,?,?,?,?,?)");$s->bind_param('iisisisiss',$patientId,$visitId,$ward,$bed,$admitDate,$reason,$userId,$doctor,$userId,$status);}
+    else{$s=$conn->prepare("INSERT INTO admissions (patient_id,ward_name,bed_number,admit_date,reason,admitted_by,attending_doctor,created_by,status) VALUES (?,?,?,?,?,?,?,?,?)");$s->bind_param('isisisiss',$patientId,$ward,$bed,$admitDate,$reason,$userId,$doctor,$userId,$status);}
+    if($s&&$s->execute()){
+      if($visitId>0){$v=$conn->prepare("UPDATE visits SET visit_type='Inpatient',clinic_category=?,status='In Progress',updated_at=NOW() WHERE id=? AND patient_id=?");if($v){$v->bind_param('sii',$ward,$visitId,$patientId);$v->execute();$v->close();}}
+      if(function_exists('audit'))audit('patient_admission',"patient_id={$patientId},ward={$ward},bed={$bed}");
+      $message="<div class='alert alert-success'><strong>Patient admitted successfully.</strong> Bed {$bed} in ".htmlspecialchars($ward)." is now occupied. <a href='ward_management.php' class='alert-link ml-2'>View Ward</a></div>";
+    }else $message="<div class='alert alert-danger'>Unable to complete admission: ".htmlspecialchars($s?$s->error:$conn->error)."</div>";
+    if($s)$s->close();
+   }
+  }
+ }
 }
-
-$patients_query = $conn->query("SELECT id, full_name, phone FROM patients ORDER BY full_name ASC");
+$patients=$conn->query("SELECT id,full_name,patient_number,phone FROM patients ORDER BY full_name ASC");
+include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';
 ?>
-
 <style>
-    .main-content { background-color: #f0f2f5; min-height: 100vh; }
-    
-    /* Expanded Card Styling */
-    .card-admission { 
-        border-radius: 12px; 
-        border: none; 
-        background: #ffffff;
-    }
-
-    .section-title { 
-        font-size: 0.85rem; 
-        font-weight: 800; 
-        color: #4e73df; 
-        text-transform: uppercase; 
-        letter-spacing: 1.5px; 
-        display: flex; 
-        align-items: center; 
-        margin: 30px 0 20px 0;
-    }
-    .section-title:first-child { margin-top: 0; }
-    .section-title::after { content: ""; flex: 1; height: 1px; background: #eaecf4; margin-left: 20px; }
-    
-    .form-control { 
-        border-radius: 6px; 
-        border: 1px solid #d1d3e2; 
-        padding: 0.75rem 1rem; 
-        height: auto;
-    }
-    .form-control:focus { 
-        box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.1); 
-        border-color: #4e73df; 
-    }
-    
-    .input-group-text { 
-        background: #f8f9fc; 
-        color: #858796; 
-        border-right: none; 
-        padding-left: 20px;
-        padding-right: 20px;
-    }
-    .form-with-icon .form-control { border-left: none; }
-    
-    .btn-register { 
-        border-radius: 8px; 
-        padding: 15px 40px; 
-        font-weight: 700; 
-        font-size: 1rem;
-        background: #4e73df;
-        border: none;
-        transition: all 0.2s;
-    }
-    .btn-register:hover { 
-        background: #2e59d9;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(78, 115, 223, 0.2);
-    }
-
-    /* Select2 Overrides for wide screens */
-    .select2-container--bootstrap4 .select2-selection--single {
-        height: calc(1.5 em + 1.5 rem + 2px) !important;
-    }
+.admit-page{padding:28px 0 45px}.admit-hero{background:linear-gradient(135deg,#f7fbff,#fff);border:1px solid #e6edf5;border-radius:16px;padding:24px 26px;display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}.admit-kicker{font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#4e73df}.admit-hero h1{font-size:26px;font-weight:800;color:#26364a;margin:4px 0}.admit-hero p{color:#6b7785;margin:0}.admit-card{background:#fff;border:1px solid #e8edf3;border-radius:16px;box-shadow:0 7px 22px rgba(31,45,61,.06)}.admit-section{padding:22px 25px;border-bottom:1px solid #edf1f5}.admit-section:last-child{border-bottom:0}.admit-section h3{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:#4e73df;font-weight:800;margin:0 0 18px}.admit-section h3 i{margin-right:7px}.admit-label{font-size:12px;font-weight:800;color:#566474;text-transform:uppercase;letter-spacing:.35px;margin-bottom:7px}.admit-field{border:1px solid #dbe3ec;border-radius:9px;padding:11px 13px;height:auto}.admit-field:focus{border-color:#4e73df;box-shadow:0 0 0 3px rgba(78,115,223,.1)}.admit-footer{padding:20px 25px;background:#fafbfd;border-radius:0 0 16px 16px;display:flex;justify-content:space-between;align-items:center;gap:15px}@media(max-width:767px){.admit-hero,.admit-footer{align-items:flex-start;flex-direction:column}.admit-footer .btn{width:100%}}
 </style>
-
-<div class="main-content">
-    <div class="container-fluid py-4">
-        
-        <div class="row mb-4">
-            <div class="col-12 d-sm-flex align-items-center justify-content-between">
-                <div>
-                    <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Clinical Admission Portal</h1>
-                    <p class="text-muted mb-0">Full-width interface for inpatient registration and bed allocation.</p>
-                </div>
-                <div class="mt-3 mt-sm-0">
-                    <a href="ward_management.php" class="btn btn-white shadow-sm border px-4">
-                        <i class="fas fa-arrow-left mr-2 text-primary"></i> Back to Wards
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-12">
-                <?= $message ?>
-                
-                <div class="card card-admission shadow-sm">
-                    <div class="card-body p-4 p-md-5">
-                        <form method="POST" autocomplete="off" class="form-with-icon">
-                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                            
-                            <div class="section-title">1. Patient Identification</div>
-                            <div class="row">
-                                <div class="col-lg-8 mb-4">
-                                    <label class="small font-weight-bold text-dark">Search Patient Database</label>
-                                    <div class="input-group">
-                                        <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-search"></i></span></div>
-                                        <select name="patient_id" class="form-control select2" required>
-                                            <option value="" disabled selected>Start typing patient name, ID, or phone number...</option>
-                                            <?php while($p = $patients_query->fetch_assoc()): ?>
-                                                <option value="<?= $p['id'] ?>">
-                                                    <?= htmlspecialchars($p['full_name']) ?> — (ID: <?= $p['id'] ?> | Tel: <?= $p['phone'] ?>)
-                                                </option>
-                                            <?php endwhile; ?>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-lg-4 mb-4">
-                                    <label class="small font-weight-bold text-dark">Attending Doctor</label>
-                                    <div class="input-group">
-                                        <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-user-md"></i></span></div>
-                                        <input type="text" name="attending_doctor" class="form-control" placeholder="Physician Name" required>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="section-title">2. Ward & Bed Assignment</div>
-                            <div class="row">
-                                <div class="col-md-5 mb-4">
-                                    <label class="small font-weight-bold text-dark">Department / Ward</label>
-                                    <div class="input-group">
-                                        <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-hospital-alt"></i></span></div>
-                                        <select name="ward_name" class="form-control" required>
-                                            <option value="General Ward (Male)" <?= ($pre_ward == 'General Ward (Male)') ? 'selected' : '' ?>>General Ward (Male)</option>
-                                            <option value="General Ward (Female)" <?= ($pre_ward == 'General Ward (Female)') ? 'selected' : '' ?>>General Ward (Female)</option>
-                                            <option value="Maternity Ward" <?= ($pre_ward == 'Maternity Ward') ? 'selected' : '' ?>>Maternity Ward</option>
-                                            <option value="Pediatric Ward" <?= ($pre_ward == 'Pediatric Ward') ? 'selected' : '' ?>>Pediatric Ward</option>
-                                            <option value="ICU" <?= ($pre_ward == 'ICU') ? 'selected' : '' ?>>Intensive Care Unit (ICU)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 mb-4">
-                                    <label class="small font-weight-bold text-dark">Bed Number</label>
-                                    <div class="input-group">
-                                        <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-tag"></i></span></div>
-                                        <input type="number" name="bed_number" class="form-control" value="<?= htmlspecialchars($pre_bed) ?>" min="1" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-4">
-                                    <label class="small font-weight-bold text-dark">Admission Date & Time</label>
-                                    <div class="input-group">
-                                        <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-calendar-check"></i></span></div>
-                                        <input type="datetime-local" name="admit_date" class="form-control" value="<?= date('Y-m-d\TH:i') ?>" required>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="section-title">3. Clinical Notes</div>
-                            <div class="form-group mb-5">
-                                <label class="small font-weight-bold text-dark">Reason for Admission / Initial Diagnosis</label>
-                                <textarea name="reason" class="form-control" rows="5" required placeholder="Enter detailed clinical reasons for this admission..."></textarea>
-                            </div>
-
-                            <hr>
-
-                            <div class="d-flex justify-content-between align-items-center mt-4">
-                                <div>
-                                    <p class="mb-0 text-muted small">Logged-in User:</p>
-                                    <span class="badge badge-light border text-dark font-weight-normal py-2 px-3">
-                                        <i class="fas fa-id-badge mr-2 text-primary"></i><?= htmlspecialchars($_SESSION['user_name'] ?? 'System') ?>
-                                    </span>
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-register shadow">
-                                    Finalize Patient Admission <i class="fas fa-chevron-right ml-2"></i>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    $(document).ready(function() {
-        $('.select2').select2({
-            theme: 'bootstrap4',
-            width: '100%'
-        });
-    });
-</script>
-
+<div class="main-content"><div class="container-fluid admit-page">
+ <div class="admit-hero"><div><div class="admit-kicker">Clinical · Inpatient Care</div><h1>New Patient Admission</h1><p>Register the admission, allocate a bed and start the inpatient encounter.</p></div><a href="ward_management.php" class="btn btn-light border"><i class="fas fa-bed text-primary mr-1"></i> Ward Management</a></div>
+ <?=$message?>
+ <div class="admit-card">
+  <form method="post" autocomplete="off">
+   <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
+   <div class="admit-section"><h3><i class="fas fa-user-injured"></i>Patient & Clinician</h3><div class="row">
+    <div class="col-lg-7 mb-3"><label class="admit-label">Patient</label><select name="patient_id" class="form-control admit-field select2" required><option value="">Search patient</option><?php if($patients):while($p=$patients->fetch_assoc()):?><option value="<?=$p['id']?>"><?=htmlspecialchars($p['full_name'])?> — <?=htmlspecialchars($p['patient_number'])?><?=!empty($p['phone'])?' · '.htmlspecialchars($p['phone']):''?></option><?php endwhile;endif;?></select></div>
+    <div class="col-lg-5 mb-3"><label class="admit-label">Attending Clinician</label><input name="attending_doctor" class="form-control admit-field" value="<?=htmlspecialchars($_POST['attending_doctor']??'')?>" placeholder="Physician / clinician name" required></div>
+   </div></div>
+   <div class="admit-section"><h3><i class="fas fa-bed"></i>Ward & Bed Allocation</h3><div class="row">
+    <div class="col-md-6 mb-3"><label class="admit-label">Ward</label><select name="ward_name" class="form-control admit-field" required><?php foreach($wards as $w):?><option value="<?=htmlspecialchars($w)?>" <?=($preWard===$w?'selected':'')?>><?=htmlspecialchars($w)?><?=($w==='ICU'?' — Intensive Care Unit':'')?></option><?php endforeach;?></select></div>
+    <div class="col-md-3 mb-3"><label class="admit-label">Bed Number</label><input type="number" min="1" max="6" name="bed_number" class="form-control admit-field" value="<?=htmlspecialchars((string)$preBed)?>" required></div>
+    <div class="col-md-3 mb-3"><label class="admit-label">Admission Date & Time</label><input type="datetime-local" name="admit_date" class="form-control admit-field" value="<?=htmlspecialchars($_POST['admit_date']??date('Y-m-d\TH:i'))?>" required></div>
+   </div></div>
+   <div class="admit-section"><h3><i class="fas fa-notes-medical"></i>Clinical Information</h3><label class="admit-label">Reason for Admission / Initial Diagnosis</label><textarea name="reason" class="form-control admit-field" rows="5" placeholder="Document the clinical reason for admission, presenting diagnosis or indication..." required><?=htmlspecialchars($_POST['reason']??'')?></textarea></div>
+   <div class="admit-footer"><div class="small text-muted"><i class="fas fa-user-circle mr-1"></i> Recorded by <strong><?=htmlspecialchars($_SESSION['user_name']??'System User')?></strong></div><div><a href="ward_management.php" class="btn btn-light border mr-2">Cancel</a><button class="btn btn-primary px-4"><i class="fas fa-check-circle mr-1"></i> Admit Patient</button></div></div>
+  </form>
+ </div>
+</div></div>
+<script>$(function(){if($.fn.select2){$('.select2').select2({theme:'bootstrap4',width:'100%',placeholder:'Search patient'});}});</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
