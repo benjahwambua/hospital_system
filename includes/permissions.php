@@ -29,7 +29,7 @@ function can_access_module(mysqli $conn, string $moduleKey): bool {
                 'pharmacy'=>in_array($role,['admin','pharmacist'],true),
                 'maternity'=>in_array($role,['admin','doctor','nurse'],true),
                 'finance'=>in_array($role,['admin','cashier','accountant'],true),
-                'procurement'=>in_array($role,['admin'],true),
+                'procurement'=>in_array($role,['admin','procurement','storekeeper','stores'],true),
                 'finance_admin'=>in_array($role,['admin','accountant'],true),
                 'administration'=>in_array($role,['admin'],true)
             ];
