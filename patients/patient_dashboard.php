@@ -56,6 +56,22 @@ if ($patient_id > 0 && $appointment_id > 0) {
     }
 }
 
+// If the dashboard was opened directly (without an appointment link), resolve the
+// patient's current open encounter before loading clinical, service, prescription,
+// and billing data. This keeps the dashboard anchored to one encounter.
+if ($patient_id > 0 && $activeVisitId <= 0 && hms_visits_available($conn)) {
+    $currentVisitStmt = $conn->prepare("SELECT id FROM visits WHERE patient_id=? AND status IN ('Open','In Progress') ORDER BY CASE WHEN visit_date=CURDATE() THEN 0 ELSE 1 END, visit_date DESC, id DESC LIMIT 1");
+    if ($currentVisitStmt) {
+        $currentVisitStmt->bind_param('i', $patient_id);
+        $currentVisitStmt->execute();
+        $currentVisitRow = $currentVisitStmt->get_result()->fetch_assoc();
+        $currentVisitStmt->close();
+        if ($currentVisitRow) {
+            $activeVisitId = (int)$currentVisitRow['id'];
+        }
+    }
+}
+
 // Visit-linked clinical records are preferred whenever the modern visit columns exist.
 $hasVisitVitals = false;
 $hasVisitServices = false;
@@ -676,8 +692,8 @@ if (!empty($patient['is_walkin'])) {
 // 4. BEGIN OUTPUT
 // ==============================================================================
 $activeVisit = null;
-$activeVisitRes = $conn->prepare("SELECT id, visit_number, visit_type, clinic_category, visit_date, visit_time, status FROM visits WHERE patient_id=? AND visit_date=CURDATE() AND status IN ('Open','In Progress') ORDER BY id DESC LIMIT 1");
-if ($activeVisitRes) { $activeVisitRes->bind_param('i', $patient_id); $activeVisitRes->execute(); $activeVisit = $activeVisitRes->get_result()->fetch_assoc(); $activeVisitRes->close(); }
+$activeVisitRes = $conn->prepare("SELECT id, visit_number, visit_type, clinic_category, visit_date, visit_time, status FROM visits WHERE id=? AND patient_id=? LIMIT 1");
+if ($activeVisitRes) { $activeVisitRes->bind_param('ii', $activeVisitId, $patient_id); $activeVisitRes->execute(); $activeVisit = $activeVisitRes->get_result()->fetch_assoc(); $activeVisitRes->close(); }
 
 // Patient Dashboard command-centre context.
 // Keep this summary read-only; specialist modules remain responsible for transactions.
