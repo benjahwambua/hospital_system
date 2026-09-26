@@ -16,10 +16,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id']))
     $conn->begin_transaction();
     try {
         if ($del_id <= 0) throw new Exception('Invalid invoice.');
+            $checks = [
+            'payments' => "SELECT COUNT(*) AS c FROM payments WHERE invoice_id = ?",
+            'payment_refunds' => "SELECT COUNT(*) AS c FROM payment_refunds WHERE invoice_id = ?",
+            'accounting_entries' => "SELECT COUNT(*) AS c FROM accounting_entries WHERE invoice_id = ?"
+        ];
+        foreach ($checks as $label => $sql) {
+            $check = $conn->prepare($sql);
+            if (!$check) throw new Exception('Unable to validate invoice financial history.');
+            $check->bind_param('i', $del_id);
+            $check->execute();
+            $count = (int)($check->get_result()->fetch_assoc()['c'] ?? 0);
+            $check->close();
+            if ($count > 0) throw new Exception("Invoice #$del_id has financial activity ($label) and cannot be deleted.");
+        }
+
         $stmt = $conn->prepare("DELETE FROM invoice_items WHERE invoice_id = ?");
         $stmt->bind_param('i', $del_id); $stmt->execute(); $stmt->close();
         $stmt = $conn->prepare("DELETE FROM invoices WHERE id = ?");
-        $stmt->bind_param('i', $del_id); $stmt->execute(); $stmt->close();
+        $stmt->bind_param('i', $del_id); $stmt->execute();
+        if ($stmt->affected_rows !== 1) throw new Exception('Invoice not found.');
+        $stmt->close();
         
         $conn->commit();
         $_SESSION['success'] = "Invoice #$del_id deleted successfully.";
@@ -58,8 +75,13 @@ $query = "
     LEFT JOIN (
         -- Payments belong to invoices, not patients. Aggregating by patient
         -- caused one patient's old payments to reduce another invoice.
-        SELECT p.invoice_id, SUM(p.amount) - COALESCE(SUM(CASE WHEN r.status='Approved' THEN r.amount ELSE 0 END),0) AS total_paid
-        FROM payments p LEFT JOIN payment_refunds r ON r.payment_id=p.id
+        SELECT p.invoice_id,
+               SUM(p.amount) - COALESCE((
+                   SELECT SUM(r.amount)
+                   FROM payment_refunds r
+                   WHERE r.invoice_id = p.invoice_id AND r.status='Approved'
+               ),0) AS total_paid
+        FROM payments p
         WHERE p.invoice_id IS NOT NULL
         GROUP BY p.invoice_id
     ) pay ON i.id = pay.invoice_id
