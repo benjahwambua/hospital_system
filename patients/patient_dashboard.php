@@ -794,7 +794,8 @@ if ($patient_id <= 0) {
         <li onclick="showTab('clinical')" id="tab-clinical" class="active">Clinical Encounter</li>
         <li onclick="showTab('services')" id="tab-services">Services</li>
         <li onclick="showTab('prescriptions')" id="tab-prescriptions">Pharmacy & Prescriptions</li>
-        <li onclick="showTab('billing')" id="tab-billing">Billing</li>\n        <li onclick="showTab('maternity')" id="tab-maternity">Maternity</li>
+        <li onclick="showTab('billing')" id="tab-billing">Billing</li>
+        <li onclick="showTab('maternity')" id="tab-maternity">Maternity</li>
         <li onclick="showTab('coverage')" id="tab-coverage">Insurance & SHA</li>
     </ul>
 
