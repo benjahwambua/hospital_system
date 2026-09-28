@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_id']=(int)$u['id']; $_SESSION['username']=$u['username']; $_SESSION['role']=$u['role'];
                 $_SESSION['is_super']=(int)$u['is_super']; $_SESSION['full_name']=$u['full_name'];
                 // Preserve the browser-bound CSRF token across session-id regeneration.
-                $_SESSION['csrf_token'] = csrf_token();
+                $_SESSION['csrf_token'] = rotate_csrf_token();
                 header('Location: /hospital_system/dashboard.php'); exit;
             }
         }
