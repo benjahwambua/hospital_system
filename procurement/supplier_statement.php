@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
-require_role(['admin']);
+require_module_access($conn, 'procurement', 'view');
 
 $supplierId=max(0,(int)($_GET['supplier_id']??0));
 $from=trim((string)($_GET['from']??date('Y-m-01')));
