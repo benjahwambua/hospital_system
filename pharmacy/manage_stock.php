@@ -85,6 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Failed to update stock";
     }
     }
+}
 
 /* NOW SAFE TO OUTPUT HTML */
 include __DIR__ . '/../includes/header.php';
