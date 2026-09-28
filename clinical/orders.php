@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
     } else {
         $type = strtolower(trim($_POST['order_type'] ?? ''));
         try {
+            $conn->begin_transaction();
             if (in_array($type,['lab','radiology'],true)) {
                 $serviceId=(int)($_POST['service_id'] ?? 0);
                 $s=$conn->prepare("SELECT id,service_name,price FROM services_master WHERE id=? AND active=1 AND category=? LIMIT 1");
@@ -47,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
                 $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$service['service_name'],1,$price,$type,$serviceId);
                 post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
+                $conn->commit();
                 $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.' sent to Central Cashier.';
             } elseif ($type==='pharmacy') {
                 $medicineId=(int)($_POST['medicine_id'] ?? 0);
@@ -71,15 +73,26 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                     $has=$conn->query("SHOW COLUMNS FROM pharmacy_queue LIKE 'visit_id'");
                     if ($has && $has->num_rows) {
                         $pq=$conn->prepare("INSERT INTO pharmacy_queue (prescription_id,patient_id,medicine_id,quantity,status,visit_id,created_at) VALUES (?,?,?,?, 'pending',?,NOW())");
-                        $pq->bind_param('iiiii',$prescriptionId,$patientId,$medicineId,$quantity,$visitId); $pq->execute(); $pq->close();
+                        if (!$pq) throw new Exception('Unable to prepare pharmacy queue entry.');
+                        $pq->bind_param('iiiii',$prescriptionId,$patientId,$medicineId,$quantity,$visitId);
+                        if (!$pq->execute()) { $err=$pq->error; $pq->close(); throw new Exception('Unable to send prescription to Pharmacy: '.$err); }
+                        $pq->close();
                     } else {
                         $pq=$conn->prepare("INSERT INTO pharmacy_queue (prescription_id,patient_id,medicine_id,quantity,status,created_at) VALUES (?,?,?,?, 'pending',NOW())");
-                        $pq->bind_param('iiii',$prescriptionId,$patientId,$medicineId,$quantity); $pq->execute(); $pq->close();
+                        if (!$pq) throw new Exception('Unable to prepare pharmacy queue entry.');
+                        $pq->bind_param('iiii',$prescriptionId,$patientId,$medicineId,$quantity);
+                        if (!$pq->execute()) { $err=$pq->error; $pq->close(); throw new Exception('Unable to send prescription to Pharmacy: '.$err); }
+                        $pq->close();
                     }
                 }
+                $conn->commit();
                 $message='Prescription sent to Pharmacy for dispensing. Stock and the pharmacy charge are posted when Pharmacy dispenses. Payment is collected only by Central Cashier.';
             } else throw new Exception('Select a department.');
-        } catch (Throwable $e) { $message=$e->getMessage(); }
+        } catch (Throwable $e) {
+            if ($conn->errno === 0) { /* no-op: transaction state is connection-managed */ }
+            $conn->rollback();
+            $message=$e->getMessage();
+        }
     }
 }
 
