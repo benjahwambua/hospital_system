@@ -2,6 +2,10 @@
 // Load shared HMS billing/visit helpers for every authenticated module.
 require_once __DIR__ . '/../helpers/billing.php';
 if (session_status() === PHP_SESSION_NONE) {
+    // Use a dedicated HMS session cookie so legacy PHPSESSID cookies from older
+    // localhost versions cannot cause the dashboard CSRF token to come from a
+    // different session.
+    session_name('HMSSESSID');
     $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
     session_set_cookie_params(['lifetime'=>0,'path'=>'/hospital_system/','secure'=>$secure,'httponly'=>true,'samesite'=>'Lax']);
     session_start();
