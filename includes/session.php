@@ -38,8 +38,14 @@ function require_login(): void {
             'reports/' => ['administration','view']
         ];
 
+        // Patient Dashboard is a cross-module command centre. It is intentionally
+        // handled by the page itself because both Front Desk and Clinical users may
+        // legitimately open it; forcing it into one module here can cause access
+        // handlers/custom 403 redirects to loop.
+        $isPatientDashboard = ($relative === 'patients/patient_dashboard.php');
+
         foreach ($moduleMap as $prefix => $rule) {
-            if ($prefix === $relative || str_ends_with($prefix, '/') && str_starts_with($relative, $prefix)) {
+            if (!$isPatientDashboard && ($prefix === $relative || (str_ends_with($prefix, '/') && str_starts_with($relative, $prefix)))) {
                 $module = $rule;
                 break;
             }
