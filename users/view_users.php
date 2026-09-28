@@ -36,7 +36,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($isDelete) {
         $deleteId = (int)($_POST['delete_user'] ?? 0);
         $selfId = (int)($_SESSION['user_id'] ?? 0);
-
         if ($deleteId <= 0) redirect_with_message('Invalid delete request.');
         if ($deleteId === $selfId) redirect_with_message('You cannot delete your own account.');
 
@@ -55,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $deleteStmt->bind_param('i', $deleteId);
         $deleteStmt->execute();
         $deleteStmt->close();
-
         redirect_with_message('User deleted successfully.');
     }
 
@@ -68,22 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($uid <= 0 || $fullName === '') redirect_with_message('Invalid user details provided.');
     if (!in_array($role, $allowedRoles, true)) redirect_with_message('Invalid role selected.');
-    if ($newPassword !== '' && strlen($newPassword) < 8) {
-        redirect_with_message('Password must be at least 8 characters long.');
-    }
+    if ($newPassword !== '' && strlen($newPassword) < 8) redirect_with_message('Password must be at least 8 characters long.');
 
     $userStmt = $conn->prepare("SELECT id, is_super FROM users WHERE id = ? LIMIT 1");
     $userStmt->bind_param('i', $uid);
     $userStmt->execute();
     $user = $userStmt->get_result()->fetch_assoc();
     $userStmt->close();
-
     if (!$user) redirect_with_message('User not found.');
 
-    if ($isSelf) {
-        $isSuper = (int)$user['is_super'];
-    }
-
+    if ($isSelf) $isSuper = (int)$user['is_super'];
     if ((int)$user['is_super'] === 1 && $isSuper === 0 && count_super_users($conn) <= 1) {
         redirect_with_message('You cannot remove the final Super User account.');
     }
