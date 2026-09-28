@@ -112,10 +112,15 @@ include __DIR__ . '/../includes/sidebar.php';
                                 <select name="role" class="form-control bg-light border-0" required>
                                     <option value="" disabled selected>Select Staff Role...</option>
                                     <option value="reception">Receptionist</option>
+                                    <option value="receptionist">Receptionist (Legacy)</option>
                                     <option value="doctor">Doctor / Consultant</option>
+                                    <option value="nurse">Nurse</option>
                                     <option value="pharmacist">Pharmacist</option>
                                     <option value="lab_tech">Lab Technician</option>
+                                    <option value="cashier">Cashier</option>
                                     <option value="accountant">Accountant</option>
+                                    <option value="procurement">Procurement</option>
+                                    <option value="storekeeper">Storekeeper</option>
                                     <option value="admin">Administrator</option>
                                 </select>
                             </div>
