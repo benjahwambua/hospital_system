@@ -26,16 +26,25 @@ if($_SERVER['REQUEST_METHOD']==='POST'&&isset($_POST['confirm_discharge'])){
    $conn->begin_transaction();
    try{
     $cols=[];$has=$conn->query("SHOW COLUMNS FROM admissions");if($has)while($c=$has->fetch_assoc())$cols[$c['Field']]=true;
-    if(isset($cols['discharge_diagnosis'],$cols['discharge_notes'],$cols['follow_up'])){
-     $u=$conn->prepare("UPDATE admissions SET status='Discharged',discharge_date=NOW(),discharged_by=?,discharge_diagnosis=?,discharge_notes=?,follow_up=? WHERE id=? AND status='Admitted'");
-     $u->bind_param('isssi',$userId,$diagnosis,$notes,$followUp,$admissionId);
-    }else{
-     $u=$conn->prepare("UPDATE admissions SET status='Discharged',discharge_date=NOW(),discharged_by=? WHERE id=? AND status='Admitted'");
-     $u->bind_param('ii',$userId,$admissionId);
-    }
-    if(!$u||!$u->execute()||$u->affected_rows!==1)throw new Exception('Admission could not be discharged.');if($u)$u->close();
+    $set=["status='Discharged'"];
+    $types=''; $values=[];
+    if(isset($cols['discharge_date'])) $set[]='discharge_date=NOW()';
+    if(isset($cols['discharged_by'])) { $set[]='discharged_by=?'; $types.='i'; $values[]=$userId; }
+    if(isset($cols['discharge_diagnosis'])) { $set[]='discharge_diagnosis=?'; $types.='s'; $values[]=$diagnosis; }
+    if(isset($cols['discharge_notes'])) { $set[]='discharge_notes=?'; $types.='s'; $values[]=$notes; }
+    if(isset($cols['follow_up'])) { $set[]='follow_up=?'; $types.='s'; $values[]=$followUp; }
+    $sql="UPDATE admissions SET ".implode(',', $set)." WHERE id=? AND status='Admitted'";
+    $types.='i'; $values[]=$admissionId;
+    $u=$conn->prepare($sql);
+    if(!$u) throw new Exception('Unable to prepare discharge: '.$conn->error);
+    if($types!=='') $u->bind_param($types,...$values);
+    if(!$u->execute()||$u->affected_rows!==1)throw new Exception('Admission could not be discharged.');
+    $u->close();
     if(!empty($admission['visit_id'])){$v=$conn->prepare("UPDATE visits SET status='Completed',updated_at=NOW() WHERE id=? AND patient_id=? AND status<>'Cancelled'");if($v){$v->bind_param('ii',$admission['visit_id'],$admission['patient_id']);$v->execute();$v->close();}}
-    $a=$conn->prepare("UPDATE appointments SET status='Closed' WHERE patient_id=? AND COALESCE(visit_id,0)=? AND status NOT IN ('Closed','Cancelled','Completed')");if($a&&isset($admission['visit_id'])){$a->bind_param('ii',$admission['patient_id'],$admission['visit_id']);$a->execute();$a->close();}
+    if(isset($admission['visit_id']) && $conn->query("SHOW COLUMNS FROM appointments LIKE 'visit_id'")?->num_rows>0){
+     $a=$conn->prepare("UPDATE appointments SET status='Closed' WHERE patient_id=? AND visit_id=? AND status NOT IN ('Closed','Cancelled','Completed')");
+     if($a){$a->bind_param('ii',$admission['patient_id'],$admission['visit_id']);$a->execute();$a->close();}
+    }
     $mcol=$conn->query("SHOW COLUMNS FROM maternity_admissions LIKE 'admission_id'");
     if($mcol && $mcol->num_rows>0){
      $m=$conn->prepare("UPDATE maternity_admissions SET status='Discharged' WHERE admission_id=? AND status<>'Discharged'");
