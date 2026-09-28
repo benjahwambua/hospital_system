@@ -10,7 +10,7 @@ if (empty($_SESSION['csrf_token'])) {
 }
 $csrfToken = $_SESSION['csrf_token'];
 
-$allowedRoles = ['admin', 'doctor', 'pharmacist', 'lab_tech', 'reception'];
+$allowedRoles = ['admin', 'doctor', 'nurse', 'pharmacist', 'lab_tech', 'reception', 'receptionist', 'cashier', 'accountant', 'procurement', 'storekeeper'];
 
 function redirect_with_message(string $message): void
 {
@@ -26,76 +26,19 @@ function count_super_users(mysqli $conn): int
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $postAction = isset($_POST['delete_user']) ? 'delete' : 'edit';
-    require_module_access($conn, 'administration', $postAction);
-    $postedToken = $_POST['csrf_token'] ?? '';
-    if (!hash_equals($csrfToken, $postedToken)) {
+    $isDelete = isset($_POST['delete_user']);
+    require_module_access($conn, 'administration', $isDelete ? 'delete' : 'edit');
+
+    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
         redirect_with_message('Security token mismatch. Please try again.');
     }
 
-        $uid = (int)($_POST['user_id'] ?? 0);
-        $fullName = trim($_POST['full_name'] ?? '');
-        $role = trim($_POST['role'] ?? '');
-        $newPassword = trim($_POST['new_password'] ?? '');
-        $isSelf = $uid === (int)($_SESSION['user_id'] ?? 0);
-        $isSuper = isset($_POST['is_super']) ? 1 : 0;
-
-        if ($uid <= 0 || $fullName === '') {
-            redirect_with_message('Invalid user details provided.');
-        }
-
-        if (!in_array($role, $allowedRoles, true)) {
-            redirect_with_message('Invalid role selected.');
-        }
-
-        if ($newPassword !== '' && strlen($newPassword) < 8) {
-            redirect_with_message('Password must be at least 8 characters long.');
-        }
-
-        $userStmt = $conn->prepare("SELECT id, is_super FROM users WHERE id = ? LIMIT 1");
-        $userStmt->bind_param('i', $uid);
-        $userStmt->execute();
-        $user = $userStmt->get_result()->fetch_assoc();
-        $userStmt->close();
-
-        if (!$user) {
-            redirect_with_message('User not found.');
-        }
-
-        if ($isSelf) {
-            $isSuper = (int)$user['is_super'];
-        }
-
-        if ((int)$user['is_super'] === 1 && $isSuper === 0 && count_super_users($conn) <= 1) {
-            redirect_with_message('You cannot remove the final Super User account.');
-        }
-
-        $stmt = $conn->prepare("UPDATE users SET full_name = ?, role = ?, is_super = ? WHERE id = ?");
-        $stmt->bind_param('ssii', $fullName, $role, $isSuper, $uid);
-        $stmt->execute();
-        $stmt->close();
-
-        if ($newPassword !== '') {
-            $newPassHash = password_hash($newPassword, PASSWORD_DEFAULT);
-            $pwStmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $pwStmt->bind_param('si', $newPassHash, $uid);
-            $pwStmt->execute();
-            $pwStmt->close();
-        }
-
-        redirect_with_message('Changes saved for ' . $fullName);
-    }
-
+    if ($isDelete) {
         $deleteId = (int)($_POST['delete_user'] ?? 0);
         $selfId = (int)($_SESSION['user_id'] ?? 0);
 
-        if ($deleteId <= 0) {
-            redirect_with_message('Invalid delete request.');
-        }
-
-        if ($deleteId === $selfId) {
-            redirect_with_message('You cannot delete your own account.');
-        }
+        if ($deleteId <= 0) redirect_with_message('Invalid delete request.');
+        if ($deleteId === $selfId) redirect_with_message('You cannot delete your own account.');
 
         $checkStmt = $conn->prepare("SELECT is_super, full_name FROM users WHERE id = ? LIMIT 1");
         $checkStmt->bind_param('i', $deleteId);
@@ -103,10 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $userToDelete = $checkStmt->get_result()->fetch_assoc();
         $checkStmt->close();
 
-        if (!$userToDelete) {
-            redirect_with_message('User not found.');
-        }
-
+        if (!$userToDelete) redirect_with_message('User not found.');
         if ((int)$userToDelete['is_super'] === 1 && count_super_users($conn) <= 1) {
             redirect_with_message('You cannot delete the final Super User account.');
         }
@@ -118,6 +58,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         redirect_with_message('User deleted successfully.');
     }
+
+    $uid = (int)($_POST['user_id'] ?? 0);
+    $fullName = trim($_POST['full_name'] ?? '');
+    $role = trim($_POST['role'] ?? '');
+    $newPassword = trim($_POST['new_password'] ?? '');
+    $isSelf = $uid === (int)($_SESSION['user_id'] ?? 0);
+    $isSuper = isset($_POST['is_super']) ? 1 : 0;
+
+    if ($uid <= 0 || $fullName === '') redirect_with_message('Invalid user details provided.');
+    if (!in_array($role, $allowedRoles, true)) redirect_with_message('Invalid role selected.');
+    if ($newPassword !== '' && strlen($newPassword) < 8) {
+        redirect_with_message('Password must be at least 8 characters long.');
+    }
+
+    $userStmt = $conn->prepare("SELECT id, is_super FROM users WHERE id = ? LIMIT 1");
+    $userStmt->bind_param('i', $uid);
+    $userStmt->execute();
+    $user = $userStmt->get_result()->fetch_assoc();
+    $userStmt->close();
+
+    if (!$user) redirect_with_message('User not found.');
+
+    if ($isSelf) {
+        $isSuper = (int)$user['is_super'];
+    }
+
+    if ((int)$user['is_super'] === 1 && $isSuper === 0 && count_super_users($conn) <= 1) {
+        redirect_with_message('You cannot remove the final Super User account.');
+    }
+
+    $stmt = $conn->prepare("UPDATE users SET full_name = ?, role = ?, is_super = ? WHERE id = ?");
+    $stmt->bind_param('ssii', $fullName, $role, $isSuper, $uid);
+    $stmt->execute();
+    $stmt->close();
+
+    if ($newPassword !== '') {
+        $newPassHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        $pwStmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $pwStmt->bind_param('si', $newPassHash, $uid);
+        $pwStmt->execute();
+        $pwStmt->close();
+    }
+
+    redirect_with_message('Changes saved for ' . $fullName);
 }
 
 $res = $conn->query("SELECT * FROM users ORDER BY full_name ASC");
