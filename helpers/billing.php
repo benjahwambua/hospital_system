@@ -660,7 +660,9 @@ function record_payment($conn, $invoice_id, $amount, $payment_method = 'Cash', $
     }
     $balance=max($total-$paid,0);
     if($balance<=0.00001) throw new Exception('Invoice is already fully paid.');
-    $amount=min($amount,$balance);
+    if($amount>$balance+0.00001){
+        throw new Exception('Payment amount exceeds the outstanding invoice balance of KES '.number_format($balance,2).'.');
+    }
 
     $patientId=(int)($invoice['patient_id']??0);
     $patientValue=$patientId>0?$patientId:null;
