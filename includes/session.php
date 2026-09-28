@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
     // Use a dedicated HMS session cookie so legacy PHPSESSID cookies from older
     // localhost versions cannot cause the dashboard CSRF token to come from a
     // different session.
+    ini_set('session.use_strict_mode', '1');
     session_name('HMSSESSID');
     $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
     session_set_cookie_params(['lifetime'=>0,'path'=>'/hospital_system/','secure'=>$secure,'httponly'=>true,'samesite'=>'Lax']);
@@ -61,10 +62,31 @@ function require_login(): void {
     }
 }
 function csrf_token(): string {
-    if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    return $_SESSION['csrf_token'];
+    // Keep the CSRF token independent from PHP session-id regeneration. This
+    // prevents a legitimate form rendered before authentication/session renewal
+    // from becoming invalid immediately after the session changes.
+    $cookieToken = (string)($_COOKIE['HMS_CSRF'] ?? '');
+    if (!preg_match('/^[a-f0-9]{64}$/', $cookieToken)) {
+        $cookieToken = bin2hex(random_bytes(32));
+        $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        setcookie('HMS_CSRF', $cookieToken, [
+            'expires' => 0,
+            'path' => '/hospital_system/',
+            'secure' => $secure,
+            'httponly' => false,
+            'samesite' => 'Lax'
+        ]);
+    }
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || !hash_equals($cookieToken, $_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = $cookieToken;
+    }
+    return $cookieToken;
 }
 function verify_csrf_token(?string $token): bool {
-    $sessionToken = $_SESSION['csrf_token'] ?? '';
-    return $sessionToken !== '' && is_string($token) && hash_equals($sessionToken, $token);
+    $posted = (string)$token;
+    if (!preg_match('/^[a-f0-9]{64}$/', $posted)) return false;
+    $expected = (string)($_SESSION['csrf_token'] ?? '');
+    if ($expected !== '' && hash_equals($expected, $posted)) return true;
+    $cookie = (string)($_COOKIE['HMS_CSRF'] ?? '');
+    return $cookie !== '' && hash_equals($cookie, $posted);
 }
