@@ -162,7 +162,13 @@ include __DIR__ . '/../includes/sidebar.php';
                                         <option value="doctor" <?= $r['role'] === 'doctor' ? 'selected' : '' ?>>Doctor</option>
                                         <option value="pharmacist" <?= $r['role'] === 'pharmacist' ? 'selected' : '' ?>>Pharmacist</option>
                                         <option value="lab_tech" <?= $r['role'] === 'lab_tech' ? 'selected' : '' ?>>Lab Tech</option>
+                                        <option value="nurse" <?= $r['role'] === 'nurse' ? 'selected' : '' ?>>Nurse</option>
                                         <option value="reception" <?= $r['role'] === 'reception' ? 'selected' : '' ?>>Reception</option>
+                                        <option value="receptionist" <?= $r['role'] === 'receptionist' ? 'selected' : '' ?>>Receptionist</option>
+                                        <option value="cashier" <?= $r['role'] === 'cashier' ? 'selected' : '' ?>>Cashier</option>
+                                        <option value="accountant" <?= $r['role'] === 'accountant' ? 'selected' : '' ?>>Accountant</option>
+                                        <option value="procurement" <?= $r['role'] === 'procurement' ? 'selected' : '' ?>>Procurement</option>
+                                        <option value="storekeeper" <?= $r['role'] === 'storekeeper' ? 'selected' : '' ?>>Storekeeper</option>
                                     </select>
                                 </td>
                                 <td class="text-center">
