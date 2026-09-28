@@ -1,27 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
-require_module_access($conn, 'clinical', 'create');
+require_module_access($conn,'clinical','create');
 require_role(['admin','doctor','nurse']);
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
-
-$patient_id = intval($_POST['patient_id'] ?? 0);
-$service_id = intval($_POST['service_id'] ?? 0);
-$category = $_POST['category'] ?? '';
-$price = floatval($_POST['price'] ?? 0);
-
-if(!$patient_id || !$service_id || !$category || !$price){
-    die("Missing required fields.");
-}
-
-// Insert service for patient
-$stmt = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at) VALUES (?,?,?,?,NOW())");
-$stmt->bind_param("iisd",$patient_id,$service_id,$category,$price);
-$stmt->execute();
-$stmt->close();
-
-// Redirect back to dashboard
-header("Location: patient_dashboard.php?id=$patient_id");
-exit;
-?>
+if($_SERVER['REQUEST_METHOD']!=='POST'||!verify_csrf_token($_POST['csrf_token']??null)){http_response_code(419);exit('Invalid security token.');}
+http_response_code(410);
+exit('Legacy service endpoint retired. Use Patient Dashboard / Clinical Orders so services are linked to the current visit and Central Billing.');
