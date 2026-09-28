@@ -17,11 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $stmt->get_result();
             $u = ($result && $result->num_rows === 1) ? $result->fetch_assoc() : null;
             if ($u && password_verify($password, $u['password'])) {
-                session_regenerate_id(true);
+                session_regenerate_id(false);
                 $_SESSION['user_id']=(int)$u['id']; $_SESSION['username']=$u['username']; $_SESSION['role']=$u['role'];
                 $_SESSION['is_super']=(int)$u['is_super']; $_SESSION['full_name']=$u['full_name'];
-                // Preserve the browser-bound CSRF token across session-id regeneration.
-                $_SESSION['csrf_token'] = rotate_csrf_token();
+                // Rotate the CSRF token only after the authenticated session is established.
+                // The new session ID is retained without immediately deleting the old session,
+                // avoiding race conditions documented for concurrent requests.
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 header('Location: /hospital_system/dashboard.php'); exit;
             }
         }
