@@ -38,11 +38,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
         $error = 'Invalid security token.';
     }
-    $change = intval($_POST['change']);
-    $note   = trim($_POST['note']);
+    $change = intval($_POST['change'] ?? 0);
+    $note   = trim((string)($_POST['note'] ?? ''));
+
+    if (!isset($error) && $change === 0) {
+        $error = 'Enter a quantity change greater than zero or less than zero.';
+    }
 
     if (!isset($error)) {
-    $newQty = max(0, $med['quantity'] + $change);
+    $conn->begin_transaction();
+    try {
+    $lock = $conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id=? FOR UPDATE");
+    $lock->bind_param("i", $id);
+    $lock->execute();
+    $locked = $lock->get_result()->fetch_assoc();
+    $lock->close();
+    if (!$locked) throw new Exception("Stock item no longer exists.");
+    $currentQty = (int)$locked['quantity'];
+    if ($change < 0 && abs($change) > $currentQty) throw new Exception("Cannot deduct more stock than is available.");
+    $newQty = max(0, $currentQty + $change);
     $type   = ($change >= 0) ? 'in' : 'out';
 
     $conn->begin_transaction();
@@ -80,9 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: view_stock.php");
         exit;
 
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $conn->rollback();
-        $error = "Failed to update stock";
+        $error = $e->getMessage() ?: "Failed to update stock";
     }
     }
 }
