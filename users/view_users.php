@@ -4,7 +4,6 @@ require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_module_access($conn, 'administration', 'view');
 require_super();
-undefined
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -34,7 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_with_message('Security token mismatch. Please try again.');
     }
 
-undefined
         $uid = (int)($_POST['user_id'] ?? 0);
         $fullName = trim($_POST['full_name'] ?? '');
         $role = trim($_POST['role'] ?? '');
@@ -88,7 +86,6 @@ undefined
         redirect_with_message('Changes saved for ' . $fullName);
     }
 
-undefined
         $deleteId = (int)($_POST['delete_user'] ?? 0);
         $selfId = (int)($_SESSION['user_id'] ?? 0);
 
@@ -148,7 +145,6 @@ include __DIR__ . '/../includes/sidebar.php';
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="h4 text-gray-800 font-weight-bold">Quick-Edit Staff Table</h2>
-undefined
         </div>
 
         <?php if(isset($_GET['msg'])): ?>
