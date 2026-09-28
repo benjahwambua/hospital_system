@@ -6,6 +6,11 @@ require_once __DIR__ . '/../helpers/billing.php';
 require_once __DIR__ . '/../config/mpesa.php';
 require_login();
 
+// Prevent browsers/proxies from serving a dashboard form with an old CSRF token.
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 // Patient Dashboard is shared by Front Desk and Clinical workflows. Require at
 // least one of those view permissions here rather than forcing a single module.
 $canPatientView = can_module_action($conn, 'clinical', 'view') || can_module_action($conn, 'front_desk', 'view');
@@ -115,9 +120,12 @@ if ($patient_id <= 0) {
         }
     }
 
-    // No schema creation or billing is performed merely by viewing the dashboard.\n    // These operations belong to migrations and transactional encounter workflows.\n\n    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_token'] ?? null)) {
-        http_response_code(419);
-        exit('Invalid security token. Please refresh the Patient Dashboard and try again.');
+    // No schema creation or billing is performed merely by viewing the dashboard.\n    // These operations belong to migrations and transactional encounter workflows.\n\n    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $postedCsrf = (string)($_POST['csrf_token'] ?? '');
+        if ($postedCsrf === '' || !verify_csrf_token($postedCsrf)) {
+            http_response_code(419);
+            exit('Invalid security token. Please refresh the Patient Dashboard and try again.');
+        }
     }
 
     // Handle Next Appointment Booking
@@ -1246,7 +1254,7 @@ function clearForm() {
                 <td><?= htmlspecialchars($s['service_name']) ?></td>
                 <td><span class="badge-info"><?= htmlspecialchars($s['svc_category']) ?></span></td>
                 <td>KSH <?= number_format($s['price'], 2) ?></td>
-                <td><form method="post" style="display:inline;" onsubmit="return confirm('Remove this service?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="item_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="type" value="service"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form></td>
+                <td><form method="post" style="display:inline;" onsubmit="return confirm('Remove this service?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="service"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form></td>
             </tr>
             <?php endwhile; ?>
         </table>
@@ -1293,7 +1301,7 @@ function clearForm() {
                 <td>KSH <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
                 <td><?= date('d/m/y', strtotime($p['created_at'])) ?></td>
                 <td>
-                    <form method="post" style="display:inline;" onsubmit="return confirm('Remove this medication?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="item_id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="type" value="prescription"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('Remove this medication?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="prescription"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form>
                 </td>
             </tr>
             <?php endwhile; ?>
