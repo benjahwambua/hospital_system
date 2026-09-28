@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         if ($pid<=0 || $ward==='' || $bed<1 || $bed>$bedCount) {
             $error='Patient, maternity ward and a valid bed are required.';
         } else {
-            $patientCheck=$conn->prepare("SELECT id,full_name FROM patients WHERE id=? AND (gender='Female' OR clinic_category IN ('ANC','PNC','Maternity')) LIMIT 1");
+            $patientCheck=$conn->prepare("SELECT p.id,p.full_name FROM patients p WHERE p.id=? AND COALESCE(p.is_walkin,0)=0 AND EXISTS (SELECT 1 FROM maternity m WHERE m.patient_id=p.id) LIMIT 1");
             $patientCheck->bind_param('i',$pid); $patientCheck->execute(); $patient=$patientCheck->get_result()->fetch_assoc(); $patientCheck->close();
             if (!$patient) {
                 $error='The selected patient is not eligible for maternity admission.';
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     }
 }
 
-$patients=$conn->query("SELECT id,full_name,patient_number FROM patients WHERE gender='Female' OR clinic_category IN ('ANC','PNC','Maternity') ORDER BY full_name ASC");
+$patients=$conn->query("SELECT p.id,p.full_name,p.patient_number FROM patients p WHERE COALESCE(p.is_walkin,0)=0 AND EXISTS (SELECT 1 FROM maternity m WHERE m.patient_id=p.id) ORDER BY p.full_name ASC");
 $occupiedBeds=[];
 $bedResult=$conn->query("SELECT bed_number FROM admissions WHERE ward_name='Maternity Ward' AND status='Admitted'");
 if($bedResult) while($b=$bedResult->fetch_assoc()) $occupiedBeds[(int)$b['bed_number']]=true;
