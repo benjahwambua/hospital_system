@@ -9,6 +9,7 @@ if (ini_get('session.use_cookies')) {
     setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'] ?? '', $params['secure'], $params['httponly']);
 }
 
+setcookie('HMS_CSRF', '', time() - 42000, '/hospital_system/');
 session_destroy();
 header('Location: /hospital_system/auth/login.php?logout=success');
 exit;
