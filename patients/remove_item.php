@@ -24,9 +24,11 @@ try{
   $p->bind_param('i',$invoiceId);$p->execute();$paid=(float)($p->get_result()->fetch_assoc()['paid']??0);$p->close();
   if($paid>0.00001)throw new Exception('This item cannot be deleted because its invoice has financial activity. Use a reversal/refund workflow instead.');
 
-  $hasType=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'item_type');$hasMed=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'med_id');$hasSource=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'source');$hasSourceId=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'source_id');
+  $hasType=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'item_type'");
+  $hasMed=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'med_id'");
+  $hasSource=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'source'");
+  $hasSourceId=$conn->query("SHOW COLUMNS FROM invoice_items LIKE 'source_id'");
   $source=$type==='service'?'service':'pharmacy';$sourceId=$type==='service'?(int)($item['service_id']??0):(int)($item['medicine_id']??0);
-  $line=null;
   if($hasType&&$hasType->num_rows&&$hasMed&&$hasMed->num_rows){
    $line=$conn->prepare("DELETE FROM invoice_items WHERE id=(SELECT id FROM (SELECT id FROM invoice_items WHERE invoice_id=? AND item_type=? AND med_id=? ORDER BY id DESC LIMIT 1) x)");
    if($line){$line->bind_param('isi',$invoiceId,$source,$sourceId);$line->execute();$line->close();}
