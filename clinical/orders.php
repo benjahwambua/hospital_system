@@ -69,7 +69,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 if (!$rx->execute()) throw new Exception($rx->error);
                 $prescriptionId=(int)$rx->insert_id; $rx->close();
                 $q=$conn->query("SHOW TABLES LIKE 'pharmacy_queue'");
-                if ($q && $q->num_rows) {
+                if (!$q || $q->num_rows === 0) {
+                    throw new Exception('Pharmacy queue is not available. Run the clinical care migration before placing pharmacy orders.');
+                }
+                {
                     $has=$conn->query("SHOW COLUMNS FROM pharmacy_queue LIKE 'visit_id'");
                     if ($has && $has->num_rows) {
                         $pq=$conn->prepare("INSERT INTO pharmacy_queue (prescription_id,patient_id,medicine_id,quantity,status,visit_id,created_at) VALUES (?,?,?,?, 'pending',?,NOW())");
@@ -89,7 +92,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 $message='Prescription sent to Pharmacy for dispensing. Stock and the pharmacy charge are posted when Pharmacy dispenses. Payment is collected only by Central Cashier.';
             } else throw new Exception('Select a department.');
         } catch (Throwable $e) {
-            if ($conn->errno === 0) { /* no-op: transaction state is connection-managed */ }
             $conn->rollback();
             $message=$e->getMessage();
         }
