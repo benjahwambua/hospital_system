@@ -1,9 +1,18 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-undefined
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_login();
+require_module_access($conn, 'administration', 'edit');
+require_super();
 
 $message = '';
-undefined
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
+        $message = "<div class='alert alert-danger'>Invalid security token.</div>";
+    } else {
     $categories = ['general', 'billing', 'clinical', 'pharmacy', 'mpesa', 'users'];
     $updateStmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
     $insertStmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
