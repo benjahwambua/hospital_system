@@ -1,18 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
 
-if ($_SESSION['role']!=='pharmacist') die("Access denied");
-
-$encounter_id = (int)$_GET['encounter_id'];
-
-$inv = $conn->query("
- SELECT status FROM invoices WHERE encounter_id=$encounter_id
-")->fetch_assoc();
-
-if (!$inv || $inv['status']!=='paid') {
-    die("Invoice not paid");
-}
-
-echo "Dispensing allowed";
+http_response_code(410);
+header('Content-Type: text/plain; charset=UTF-8');
+echo "This legacy pharmacy payment gate has been retired. Use the central Billing and Pharmacy Dispensing Queue workflow.";
+exit;
