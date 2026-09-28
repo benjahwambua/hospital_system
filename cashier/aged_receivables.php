@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
+require_module_access($conn, 'finance', 'view');
 
 $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
 $isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
@@ -72,6 +73,7 @@ $sql = "
            v.visit_number, v.visit_type, v.clinic_category,
            COALESCE(items.total, i.total, 0) AS bill_total,
            COALESCE(pay.paid, 0) AS paid_total,
+           pay.last_payment_date,
            DATEDIFF(CURDATE(), DATE(i.created_at)) AS age_days
     {$baseFrom}
     ORDER BY age_days DESC, i.created_at ASC, i.id ASC
@@ -192,18 +194,20 @@ include __DIR__ . '/../includes/sidebar.php';
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover">
                         <thead class="thead-light">
-                            <tr><th>Age</th><th>Patient</th><th>Invoice / Visit</th><th>Bill</th><th>Paid</th><th>Outstanding</th><th>Action</th></tr>
+                            <tr><th>Age</th><th>Client / Patient</th><th>Invoice / Visit</th><th>Invoice Date</th><th>Bill</th><th>Paid</th><th>Outstanding</th><th>Last Payment</th><th>Action</th></tr>
                         </thead>
                         <tbody>
                         <?php foreach ($rows as $row): ?>
                             <tr>
                                 <td><strong><?= $row['age_days'] ?> days</strong><br><span class="badge badge-secondary"><?= htmlspecialchars(age_label($row['age_days'])) ?></span></td>
-                                <td><strong><?= htmlspecialchars($row['patient_name'] ?: 'Unknown') ?></strong><br><small class="text-muted"><?= htmlspecialchars($row['patient_number'] ?: ($row['walkin_phone'] ?: 'N/A')) ?></small></td>
+                                <td><strong><?= htmlspecialchars($row['patient_name'] ?: 'Unknown Client') ?></strong><br><small class="text-muted"><?= htmlspecialchars($row['patient_number'] ?: ($row['walkin_phone'] ?: 'N/A')) ?></small><?php if (!empty($row['is_walkin'])): ?><span class="badge badge-info ml-1">Walk-in</span><?php endif; ?></td>
                                 <td><strong><?= htmlspecialchars($row['invoice_number'] ?: ('INV-'.$row['id'])) ?></strong><br><small class="text-muted"><?= htmlspecialchars($row['visit_number'] ?: 'Legacy / Unassigned') ?></small></td>
+                                <td><?= htmlspecialchars(date('d M Y', strtotime($row['created_at']))) ?></td>
                                 <td>KSH <?= number_format($row['bill_total'],2) ?></td>
                                 <td class="text-success">KSH <?= number_format($row['paid_total'],2) ?></td>
                                 <td class="text-danger font-weight-bold">KSH <?= number_format($row['balance'],2) ?></td>
-                                <td style="min-width:250px">
+                                <td><?= !empty($row['last_payment_date']) ? htmlspecialchars(date('d M Y', strtotime($row['last_payment_date']))) : '<span class="text-muted">None</span>' ?></td>
+                                <td style="min-width:290px">
                                     <form method="post" action="/hospital_system/billing/pay_invoice.php" class="cashier-payment-form">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                                         <input type="hidden" name="invoice_id" value="<?= (int)$row['id'] ?>">
@@ -217,6 +221,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                             <button class="btn btn-success" type="submit" <?= !$openShift ? 'disabled title="Open a cashier shift first"' : '' ?>><i class="fas fa-check"></i> Receive</button>
                                         </div>
                                     </form>
+                                    <?php if (!empty($row['patient_id'])): ?><a class="btn btn-sm btn-outline-secondary btn-block mt-1" target="_blank" href="/hospital_system/patients/patient_dashboard.php?id=<?= (int)$row['patient_id'] ?>"><i class="fas fa-user"></i> View Client / Patient</a><?php endif; ?>
                                     <a class="btn btn-sm btn-outline-primary btn-block mt-1" target="_blank" href="/hospital_system/billing/view_invoice.php?id=<?= (int)$row['id'] ?>"><i class="fas fa-file-invoice"></i> View Invoice</a>
                                 </td>
                             </tr>
