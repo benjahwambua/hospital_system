@@ -113,40 +113,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
         http_response_code(419);
         exit('Invalid security token.');
     }
-    $delete_id = (int)$_POST['delete_id'];
-    $stmt = $conn->prepare("DELETE FROM patient_services WHERE id = ? AND category = 'lab' AND status = 'Pending'");
-    $stmt->bind_param("i", $delete_id);
-    $stmt->execute();
-    $stmt->close();
-    header('Location: lab_requests.php?deleted=1');
-    exit;
-}
-
-// All POST actions and redirects above must finish before shared HTML output begins.
-include __DIR__ . '/../includes/header.php';
-include __DIR__ . '/../includes/sidebar.php';
-
-// --- 3. HANDLE LAB RESULT SUBMISSION ---
-if (isset($_POST['save_lab_result'])) {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
-        http_response_code(419);
-        exit('Invalid security token.');
-    }
-    $record_id = intval($_POST['record_id']);
-    $findings = $_POST['findings'] ?? '';
-    $status = 'Completed'; 
-
-    $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ?");
-    $stmt->bind_param("ssi", $findings, $status, $record_id);
-    
-    if ($stmt->execute()) {
-        echo "<script>alert('Results saved successfully!'); window.location.href='lab_requests.php?start_date=$start_date&end_date=$end_date';</script>";
-        exit;
-    }
-    $stmt->close();
+    // Lab requests can already have a corresponding Central Billing line.
+    // Never physically delete a clinical request and leave its financial record orphaned.
+    http_response_code(409);
+    exit('Laboratory requests are not deleted after submission. Use the clinical cancellation/reversal workflow so the clinical and financial records remain synchronized.');
 }
 
 // Laboratory requests are submitted here and processed in the Lab Results worklist.
+include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/sidebar.php';
 $created = isset($_GET['created']);
 $walkin_lab_services = $conn->query("SELECT id, service_name, price FROM services_master WHERE active = 1 AND category = 'lab' ORDER BY service_name ASC");
 ?>
