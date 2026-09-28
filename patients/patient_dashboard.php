@@ -284,8 +284,8 @@ if ($patient_id <= 0) {
     if(isset($_POST['add_service'])){
         if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to add services.'); }
         $service_id=intval($_POST['service_id']);
-        $price=floatval($_POST['price']);
-        if($service_id>0 && $price>=0){
+        $postedPrice=floatval($_POST['price'] ?? 0);
+        if($service_id>0 && $postedPrice>=0){
             $serviceStmt=$conn->prepare("SELECT service_name, category FROM services_master WHERE id=? AND active=1 LIMIT 1");
             $serviceStmt->bind_param('i',$service_id);
             $serviceStmt->execute();
@@ -293,6 +293,8 @@ if ($patient_id <= 0) {
             $serviceStmt->close();
 
             if(!$service) throw new Exception('Selected service is not active or does not exist.');
+            $price = !empty($_SESSION['is_super']) ? $postedPrice : (float)$service['price'];
+            if($price < 0) throw new Exception('Invalid service price.');
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category'] ?: 'General', (int)($patient['doctor_id'] ?? 0));
             if ($hasVisitServices && $visitId > 0) {
@@ -315,15 +317,7 @@ if ($patient_id <= 0) {
 
     // Deletions are POST-only and protected by the dashboard CSRF token.
     if (isset($_POST['delete_item'])) {
-        $item_id = (int)($_POST['item_id'] ?? 0);
-        $type = $_POST['type'] ?? '';
-        if ($item_id > 0 && in_array($type, ['service', 'prescription'], true)) {
-            $stmt = $conn->prepare($type === 'service'
-                ? "DELETE FROM patient_services WHERE id = ? AND patient_id = ?"
-                : "DELETE FROM prescriptions WHERE id = ? AND patient_id = ?");
-            if ($stmt) { $stmt->bind_param('ii', $item_id, $patient_id); $stmt->execute(); $stmt->close(); }
-        }
-        header("Location: patient_dashboard.php?id=$patient_id&tab=billing&deleted=1");
+        header('Location: /hospital_system/patients/remove_item.php', true, 307);
         exit;
     }
 
@@ -331,7 +325,7 @@ if ($patient_id <= 0) {
     if(isset($_POST['add_lab_request'])){
         if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to order laboratory services.'); }
         $service_id=intval($_POST['service_id']);
-        $price=floatval($_POST['price']);
+        $price=0.0;
         $instructions=$_POST['lab_instructions'] ?? '';
         if($service_id>0 && $price>=0){
             $stmt=$conn->prepare("SELECT service_name FROM services_master WHERE id=? AND active=1 AND category='lab' LIMIT 1");
@@ -340,6 +334,7 @@ if ($patient_id <= 0) {
             $labService=$stmt->get_result()->fetch_assoc();
             $stmt->close();
             if(!$labService) throw new Exception('Selected laboratory service is invalid.');
+            $price = (float)($labService['price'] ?? 0);
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Laboratory', (int)($patient['doctor_id'] ?? 0));
             if ($hasVisitServices && $visitId > 0) {
