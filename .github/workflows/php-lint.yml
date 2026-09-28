@@ -1,0 +1,26 @@
+name: PHP Syntax Audit
+
+on:
+  push:
+    branches: ["main", "audit-operational-hardening-2026-09-28"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+      - name: Lint every PHP file
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          while IFS= read -r -d '' file; do
+            echo "Linting $file"
+            if ! php -l "$file"; then failed=1; fi
+          done < <(find . -type f -name "*.php" -not -path "./.git/*" -print0)
+          exit "$failed"
