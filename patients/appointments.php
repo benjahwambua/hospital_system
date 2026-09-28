@@ -130,23 +130,25 @@ include __DIR__ . '/../includes/sidebar.php';
                                 </td>
                                 <td style="padding: 15px 20px; text-align: center;">
                                     <?php if (!$is_closed): ?>
-                                        <?php if ($has_appeared): ?><a href="patient_dashboard.php?id=<?= $row['patient_id'] ?>&appointment_id=<?= (int)$row['id'] ?>" 
-                                           style="display:inline-block;padding:10px 16px;background:#059669;color:white;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;">
-                                           OPEN PATIENT
-                                        </a><?php endif; ?>
-                                        <?php if (!$is_closed): ?>
-                                            <?php if (can_edit($conn, 'clinical')): ?><form method="post" style="display:inline-block;margin:0 0 0 5px;" onsubmit="return confirm('Change this appointment status to Closed?');">
+                                        <?php if ($has_appeared): ?>
+                                            <a href="patient_dashboard.php?id=<?= $row['patient_id'] ?>&appointment_id=<?= (int)$row['id'] ?>"
+                                               style="display:inline-block;padding:10px 16px;background:#059669;color:white;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;">
+                                               OPEN PATIENT
+                                            </a>
+                                        <?php endif; ?>
+                                        <?php if (can_edit($conn, 'clinical')): ?>
+                                            <form method="post" style="display:inline-block;margin:0 0 0 5px;" onsubmit="return confirm('Change this appointment status to Closed?');">
                                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                                 <input type="hidden" name="appointment_id" value="<?= (int)$row['id'] ?>">
-                                                <button type="submit" name="close_appointment" style="padding:10px 16px;background:#475569;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;"<?= $has_appeared ? 'CHANGE STATUS TO CLOSED' : 'CLOSE / NO-SHOW' ?></button>
-                                            </form><?php endif; ?>
-                                        <?php else: ?>
-                                            <span style="display:inline-block;padding:9px 12px;color:#92400e;font-size:12px;font-weight:600;">Waiting for patient</span>
+                                                <button type="submit" name="close_appointment" style="padding:10px 16px;background:#475569;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
+                                                    <?= $has_appeared ? 'CHANGE STATUS TO CLOSED' : 'CLOSE / NO-SHOW' ?>
+                                                </button>
+                                            </form>
                                         <?php endif; ?>
                                     <?php else: ?>
                                         <span style="color:#64748b;font-size:12px;font-weight:600;">Appointment closed</span>
                                     <?php endif; ?>
-                                </td>
+                                </td>>
                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
