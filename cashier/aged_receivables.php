@@ -48,7 +48,8 @@ $baseFrom = "
                    SELECT SUM(r.amount)
                    FROM payment_refunds r
                    WHERE r.invoice_id = p.invoice_id AND r.status = 'Approved'
-               ),0) AS paid
+               ),0) AS paid,
+               MAX(p.created_at) AS last_payment_date
         FROM payments p
         WHERE p.invoice_id IS NOT NULL
         GROUP BY p.invoice_id
