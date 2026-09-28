@@ -15,10 +15,7 @@ if (!$canPatientView) {
 }
 $canPatientEdit = can_module_action($conn, 'front_desk', 'edit');
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrfToken = $_SESSION['csrf_token'];
+$csrfToken = csrf_token();
 
 $patient_id = intval($_GET['id'] ?? 0);
 $appointment_id = intval($_GET['appointment_id'] ?? 0);
@@ -118,12 +115,9 @@ if ($patient_id <= 0) {
         }
     }
 
-    // No schema creation or billing is performed merely by viewing the dashboard.\n    // These operations belong to migrations and transactional encounter workflows.\n\n    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $postedToken = $_POST['csrf_token'] ?? '';
-        if (!hash_equals($csrfToken, $postedToken)) {
-            header("Location: patient_dashboard.php?id=$patient_id&tab=clinical&error=csrf");
-            exit;
-        }
+    // No schema creation or billing is performed merely by viewing the dashboard.\n    // These operations belong to migrations and transactional encounter workflows.\n\n    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        http_response_code(419);
+        exit('Invalid security token. Please refresh the Patient Dashboard and try again.');
     }
 
     // Handle Next Appointment Booking
