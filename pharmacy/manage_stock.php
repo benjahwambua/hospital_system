@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 require_login();
 require_module_access($conn, 'pharmacy', 'edit');
-require_role('pharmacist');
+require_role(['admin','pharmacist']);
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
