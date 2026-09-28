@@ -44,7 +44,9 @@ undefined
     }
 
     $message = "<div class='alert alert-success'>System settings updated successfully.</div>";
+    }
 }
+
 
 // Fetch settings
 $settings = [];
@@ -157,6 +159,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 </ul>
 
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                     <div class="tab-content mt-4" id="settingsTabContent">
                         <?php foreach ($tabs as $category => $tab): ?>
                             <div class="tab-pane fade <?= $category === 'general' ? 'show active' : '' ?>" id="<?= $category ?>" role="tabpanel">
