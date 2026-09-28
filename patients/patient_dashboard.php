@@ -5,6 +5,14 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_once __DIR__ . '/../config/mpesa.php';
 require_login();
+
+// Patient Dashboard is shared by Front Desk and Clinical workflows. Require at
+// least one of those view permissions here rather than forcing a single module.
+$canPatientView = can_module_action($conn, 'clinical', 'view') || can_module_action($conn, 'front_desk', 'view');
+if (!$canPatientView) {
+    http_response_code(403);
+    exit('Forbidden: You do not have permission to access the Patient Dashboard.');
+}
 $canPatientEdit = can_module_action($conn, 'front_desk', 'edit');
 
 if (empty($_SESSION['csrf_token'])) {
