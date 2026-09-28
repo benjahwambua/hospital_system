@@ -74,7 +74,8 @@ try{
         }
         $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? $_POST['reference'] ?? '')));
         // Receipt and phone are optional for manual M-Pesa record keeping.
-        $paymentAmount = $amount>0 ? min($amount,$remaining) : $remaining;
+        $paymentAmount = $amount>0 ? $amount : $remaining;
+        if($paymentAmount>$remaining+0.00001) throw new Exception('Payment amount exceeds the outstanding invoice balance of KES '.number_format($remaining,2).'.');
         $payment=record_payment($conn,$id,$paymentAmount,'Mpesa',$receipt,(int)$shift['id']);
         record_manual_mpesa_transaction($conn,$id,(int)($invoice['patient_id'] ?? 0),$payment['amount'],$phone,$receipt,'Manually recorded M-Pesa payment');
         post_payment_journal($conn,$id,$payment['amount'],'Mpesa',$payment['payment_id']);
@@ -93,16 +94,13 @@ try{
         $payment=record_payment($conn,$id,$remaining,$mode,null,(int)$shift['id']);
         post_payment_journal($conn,$id,$payment['amount'],$mode,$payment['payment_id']);
     }elseif($amount>0 && $remaining>0){
-        $payment=record_payment($conn,$id,min($amount,$remaining),$mode,null,(int)$shift['id']);
+        $payment=record_payment($conn,$id,$amount,$mode,null,(int)$shift['id']);
         post_payment_journal($conn,$id,$payment['amount'],$mode,$payment['payment_id']);
     }
 
     $conn->commit();
 
-    if(isset($_POST['ajax'])){
-        echo json_encode(['status'=>'success']);
-    }else{
-        if (($_POST['return_to'] ?? '') === 'cashier') {
+    if (($_POST['return_to'] ?? '') === 'cashier') {
             header("Location: /hospital_system/cashier/index.php?success=1&paid_invoice=".$id);
         } elseif (($_POST['return_to'] ?? '') === 'aged_receivables') {
             header("Location: /hospital_system/cashier/aged_receivables.php?success=1&paid_invoice=".$id);
@@ -110,10 +108,8 @@ try{
             header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1");
         }
         exit;
-    }
 }catch(Throwable $e){
     $conn->rollback();
     error_log('HMS payment error: ' . $e->getMessage());
-    if(isset($_POST['ajax'])) echo json_encode(['status'=>'error','message'=>'Unable to complete payment. Please try again.']);
-    else { http_response_code(500); exit('Unable to complete payment. Please try again.'); }
+    http_response_code(500); exit('Unable to complete payment. Please try again.');
 }
