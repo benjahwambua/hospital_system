@@ -19,6 +19,11 @@ require_role(['admin','cashier']);
 $id=(int)($_POST['invoice_id'] ?? $_GET['id'] ?? 0);
 $amount=(float)($_POST['amount'] ?? 0);
 $mode=trim((string)($_POST['payment_mode'] ?? 'Cash'));
+if (!in_array(strtolower($mode), ['cash','mpesa','other'], true)) {
+    http_response_code(400);
+    exit('Invalid payment method.');
+}
+$mode = strtolower($mode) === 'mpesa' ? 'Mpesa' : (strtolower($mode) === 'cash' ? 'Cash' : 'Other');
 $mark_paid=isset($_POST['mark_paid']) && $_POST['mark_paid']=='1';
 $cashierId=(int)($_SESSION['user_id']??0);
 $shift=get_open_cashier_shift($conn,$cashierId);
