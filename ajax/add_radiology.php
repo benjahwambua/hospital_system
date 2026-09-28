@@ -3,25 +3,13 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
-require_module_access($conn, 'radiology', 'create');
+require_module_access($conn,'radiology','create');
 require_role(['admin','doctor','nurse']);
-
 header('Content-Type: application/json');
-
-$patient_id = intval($_POST['patient_id'] ?? 0);
-$scan_type = trim($_POST['scan_type'] ?? '');
-
-if(!$patient_id || !$scan_type){
-    echo json_encode(['status'=>0,'message'=>'Invalid input']);
-    exit;
+if($_SERVER['REQUEST_METHOD']!=='POST'||!verify_csrf_token($_POST['csrf_token']??null)){
+ http_response_code(419);echo json_encode(['status'=>0,'message'=>'Invalid security token.']);exit;
 }
-
-$stmt = $conn->prepare("INSERT INTO radiology_requests (patient_id, scan_type, created_at) VALUES (?, ?, NOW())");
-$stmt->bind_param("is", $patient_id, $scan_type);
-
-if($stmt->execute()){
-    echo json_encode(['status'=>1,'message'=>'Radiology request added successfully']);
-}else{
-    echo json_encode(['status'=>0,'message'=>'Error adding radiology request']);
-}
-$stmt->close();
+// Radiology requests are now created by Clinical Orders so the order, visit,
+// service charge and radiology worklist remain one transaction.
+http_response_code(410);
+echo json_encode(['status'=>0,'message'=>'Legacy radiology endpoint retired. Use Clinical Orders.']);
