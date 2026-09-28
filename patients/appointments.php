@@ -24,10 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_appointment']))
             $error='Appointment not found.';
         } elseif (strtolower((string)$appointment['status'])==='closed') {
             $notice='Appointment is already closed.';
-        } elseif ((int)($appointment['visit_id'] ?? 0)<=0) {
-            $error='This appointment cannot be closed because the patient has not appeared.';
         } else {
-            $stmt=$conn->prepare("UPDATE appointments SET status='Closed' WHERE id=? AND COALESCE(visit_id,0)>0 AND status<>'Closed'");
+            $stmt=$conn->prepare("UPDATE appointments SET status='Closed' WHERE id=? AND status NOT IN ('Closed','Cancelled','Completed')");
             $stmt->bind_param('i',$appointmentId);
             if ($stmt->execute() && $stmt->affected_rows>0) $notice='Appointment closed successfully.';
             else $error='Unable to close the appointment. Please confirm that the patient has appeared.';
@@ -46,6 +44,7 @@ $query = "
     FROM appointments a
     JOIN patients p ON a.patient_id = p.id
     JOIN users u ON a.doctor_id = u.id
+    LEFT JOIN visits v ON v.id = a.visit_id
     WHERE a.appointment_date >= CURDATE()
 ";
 
@@ -69,7 +68,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h2 style="margin:0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 24px;">📋</span> Daily Appointment Register
                 </h2>
-                <p style="margin:5px 0 0;color:#64748b;font-size:14px;">Appointments remain open until the patient appears. Once the patient appears, the appointment can be closed after the clinical encounter.</p><div style="margin-top:12px;display:flex;gap:8px;"><a href="../appointments/appointments.php<?=isset($_GET["id"])?"?patient_id=".(int)$_GET["id"]:""?>" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1"></i> Schedule Appointment</a></div>            <?php if ($notice): ?><div style="margin-top:10px;color:#166534;"><?= htmlspecialchars($notice) ?></div><?php endif; ?>            <?php if ($error): ?><div style="margin-top:10px;color:#991b1b;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+                <p style="margin:5px 0 0;color:#64748b;font-size:14px;">Appointments can be closed from Reception when the patient has appeared or when the appointment is being marked as closed/no-show.</p><div style="margin-top:12px;display:flex;gap:8px;"><a href="../appointments/appointments.php<?=isset($_GET["id"])?"?patient_id=".(int)$_GET["id"]:""?>" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1"></i> Schedule Appointment</a></div>            <?php if ($notice): ?><div style="margin-top:10px;color:#166534;"><?= htmlspecialchars($notice) ?></div><?php endif; ?>            <?php if ($error): ?><div style="margin-top:10px;color:#991b1b;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             </div>
 
             <form method="GET" style="display:flex;gap:0;width:400px;">
@@ -135,11 +134,11 @@ include __DIR__ . '/../includes/sidebar.php';
                                            style="display:inline-block;padding:10px 16px;background:#059669;color:white;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;">
                                            OPEN PATIENT
                                         </a><?php endif; ?>
-                                        <?php if ($has_appeared && !$is_closed): ?>
-                                            <?php if (can_edit($conn, 'clinical')): ?><form method="post" style="display:inline-block;margin:0 0 0 5px;" onsubmit="return confirm('Change appointment status to Closed?');">
+                                        <?php if (!$is_closed): ?>
+                                            <?php if (can_edit($conn, 'clinical')): ?><form method="post" style="display:inline-block;margin:0 0 0 5px;" onsubmit="return confirm('Change this appointment status to Closed?');">
                                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                                 <input type="hidden" name="appointment_id" value="<?= (int)$row['id'] ?>">
-                                                <button type="submit" name="close_appointment" style="padding:10px 16px;background:#475569;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">CHANGE STATUS TO CLOSED</button>
+                                                <button type="submit" name="close_appointment" style="padding:10px 16px;background:#475569;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;"<?= $has_appeared ? 'CHANGE STATUS TO CLOSED' : 'CLOSE / NO-SHOW' ?></button>
                                             </form><?php endif; ?>
                                         <?php else: ?>
                                             <span style="display:inline-block;padding:9px 12px;color:#92400e;font-size:12px;font-weight:600;">Waiting for patient</span>
