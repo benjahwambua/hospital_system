@@ -1,14 +1,9 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_login();
-
-$role = strtolower((string)($_SESSION['role'] ?? ''));
-$isSuperUser = !empty($_SESSION['is_super']) && $_SESSION['is_super'] === 1;
-if (!$isSuperUser && !in_array($role, ['admin', 'receptionist', 'cashier'], true)) {
-    http_response_code(403);
-    exit('Access denied.');
-}
+require_module_access($conn, 'front_desk', 'view');
 
 $today = date('Y-m-d');
 $stats = [
