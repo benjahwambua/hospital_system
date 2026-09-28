@@ -6,11 +6,9 @@ require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
 require_module_access($conn, 'finance', 'view');
 
-$role = strtolower(trim((string)($_SESSION['role'] ?? '')));
-$isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
-if (!$isSuper && !in_array($role, ['admin', 'cashier'], true)) {
+if (!can_module_action($conn, 'finance', 'view')) {
     http_response_code(403);
-    die('Access denied. Only the cashier or administrator can access the Cashier module.');
+    die('Access denied. Finance View permission is required.');
 }
 
 $today = date('Y-m-d');
