@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_module_access($conn, 'laboratory', 'view');
+require_module_access($conn, 'laboratory', 'view');
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];
@@ -19,7 +20,7 @@ if (isset($_POST['save_lab_result'])) {
         $findings = $_POST['findings'] ?? '';
         $status = ($action === 'complete') ? 'Completed' : 'Pending';
 
-        $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ? AND category = 'lab'");
         $stmt->bind_param("ssi", $findings, $status, $record_id);
 
         if ($stmt->execute()) {
