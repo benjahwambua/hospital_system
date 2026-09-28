@@ -1,5 +1,5 @@
 <?php
-ob_start(); // START OUTPUT BUFFER
+ob_start();
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
@@ -8,21 +8,18 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'pharmacy', 'edit');
 require_role('pharmacist');
-if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
-/* GET ID */
-$id = intval($_GET['id'] ?? 0);
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+$id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
     header("Location: view_stock.php");
     exit;
 }
 
-/* FETCH STOCK */
-$stmt = $conn->prepare("
-    SELECT id, drug_name, quantity
-    FROM pharmacy_stock
-    WHERE id=?
-");
+$stmt = $conn->prepare("SELECT id, drug_name, quantity FROM pharmacy_stock WHERE id=?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $med = $stmt->get_result()->fetch_assoc();
@@ -33,75 +30,72 @@ if (!$med) {
     exit;
 }
 
-/* PROCESS POST BEFORE ANY HTML */
+$error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
         $error = 'Invalid security token.';
-    }
-    $change = intval($_POST['change'] ?? 0);
-    $note   = trim((string)($_POST['note'] ?? ''));
+    } else {
+        $change = (int)($_POST['change'] ?? 0);
+        $note = trim((string)($_POST['note'] ?? ''));
 
-    if (!isset($error) && $change === 0) {
-        $error = 'Enter a quantity change greater than zero or less than zero.';
-    }
+        if ($change === 0) {
+            $error = 'Enter a quantity change greater than zero or less than zero.';
+        } else {
+            $conn->begin_transaction();
 
-    if (!isset($error)) {
-    $conn->begin_transaction();
-    try {
-    $lock = $conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id=? FOR UPDATE");
-    $lock->bind_param("i", $id);
-    $lock->execute();
-    $locked = $lock->get_result()->fetch_assoc();
-    $lock->close();
-    if (!$locked) throw new Exception("Stock item no longer exists.");
-    $currentQty = (int)$locked['quantity'];
-    if ($change < 0 && abs($change) > $currentQty) throw new Exception("Cannot deduct more stock than is available.");
-    $newQty = max(0, $currentQty + $change);
-    $type   = ($change >= 0) ? 'in' : 'out';
+            try {
+                $lock = $conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id=? FOR UPDATE");
+                $lock->bind_param("i", $id);
+                $lock->execute();
+                $locked = $lock->get_result()->fetch_assoc();
+                $lock->close();
 
-    $conn->begin_transaction();
+                if (!$locked) {
+                    throw new Exception('Stock item no longer exists.');
+                }
 
-    try {
-        /* UPDATE STOCK */
-        $stmt = $conn->prepare("
-            UPDATE pharmacy_stock 
-            SET quantity=?, updated_at=NOW()
-            WHERE id=?
-        ");
-        $stmt->bind_param("ii", $newQty, $id);
-        $stmt->execute();
-        $stmt->close();
+                $currentQty = (int)$locked['quantity'];
+                if ($change < 0 && abs($change) > $currentQty) {
+                    throw new Exception('Cannot deduct more stock than is available.');
+                }
 
-        /* LOG MOVEMENT */
-        $stmt = $conn->prepare("
-            INSERT INTO stock_movements
-            (stock_id, movement_type, quantity_change, balance_after, note, user_id)
-            VALUES (?,?,?,?,?,?)
-        ");
-        $stmt->bind_param(
-            "isissi",
-            $id,
-            $type,
-            $change,
-            $newQty,
-            $note,
-            $_SESSION['user_id']
-        );
-        $stmt->execute();
-        $stmt->close();
+                $newQty = $currentQty + $change;
+                $movementType = $change > 0 ? 'in' : 'out';
+                $uid = (int)($_SESSION['user_id'] ?? 0);
 
-        $conn->commit();
-        header("Location: view_stock.php");
-        exit;
+                $update = $conn->prepare("UPDATE pharmacy_stock SET quantity=?, updated_at=NOW() WHERE id=?");
+                $update->bind_param("ii", $newQty, $id);
+                if (!$update->execute() || $update->affected_rows !== 1) {
+                    throw new Exception('Unable to update stock.');
+                }
+                $update->close();
 
-    } catch (Throwable $e) {
-        $conn->rollback();
-        $error = $e->getMessage() ?: "Failed to update stock";
-    }
+                $movement = $conn->prepare(
+                    "INSERT INTO stock_movements
+                    (stock_id, movement_type, quantity_change, balance_after, note, user_id)
+                    VALUES (?,?,?,?,?,?)"
+                );
+                if (!$movement) {
+                    throw new Exception('Unable to prepare stock movement log.');
+                }
+                $movement->bind_param("isissi", $id, $movementType, $change, $newQty, $note, $uid);
+                if (!$movement->execute()) {
+                    throw new Exception('Unable to log stock movement: ' . $movement->error);
+                }
+                $movement->close();
+
+                $conn->commit();
+                header("Location: view_stock.php");
+                exit;
+            } catch (Throwable $e) {
+                $conn->rollback();
+                $error = $e->getMessage() ?: 'Failed to update stock.';
+            }
+        }
     }
 }
 
-/* NOW SAFE TO OUTPUT HTML */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
@@ -112,8 +106,8 @@ include __DIR__ . '/../includes/sidebar.php';
     <p><strong>Medicine:</strong> <?= htmlspecialchars($med['drug_name']) ?></p>
     <p><strong>Current Quantity:</strong> <?= (int)$med['quantity'] ?></p>
 
-    <?php if (!empty($error)): ?>
-        <div class="alert alert-danger"><?= $error ?></div>
+    <?php if ($error !== ''): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
     <form method="post">
@@ -124,7 +118,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <label style="margin-top:8px">Reason / Note</label>
         <input type="text" name="note" class="form-control">
 
-        <button class="btn btn-primary" style="margin-top:10px">
+        <button type="submit" class="btn btn-primary" style="margin-top:10px">
             Apply Changes
         </button>
     </form>
@@ -132,5 +126,5 @@ include __DIR__ . '/../includes/sidebar.php';
 
 <?php
 include __DIR__ . '/../includes/footer.php';
-ob_end_flush(); // END BUFFER
+ob_end_flush();
 ?>
