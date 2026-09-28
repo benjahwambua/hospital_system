@@ -44,8 +44,10 @@ function mpesa_initiate_stk($conn,int $invoiceId,int $patientId,float $amount,st
  $balance=max($total-$paid,0);
  $amount=round($amount,2);if($amount<=0||$amount>$balance+0.00001)throw new Exception('M-Pesa amount exceeds the invoice balance.');
  if($cashierShiftId<=0)throw new Exception('An open cashier shift is required before starting an M-Pesa collection.');
- $shift=$conn->prepare("SELECT id FROM cashier_shifts WHERE id=? AND status='Open' LIMIT 1");
- if(!$shift)throw new Exception('Unable to verify cashier shift.');$shift->bind_param('i',$cashierShiftId);$shift->execute();$ok=$shift->get_result()->fetch_assoc();$shift->close();if(!$ok)throw new Exception('The selected cashier shift is not open.');
+ $currentCashierId=(int)($_SESSION['user_id'] ?? 0);
+ if($currentCashierId<=0)throw new Exception('A logged-in cashier is required for M-Pesa collection.');
+ $shift=$conn->prepare("SELECT id FROM cashier_shifts WHERE id=? AND cashier_id=? AND status='Open' LIMIT 1");
+ if(!$shift)throw new Exception('Unable to verify cashier shift.');$shift->bind_param('ii',$cashierShiftId,$currentCashierId);$shift->execute();$ok=$shift->get_result()->fetch_assoc();$shift->close();if(!$ok)throw new Exception('The selected cashier shift is not open.');
 
  $shortcode=mpesa_setting('mpesa_shortcode');$passkey=mpesa_setting('mpesa_passkey');$callback=mpesa_setting('mpesa_callback_url');$accountReference=mpesa_setting('mpesa_account_reference','HMS');
  if($shortcode===''||$passkey===''||$callback==='')throw new Exception('Configure M-Pesa Shortcode, Passkey and Callback URL in System Settings first.');
