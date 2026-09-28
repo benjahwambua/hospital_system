@@ -62,31 +62,24 @@ function require_login(): void {
     }
 }
 function csrf_token(): string {
-    // Keep the CSRF token independent from PHP session-id regeneration. This
-    // prevents a legitimate form rendered before authentication/session renewal
-    // from becoming invalid immediately after the session changes.
-    $cookieToken = (string)($_COOKIE['HMS_CSRF'] ?? '');
-    if (!preg_match('/^[a-f0-9]{64}$/', $cookieToken)) {
-        $cookieToken = bin2hex(random_bytes(32));
-        $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-        setcookie('HMS_CSRF', $cookieToken, [
-            'expires' => 0,
-            'path' => '/hospital_system/',
-            'secure' => $secure,
-            'httponly' => false,
-            'samesite' => 'Lax'
-        ]);
+    // The CSRF token belongs to the authenticated PHP session. Do not derive or
+    // overwrite it from a client cookie: doing so can invalidate an already
+    // rendered form when the browser sends a stale/missing auxiliary cookie.
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || !preg_match('/^[a-f0-9]{64}$/', $_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
-    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || !hash_equals($cookieToken, $_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = $cookieToken;
-    }
-    return $cookieToken;
+    return $_SESSION['csrf_token'];
 }
+
+function rotate_csrf_token(): string {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf_token'];
+}
+
 function verify_csrf_token(?string $token): bool {
     $posted = (string)$token;
-    if (!preg_match('/^[a-f0-9]{64}$/', $posted)) return false;
     $expected = (string)($_SESSION['csrf_token'] ?? '');
-    if ($expected !== '' && hash_equals($expected, $posted)) return true;
-    $cookie = (string)($_COOKIE['HMS_CSRF'] ?? '');
-    return $cookie !== '' && hash_equals($cookie, $posted);
+    if ($posted === '' || $expected === '') return false;
+    if (!preg_match('/^[a-f0-9]{64}$/', $posted)) return false;
+    return hash_equals($expected, $posted);
 }
