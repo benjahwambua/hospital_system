@@ -55,21 +55,11 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 <style>
-.reception-wrap{padding:28px;max-width:1250px;margin:auto}
-.reception-head{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:25px;flex-wrap:wrap}
-.reception-head h1{margin:0;color:#123;font-size:28px}.reception-head p{margin:6px 0 0;color:#687}
-.actions{display:flex;gap:10px;flex-wrap:wrap}.btn{display:inline-block;padding:11px 16px;border-radius:8px;text-decoration:none;font-weight:600}
-.btn-primary{background:#007bff;color:#fff}.btn-light{background:#eef4fa;color:#145}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:25px}
-.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 5px 20px rgba(0,0,0,.08)}
-.stat-label{color:#687;font-size:13px}.stat-value{font-size:30px;font-weight:800;margin-top:7px;color:#123}
-.section-title{font-size:19px;font-weight:700;margin:0 0 15px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:12px;border-bottom:1px solid #eee;text-align:left;font-size:14px}.table th{background:#f7f9fc;color:#456}
-.badge{display:inline-block;padding:5px 9px;border-radius:12px;font-size:12px;font-weight:700;background:#eef4fa}.badge-open{background:#fff3cd;color:#856404}.badge-progress{background:#dbeafe;color:#1d4ed8}.badge-done{background:#d4edda;color:#155724}
-@media(max-width:850px){.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:520px){.reception-wrap{padding:15px}.stats{grid-template-columns:1fr}}
+.reception-wrap{padding:24px;background:#f4f7fb;min-height:calc(100vh - 60px)}.reception-shell{max-width:1500px;margin:auto}.reception-head{background:linear-gradient(135deg,#075985,#0284c7);color:#fff;border-radius:20px;padding:30px;display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px;box-shadow:0 14px 34px rgba(2,132,199,.2)}.reception-head h1{margin:5px 0;font-size:29px}.reception-head p{margin:0;color:rgba(255,255,255,.82);font-size:14px}.reception-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#c9efff}.actions{display:flex;gap:9px;flex-wrap:wrap}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.card{background:#fff;border:1px solid #e7ebf2;border-radius:15px;padding:20px;box-shadow:0 4px 15px rgba(31,45,61,.05)}.stat-label{color:#7b8798;text-transform:uppercase;font-size:10px;font-weight:800}.stat-value{font-size:29px;font-weight:800;margin-top:7px;color:#25324a}.section-title{font-size:15px;font-weight:800;color:#25324a;margin:0}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:12px;border-bottom:1px solid #edf0f5;text-align:left;font-size:13px}.table th{background:#fafbfc;color:#667085;font-size:11px;text-transform:uppercase}.badge{display:inline-block;padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700;background:#eef4fa}.badge-open{background:#fff3cd;color:#856404}.badge-progress{background:#dbeafe;color:#1d4ed8}.badge-done{background:#d4edda;color:#155724}@media(max-width:850px){.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.reception-wrap{padding:18px 12px}.reception-head{flex-direction:column;align-items:flex-start}.stats{grid-template-columns:1fr}}
 </style>
-<div class="reception-wrap">
+<div class="reception-wrap"><div class="reception-shell">
     <div class="reception-head">
-        <div><h1><i class="fas fa-concierge-bell"></i> Reception</h1><p>Patient registration, visits, queue and front-desk control.</p></div>
+        <div><div class="reception-kicker">Front Desk</div><h1>Reception Dashboard</h1><p>Patient registration, visits and front-desk operations.</p></div>
         <div class="actions">
             <a class="btn btn-primary" href="/hospital_system/patients/reception_register.php"><i class="fas fa-user-plus"></i> New Patient</a>
             <a class="btn btn-light" href="/hospital_system/patients/patient_list.php"><i class="fas fa-search"></i> Patient Search</a>
@@ -117,4 +107,4 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
     </div>
 </div>
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+</div></div>\n<?php include __DIR__ . '/../includes/footer.php'; ?>
