@@ -62,14 +62,26 @@ try{
     if(strtolower($mode)==='mpesa' && $remaining>0){
         $phone = trim((string)($_POST['phone'] ?? ''));
         if($phone===''){
-            $pstmt=$conn->prepare("SELECT phone FROM patients WHERE id=? LIMIT 1");
-            if($pstmt){
-                $patientId=(int)($invoice['patient_id'] ?? 0);
-                $pstmt->bind_param('i',$patientId);
-                $pstmt->execute();
-                $prow=$pstmt->get_result()->fetch_assoc();
-                $pstmt->close();
-                $phone=trim((string)($prow['phone'] ?? ''));
+            $patientId=(int)($invoice['patient_id'] ?? 0);
+            if($patientId > 0){
+                $pstmt=$conn->prepare("SELECT phone FROM patients WHERE id=? LIMIT 1");
+                if($pstmt){
+                    $pstmt->bind_param('i',$patientId);
+                    $pstmt->execute();
+                    $prow=$pstmt->get_result()->fetch_assoc();
+                    $pstmt->close();
+                    $phone=trim((string)($prow['phone'] ?? ''));
+                }
+            } elseif(!empty($invoice['walkin_id'])){
+                $pstmt=$conn->prepare("SELECT phone FROM walkin_customers WHERE id=? LIMIT 1");
+                if($pstmt){
+                    $walkinId=(int)$invoice['walkin_id'];
+                    $pstmt->bind_param('i',$walkinId);
+                    $pstmt->execute();
+                    $prow=$pstmt->get_result()->fetch_assoc();
+                    $pstmt->close();
+                    $phone=trim((string)($prow['phone'] ?? ''));
+                }
             }
         }
         $receipt = strtoupper(trim((string)($_POST['mpesa_receipt'] ?? $_POST['reference'] ?? '')));
