@@ -93,9 +93,9 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
                 "SELECT pt.plan_id,
                         COALESCE(NULLIF(pt.approved_price,0), pt.base_price) AS tariff_price
                  FROM payer_tariffs pt
-                 INNER JOIN services_master sm ON sm.id = pt.service_id
+                 INNER JOIN services_master sm ON sm.service_code = pt.item_code
                  WHERE pt.payer_id = ?
-                   AND pt.item_code = sm.service_code
+                   AND sm.id = ?
                    AND pt.active = 1
                    AND (
                         pt.plan_id = ?
@@ -115,7 +115,7 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
                  LIMIT 1"
             );
             if ($tariffStmt) {
-                $tariffStmt->bind_param('iii', $payerId, $planId, $planId);
+                $tariffStmt->bind_param('iiii', $payerId, $serviceId, $planId, $planId);
                 $tariffStmt->execute();
                 $tariff = $tariffStmt->get_result()->fetch_assoc();
                 $tariffStmt->close();
