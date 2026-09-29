@@ -1238,7 +1238,7 @@ function clearForm() {
                     <option value="<?= $s['id'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
                     <?php endif; endwhile; ?>
                 </select>
-                <input type="number" name="price" placeholder="Price" step="0.01" style="padding:10px;">
+                <span style="padding:10px;background:#f3f6fa;border:1px solid #dbe3ec;border-radius:5px;font-size:12px;color:#667085;">Catalogue price applied automatically</span>
                 <input type="text" name="lab_instructions" placeholder="Notes..." style="padding:10px;">
                 <button type="submit" name="add_lab_request" style="background:#2980b9; color:white; border:none; padding:10px; border-radius:5px;">Request Lab</button>
             </form>
