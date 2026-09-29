@@ -1219,8 +1219,10 @@ function clearForm() {
                     </select>
                 </div>
                 <div>
-                    <label class="info-label">Fee (KSH)</label>
-                    <input type="number" id="svc_p" name="price" step="0.01" style="width:100%; padding:10px;">
+                    <label class="info-label">Pricing</label>
+                    <div style="padding:10px;background:#f3f6fa;border:1px solid #dbe3ec;border-radius:5px;font-size:12px;color:#667085;">
+                        Price is taken automatically from the active Service Catalogue and applicable patient coverage.
+                    </div>
                 </div>
                 <button type="submit" name="add_service" style="background:var(--primary-blue); color:white; border:none; border-radius:5px; margin-top:22px;">Bill Item</button>
             </div>
