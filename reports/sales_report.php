@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'finance', 'view');
 
 // Get date filters
 $from_date = isset($_GET['from_date']) ? $_GET['from_date'] : date('Y-m-d', strtotime('-30 days'));
@@ -20,14 +21,15 @@ $sql = "
         ae.debit AS amount,
         ae.note,
         COALESCE(i.id, ae.invoice_id) AS invoice_id,
-        COALESCE(p.full_name, 'Walk-in Customer') AS patient_name,
+        COALESCE(p.full_name, w.full_name, 'Walk-in Customer') AS patient_name,
         CASE
-            WHEN i.patient_id IS NOT NULL THEN 'Clinical'
-            ELSE 'Pharmacy'
+            WHEN i.walkin_id IS NOT NULL OR COALESCE(p.is_walkin, 0) = 1 THEN 'Walk-in'
+            ELSE 'Patient'
         END AS transaction_type
     FROM accounting_entries ae
     LEFT JOIN invoices i ON ae.invoice_id = i.id
     LEFT JOIN patients p ON i.patient_id = p.id
+    LEFT JOIN walkin_customers w ON i.walkin_id = w.id
     WHERE ae.account IN ('Cash', 'M-Pesa', 'Bank')
       AND ae.debit > 0
       AND DATE(ae.created_at) BETWEEN ? AND ?
@@ -42,7 +44,7 @@ $payments = $stmt->get_result();
 // Calculate totals
 $totalRevenue = 0;
 $paymentMethodTotals = [];
-$transactionTypeTotals = ['Clinical' => 0, 'Pharmacy' => 0];
+$transactionTypeTotals = ['Patient' => 0, 'Walk-in' => 0];
 $payments_data = [];
 
 while ($payment = $payments->fetch_assoc()) {
@@ -208,19 +210,19 @@ include __DIR__ . '/../includes/sidebar.php';
     color: #28a745;
 }
 
-.stat-card.clinical {
+.stat-card.patient {
     border-left-color: #17a2b8;
 }
 
-.stat-card.clinical .stat-value {
+.stat-card.patient .stat-value {
     color: #17a2b8;
 }
 
-.stat-card.pharmacy {
+.stat-card.walkin {
     border-left-color: #ffc107;
 }
 
-.stat-card.pharmacy .stat-value {
+.stat-card.walkin .stat-value {
     color: #ffc107;
 }
 
@@ -340,7 +342,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
 <div class="main-content">
     <h1 class="page-title">Daily Sales Report</h1>
-    <p class="page-subtitle">View total revenue collected by date range</p>
+    <p class="page-subtitle">Collections by date, customer and payment method.</p>
 
     <div class="filter-section">
         <div class="form-group">
@@ -365,13 +367,13 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="stat-label">Total Payments</div>
             <div class="stat-value"><?= $totalTransactions; ?></div>
         </div>
-        <div class="stat-card clinical">
-            <div class="stat-label">Clinical Revenue</div>
-            <div class="stat-value">KSH <?= number_format($transactionTypeTotals['Clinical'], 2); ?></div>
+        <div class="stat-card patient">
+            <div class="stat-label">Patient Collections</div>
+            <div class="stat-value">KSH <?= number_format($transactionTypeTotals['Patient'], 2); ?></div>
         </div>
-        <div class="stat-card pharmacy">
-            <div class="stat-label">Pharmacy Revenue</div>
-            <div class="stat-value">KSH <?= number_format($transactionTypeTotals['Pharmacy'], 2); ?></div>
+        <div class="stat-card walkin">
+            <div class="stat-label">Walk-in Collections</div>
+            <div class="stat-value">KSH <?= number_format($transactionTypeTotals['Walk-in'], 2); ?></div>
         </div>
     </div>
 
@@ -439,7 +441,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <?php else: ?>
         <div class="no-data">
             No payments found for the selected date range (<?= htmlspecialchars($from_date); ?> to <?= htmlspecialchars($to_date); ?>).
-            <br><small>This could mean no payments were recorded in the accounting system for these dates.</small>
+            
         </div>
         <?php endif; ?>
     </div>
