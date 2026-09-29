@@ -53,18 +53,35 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
             $conn->begin_transaction();
             if (in_array($type,['lab','radiology'],true)) {
                 $serviceId=(int)($_POST['service_id'] ?? 0);
-                $s=$conn->prepare("SELECT id,service_name,price FROM services_master WHERE id=? AND active=1 AND category=? LIMIT 1");
+                $s=$conn->prepare("SELECT id,service_name,category FROM services_master WHERE id=? AND active=1 AND category=? LIMIT 1");
                 if (!$s) throw new Exception('Unable to load service.');
                 $s->bind_param('is',$serviceId,$type); $s->execute(); $service=$s->get_result()->fetch_assoc(); $s->close();
                 if (!$service) throw new Exception('Select a valid service.');
-                $price=(float)$service['price'];
-                $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
-                if (!$ins) throw new Exception('Unable to create order: '.$conn->error);
-                $ins->bind_param('iisdi',$patientId,$serviceId,$type,$price,$visitId);
+                $resolved=get_service_price($conn,$serviceId,null,null);
+                $price=(float)$resolved['price'];
+                $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
+
+                $hasSnapshots=false;
+                $checkCols=$conn->query("SHOW COLUMNS FROM patient_services");
+                if($checkCols){
+                    $snapshotCols=[];
+                    while($col=$checkCols->fetch_assoc()) $snapshotCols[$col['Field']]=true;
+                    $hasSnapshots=isset($snapshotCols['service_code_snapshot'],$snapshotCols['service_name_snapshot'],$snapshotCols['quantity'],$snapshotCols['gross_amount'],$snapshotCols['discount_amount'],$snapshotCols['net_amount'],$snapshotCols['price_id']);
+                }
+
+                if($hasSnapshots){
+                    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,service_code_snapshot,service_name_snapshot,quantity,gross_amount,discount_amount,net_amount,price_id,visit_id,created_at,status) VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),'Pending')");
+                    if (!$ins) throw new Exception('Unable to create order: '.$conn->error);
+                    $code=$resolved['service_code']; $name=$resolved['service_name']; $qty=1; $gross=$price; $discount=0.0; $net=$price; $priceId=(int)$resolved['price_id'];
+                    $ins->bind_param('iisdssddddii', $patientId,$serviceId,$type,$price,$code,$name,$qty,$gross,$discount,$net,$priceId,$visitId);
+                } else {
+                    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
+                    if (!$ins) throw new Exception('Unable to create order: '.$conn->error);
+                    $ins->bind_param('iisdi',$patientId,$serviceId,$type,$price,$visitId);
+                }
                 if (!$ins->execute()) throw new Exception($ins->error);
                 $ins->close();
-                $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
-                $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$service['service_name'],1,$price,$type,$serviceId);
+                $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$resolved['service_name'],1,$price,$type,$serviceId);
                 post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
                 $conn->commit();
                 $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.'.';
@@ -116,8 +133,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
     }
 }
 
-$labs=$conn->query("SELECT id,service_name,price FROM services_master WHERE active=1 AND category='lab' ORDER BY service_name");
-$rads=$conn->query("SELECT id,service_name,price FROM services_master WHERE active=1 AND category='radiology' ORDER BY service_name");
+$labs=$conn->query("SELECT id,service_name FROM services_master WHERE active=1 AND category='lab' ORDER BY service_name");
+$rads=$conn->query("SELECT id,service_name FROM services_master WHERE active=1 AND category='radiology' ORDER BY service_name");
 $meds=$conn->query("SELECT id,drug_name,selling_price,quantity FROM pharmacy_stock WHERE quantity>0 ORDER BY drug_name");
 $orders=$conn->prepare("SELECT ps.id,ps.category,ps.price,ps.status,ps.created_at,sm.service_name FROM patient_services ps JOIN services_master sm ON sm.id=ps.service_id WHERE ps.patient_id=? AND ps.visit_id=? AND ps.category IN ('lab','radiology') ORDER BY ps.id DESC");
 $orders->bind_param('ii',$patientId,$visitId); $orders->execute(); $orderRows=$orders->get_result();
@@ -139,7 +156,7 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="patient_id" value="<?=$patientId?>"><input type="hidden" name="visit_id" value="<?=$visitId?>">
 <div class="col-md-3 mb-3"><label>Department</label><select name="order_type" id="orderType" class="form-control" onchange="toggleOrder()" required><option value="">Select...</option><option value="lab">Laboratory</option><option value="radiology">Radiology</option><option value="pharmacy">Pharmacy</option></select></div>
 <div class="col-md-5 mb-3" id="serviceBox"><label>Investigation / Service</label><select name="service_id" class="form-control"><option value="">Select...</option>
-<?php if($labs): while($x=$labs->fetch_assoc()): ?><option value="<?=$x['id']?>">Lab: <?=htmlspecialchars($x['service_name'])?> — KES <?=number_format($x['price'],2)?></option><?php endwhile; endif; ?>
+<?php if($labs): while($x=$labs->fetch_assoc()): ?><option value="<?=$x['id']?>">Lab: <?=htmlspecialchars($x['service_name'])?> — KES <?=number_format((float)get_service_price($conn,(int)$x['id'])['price'],2)?></option><?php endwhile; endif; ?>
 <?php if($rads): while($x=$rads->fetch_assoc()): ?><option value="<?=$x['id']?>">Radiology: <?=htmlspecialchars($x['service_name'])?> — KES <?=number_format($x['price'],2)?></option><?php endwhile; endif; ?></select></div>
 <div class="col-md-5 mb-3" id="medicineBox" style="display:none"><label>Medicine</label><select name="medicine_id" class="form-control"><option value="">Select...</option><?php if($meds): while($m=$meds->fetch_assoc()): ?><option value="<?=$m['id']?>"><?=htmlspecialchars($m['drug_name'])?> — KES <?=number_format($m['selling_price'],2)?> · Stock <?=$m['quantity']?></option><?php endwhile; endif; ?></select></div>
 <div class="col-md-2 mb-3"><label>Qty</label><input type="number" name="quantity" value="1" min="1" class="form-control"></div>
