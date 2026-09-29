@@ -71,7 +71,7 @@ function isParentActive($paths) {
 
 
         <?php if (can_access_module($conn, 'clinical')): ?>
-        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php', 'admit_patient.php', 'discharge_patient.php', 'diagnostics.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-stethoscope icon-main"></i> Clinical
                 <i class="fas fa-chevron-down caret"></i>
