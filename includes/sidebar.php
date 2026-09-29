@@ -219,7 +219,7 @@ function isParentActive($paths) {
         <?php if (can_access_module($conn, 'front_desk')): ?>
         <div class="menu-title">Front Desk</div>
         <a href="/hospital_system/reception/index.php" class="<?= isActive('reception/index.php') ?>">
-            <i class="fas fa-concierge-bell icon-main"></i> Reception
+            <i class="fas fa-th-large icon-main"></i> Reception Dashboard
         </a>
         <a href="/hospital_system/patients/reception_register.php" class="<?= isActive('reception_register.php') ?>">
             <i class="fas fa-user-plus icon-main"></i> Register Patient
@@ -247,12 +247,13 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'laboratory')): ?>
-        <div class="has-submenu <?= isParentActive(['lab_requests.php', 'lab_results.php', 'lab/inventory/']) ?>">
+        <div class="has-submenu <?= isParentActive(['lab/dashboard.php','lab_requests.php', 'lab_results.php', 'lab/inventory/']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-microscope icon-main"></i> Laboratory
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
+                <a href="/hospital_system/lab/dashboard.php" class="<?= isActive('lab/dashboard.php') ?>"><i class="fas fa-th-large"></i> Laboratory Dashboard</a>
                 <a href="/hospital_system/lab/lab_requests.php" class="<?= isActive('lab_requests.php') ?>"><i class="fas fa-vial"></i> Lab Requests</a>
                 <a href="/hospital_system/lab/lab_results.php" class="<?= isActive('lab_results.php') ?>"><i class="fas fa-poll-h"></i> Lab Results</a>
                 <a href="/hospital_system/lab/inventory/index.php" class="<?= isActive('lab/inventory/') ?>"><i class="fas fa-boxes"></i> Lab Inventory</a>
@@ -261,12 +262,13 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'radiology')): ?>
-        <div class="has-submenu <?= isParentActive(['radiology_requests.php', 'radiology_results.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['radiology/dashboard.php','radiology_requests.php', 'radiology_results.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-x-ray icon-main"></i> Radiology
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
+                <a href="/hospital_system/radiology/dashboard.php" class="<?= isActive('radiology/dashboard.php') ?>"><i class="fas fa-th-large"></i> Radiology Dashboard</a>
                 <a href="/hospital_system/radiology/radiology_requests.php" class="<?= isActive('radiology_requests.php') ?>"><i class="fas fa-x-ray"></i> Radiology Requests</a>
                 <a href="/hospital_system/radiology/radiology_results.php" class="<?= isActive('radiology_results.php') ?>"><i class="fas fa-images"></i> Radiology Results</a>
             </div>
@@ -274,12 +276,13 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'pharmacy')): ?>
-        <div class="has-submenu <?= isParentActive(['dispensing_queue.php', 'sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['pharmacy/dashboard.php','dispensing_queue.php', 'sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
             <a href="#" class="menu-toggle">
                 <i class="fas fa-pills icon-main"></i> Pharmacy
                 <i class="fas fa-chevron-down caret"></i>
             </a>
             <div class="submenu">
+                <a href="/hospital_system/pharmacy/dashboard.php" class="<?= isActive('pharmacy/dashboard.php') ?>"><i class="fas fa-th-large"></i> Pharmacy Dashboard</a>
                 <a href="/hospital_system/pharmacy/dispensing_queue.php" class="<?= isActive('dispensing_queue.php') ?>"><i class="fas fa-clipboard-check"></i> Dispensing Queue</a>
                 <a href="/hospital_system/pharmacy/sell_medicine.php" class="<?= isActive('sell_medicine.php') ?>"><i class="fas fa-file-prescription"></i> Sell Medicine</a>
                 <a href="/hospital_system/pharmacy/add_stock.php" class="<?= isActive('add_stock.php') ?>"><i class="fas fa-box-open"></i> Add Stock</a>
@@ -311,6 +314,7 @@ function isParentActive($paths) {
         <div class="has-submenu <?= isParentActive(['accounting/', 'billing/', 'expenses/']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-coins icon-main"></i> Finance & Billing <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
+                <a href="/hospital_system/finance/dashboard.php" class="<?= isActive('finance/dashboard.php') ?>"><i class="fas fa-th-large"></i> Finance Dashboard</a>
                 <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
                 <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
                 <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
@@ -323,9 +327,10 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'procurement')): ?>
-        <div class="has-submenu <?= isParentActive(['procurement/']) ?>">
+        <div class="has-submenu <?= isParentActive(['procurement/dashboard.php','procurement/']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-boxes icon-main"></i> Procurement <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
+                <a href="/hospital_system/procurement/dashboard.php" class="<?= isActive('procurement/dashboard.php') ?>"><i class="fas fa-th-large"></i> Procurement Dashboard</a>
                 <a href="/hospital_system/procurement/manage_suppliers.php" class="<?= isActive('manage_suppliers.php') ?>"><i class="fas fa-truck"></i> Suppliers</a>
                 <a href="/hospital_system/procurement/purchase_orders.php" class="<?= isActive('purchase_orders.php') ?>"><i class="fas fa-shopping-basket"></i> Purchase Orders</a>
                 <a href="/hospital_system/procurement/receive_inventory.php" class="<?= isActive('receive_inventory.php') ?>"><i class="fas fa-warehouse"></i> Receive Inventory</a>
@@ -345,9 +350,10 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
-        <div class="has-submenu <?= isParentActive(['users/', 'settings/']) ?>">
+        <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-cogs icon-main"></i> Administration <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
+                <a href="/hospital_system/administration/dashboard.php" class="<?= isActive('administration/dashboard.php') ?>"><i class="fas fa-th-large"></i> Administration Dashboard</a>
                 <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
                 <a href="/hospital_system/users/access_rights.php" class="<?= isActive('access_rights.php') ?>"><i class="fas fa-user-shield"></i> Access Rights</a>
                 <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
