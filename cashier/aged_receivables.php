@@ -1,4 +1,4 @@
-
+<style>
 /* HMS unified operational workspace */
 .main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
 .main-content>.container-fluid{max-width:1500px}
@@ -13,6 +13,25 @@
 .main-content .btn{border-radius:8px;font-weight:700}
 .main-content .btn-primary{background:#075b9d;border-color:#075b9d}
 .main-content .page-header,.main-content .d-flex.justify-content-between.align-items-center{margin-bottom:20px!important}
+.hms-workspace{padding:26px 24px 42px}
+.hms-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}
+.hms-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;font-weight:800;color:#667085;margin-bottom:5px}
+.hms-hero h1{font-size:26px;font-weight:800;margin:0 0 5px}
+.hms-hero p{margin:0;color:#667085;font-size:14px}
+.hms-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.hms-stat{height:100%;padding:18px 20px}
+.hms-stat .label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:800;color:#667085}
+.hms-stat .value{font-size:22px;font-weight:800;color:#25324a;margin-top:4px}
+.hms-stat .hint{font-size:12px;color:#98a2b3;margin-top:2px}
+.hms-icon{width:38px;height:38px;border-radius:10px;background:#eef5fb;color:#075b9d;display:flex;align-items:center;justify-content:center}
+.hms-filter{padding:18px 20px}
+.hms-filter label{font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;color:#667085}
+.hms-person{font-weight:800;color:#25324a}.hms-meta{font-size:11px;color:#98a2b3}
+.hms-amount{font-weight:800;color:#25324a;white-space:nowrap}
+.hms-danger{color:#b42318!important;font-weight:800}.hms-success{color:#067647!important;font-weight:800}
+.hms-empty{padding:60px 20px;text-align:center;color:#98a2b3}.hms-empty i{font-size:38px;color:#c5ccd6;margin-bottom:12px}
+@media(max-width:900px){.hms-hero{flex-direction:column}.hms-actions{justify-content:flex-start}.hms-workspace{padding:20px 12px 35px}}
+</style>
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
@@ -148,8 +167,7 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<div class="main-content">
-    <div class="container-fluid">
+<div class="main-content"><div class="container-fluid hms-workspace">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-user-clock"></i> Aged Receivables</h2>
