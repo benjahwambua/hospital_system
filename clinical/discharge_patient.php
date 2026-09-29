@@ -1,3 +1,6 @@
+<style>
+.workspace-page{background:#f5f7fb;min-height:calc(100vh - 72px);padding:28px 24px 40px}.workspace-shell{max-width:1500px;margin:0 auto}.workspace-card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);background:#fff;overflow:hidden}.workspace-card .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}.workspace-page .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}.workspace-page .table td{border-color:#edf0f5;vertical-align:middle}.workspace-page .form-control{border-color:#d7dee8;border-radius:9px}.workspace-page .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}.workspace-page .btn{border-radius:8px;font-weight:700}
+</style>
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
