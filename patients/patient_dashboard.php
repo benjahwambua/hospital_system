@@ -297,8 +297,7 @@ if ($patient_id <= 0) {
     if(isset($_POST['add_service'])){
         if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to add services.'); }
         $service_id=intval($_POST['service_id']);
-        $postedPrice=floatval($_POST['price'] ?? 0);
-        if($service_id>0 && $postedPrice>=0){
+        if($service_id>0){
             $serviceStmt=$conn->prepare("SELECT service_name, category FROM services_master WHERE id=? AND active=1 LIMIT 1");
             $serviceStmt->bind_param('i',$service_id);
             $serviceStmt->execute();
@@ -312,19 +311,7 @@ if ($patient_id <= 0) {
             if($price < 0) throw new Exception('Invalid service price.');
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category'] ?: 'General', (int)($patient['doctor_id'] ?? 0));
-            if ($hasVisitServices && $visitId > 0) {
-                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at, status) VALUES (?, ?, ?, ?, ?, NOW(), 'Completed')");
-                $stmt->bind_param("iisdi",$patient_id,$service_id,$service['category'],$price,$visitId);
-            } else {
-                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, ?, ?, NOW(), 'Completed')");
-                $stmt->bind_param("iisd",$patient_id,$service_id,$service['category'],$price);
-            }
-            if (!$stmt->execute()) {
-                $error = $stmt->error;
-                $stmt->close();
-                throw new Exception('Unable to save service: '.$error);
-            }
-            $stmt->close();
+            add_patient_service($conn, $patient_id, $service_id, $visitId, null, null, 1, 0, 'Completed', null);
 
             $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
             $itemId=add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
@@ -345,31 +332,20 @@ if ($patient_id <= 0) {
     if(isset($_POST['add_lab_request'])){
         if (!can_module_action($conn, 'clinical', 'create')) { throw new Exception('You do not have permission to order laboratory services.'); }
         $service_id=intval($_POST['service_id']);
-        $price=0.0;
         $instructions=$_POST['lab_instructions'] ?? '';
-        if($service_id>0 && $price>=0){
+        if($service_id>0){
             $stmt=$conn->prepare("SELECT service_name FROM services_master WHERE id=? AND active=1 AND category='lab' LIMIT 1");
             $stmt->bind_param('i',$service_id);
             $stmt->execute();
             $labService=$stmt->get_result()->fetch_assoc();
             $stmt->close();
             if(!$labService) throw new Exception('Selected laboratory service is invalid.');
-            $price = (float)($labService['price'] ?? 0);
+            $resolved = get_service_price($conn, $service_id, null, null);
+            $price = (float)$resolved['price'];
+            $labService['service_name'] = $resolved['service_name'];
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Laboratory', (int)($patient['doctor_id'] ?? 0));
-            if ($hasVisitServices && $visitId > 0) {
-                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,visit_id,created_at,status) VALUES (?, ?, 'lab', ?, ?, ?, NOW(), 'Pending')");
-                $stmt->bind_param("iidsi",$patient_id,$service_id,$price,$instructions,$visitId);
-            } else {
-                $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,created_at,status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
-                $stmt->bind_param("iids",$patient_id,$service_id,$price,$instructions);
-            }
-            if (!$stmt->execute()) {
-                $error = $stmt->error;
-                $stmt->close();
-                throw new Exception('Unable to save laboratory request: '.$error);
-            }
-            $stmt->close();
+            add_patient_service($conn, $patient_id, $service_id, $visitId, null, null, 1, 0, 'Pending', $instructions);
 
             $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
             $itemId=add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
