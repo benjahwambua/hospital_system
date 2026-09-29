@@ -33,13 +33,21 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 // No registration form is required. A minimal internal walk-in patient
                 // record is created only because the existing invoice/payment schema
                 // requires a patient key.
-                $patientNo='WS-'.date('YmdHis').'-'.strtoupper(bin2hex(random_bytes(2)));
+                $patientNo='TEMP-WLK-'.date('YmdHis').'-'.strtoupper(bin2hex(random_bytes(2)));
                 $gender=''; $phone='';
                 $p=$conn->prepare("INSERT INTO patients (patient_number,full_name,gender,phone,is_walkin,created_at) VALUES (?,?,?,?,1,NOW())");
                 if(!$p) throw new Exception('Unable to create walk-in customer: '.$conn->error);
                 $p->bind_param('ssss',$patientNo,$customer,$gender,$phone);
                 if(!$p->execute()) throw new Exception('Unable to create walk-in customer: '.$p->error);
                 $patientId=(int)$p->insert_id; $p->close();
+
+                // Walk-in patient numbers use the short WLK format, e.g. WLK0011.
+                $patientNo='WLK'.str_pad((string)$patientId,4,'0',STR_PAD_LEFT);
+                $numberStmt=$conn->prepare('UPDATE patients SET patient_number=? WHERE id=?');
+                if(!$numberStmt) throw new Exception('Unable to assign walk-in patient number: '.$conn->error);
+                $numberStmt->bind_param('si',$patientNo,$patientId);
+                if(!$numberStmt->execute()) throw new Exception('Unable to assign walk-in patient number: '.$numberStmt->error);
+                $numberStmt->close();
 
                 $invoiceId=get_or_create_invoice($conn,$patientId);
                 $unit=(float)$stock['selling_price'];
