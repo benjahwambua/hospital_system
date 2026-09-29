@@ -61,26 +61,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 $price=(float)$resolved['price'];
                 $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
 
-                $hasSnapshots=false;
-                $checkCols=$conn->query("SHOW COLUMNS FROM patient_services");
-                if($checkCols){
-                    $snapshotCols=[];
-                    while($col=$checkCols->fetch_assoc()) $snapshotCols[$col['Field']]=true;
-                    $hasSnapshots=isset($snapshotCols['service_code_snapshot'],$snapshotCols['service_name_snapshot'],$snapshotCols['quantity'],$snapshotCols['gross_amount'],$snapshotCols['discount_amount'],$snapshotCols['net_amount'],$snapshotCols['price_id']);
-                }
-
-                if($hasSnapshots){
-                    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,service_code_snapshot,service_name_snapshot,quantity,gross_amount,discount_amount,net_amount,price_id,visit_id,created_at,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),'Pending')");
-                    if (!$ins) throw new Exception('Unable to create order: '.$conn->error);
-                    $code=$resolved['service_code']; $name=$resolved['service_name']; $qty=1; $gross=$price; $discount=0.0; $net=$price; $priceId=(int)$resolved['price_id'];
-                    $ins->bind_param('iisdssddddii', $patientId,$serviceId,$type,$price,$code,$name,$qty,$gross,$discount,$net,$priceId,$visitId);
-                } else {
-                    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,visit_id,created_at,status) VALUES (?,?,?,?,?,NOW(),'Pending')");
-                    if (!$ins) throw new Exception('Unable to create order: '.$conn->error);
-                    $ins->bind_param('iisdi',$patientId,$serviceId,$type,$price,$visitId);
-                }
-                if (!$ins->execute()) throw new Exception($ins->error);
-                $ins->close();
+                add_patient_service($conn, $patientId, $serviceId, $visitId, null, null, 1, 0, 'Pending', null);
                 $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$resolved['service_name'],1,$price,$type,$serviceId);
                 post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
                 $conn->commit();
