@@ -70,7 +70,7 @@ include __DIR__.'/../includes/sidebar.php';
 <div class="col-md-3"><div class="card shadow h-100"><div class="card-body"><small class="text-muted">M-Pesa Collected</small><h5>KSH <?=number_format($totals['mpesa'],2)?></h5></div></div></div>
 </div>
 <div class="card shadow"><div class="card-header"><h6 class="m-0 font-weight-bold text-danger">Close Shift & Reconcile</h6></div><div class="card-body">
-<div class="alert alert-info">Expected physical cash = opening cash + cash collections. M-Pesa is reconciled separately and is not included in physical cash.</div>
+
 <form method="post" onsubmit="return confirm('Close this cashier shift? This action cannot be undone.');"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>"><input type="hidden" name="action" value="close"><input type="hidden" name="shift_id" value="<?= (int)$open['id']?>">
 <div class="form-row"><div class="form-group col-md-4"><label>Physical Closing Cash (KSH)</label><input type="number" name="closing_cash" class="form-control" min="0" step="0.01" required></div><div class="form-group col-md-8"><label>Closing Notes</label><input type="text" name="closing_notes" class="form-control" maxlength="500"></div></div>
 <button class="btn btn-danger"><i class="fas fa-lock"></i> Close Shift</button></form></div></div>
