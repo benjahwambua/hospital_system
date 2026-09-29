@@ -546,29 +546,8 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
             $check->close();
 
             if (!$exists) {
-                $category=(string)($service['category'] ?? 'procedures');
-                if (invoice_column_exists($conn,'visit_id')) {
-                    $stmt=$conn->prepare(
-                        "INSERT INTO patient_services
-                         (patient_id,service_id,category,price,visit_id,created_at,status)
-                         VALUES (?,?,?,?,?,NOW(),'Completed')"
-                    );
-                    if (!$stmt) throw new Exception('Unable to prepare consultation service: '.$conn->error);
-                    $stmt->bind_param('iisdi',$patient_id,$sid,$category,$fee,$visitId);
-                } else {
-                    $stmt=$conn->prepare(
-                        "INSERT INTO patient_services
-                         (patient_id,service_id,category,price,created_at,status)
-                         VALUES (?,?,?, ?,NOW(),'Completed')"
-                    );
-                    if (!$stmt) throw new Exception('Unable to prepare consultation service: '.$conn->error);
-                    $stmt->bind_param('iisd',$patient_id,$sid,$category,$fee);
-                }
-                if (!$stmt->execute()) {
-                    $err=$stmt->error; $stmt->close();
-                    throw new Exception('Unable to create consultation service: '.$err);
-                }
-                $stmt->close();
+                $category=(string)($service['category'] ?? 'procedure');
+                add_patient_service($conn, $patient_id, $sid, $visitId, null, null, 1, 0, 'Completed', null);
             }
         }
     }
