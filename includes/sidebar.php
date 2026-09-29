@@ -82,9 +82,6 @@ function isParentActive($paths) {
                 <a href="/hospital_system/patients/appointments.php" class="<?= isActive('appointments.php') ?>"><i class="fas fa-calendar-check"></i> Appointments</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
-                <a href="/hospital_system/clinical/admit_patient.php" class="<?= isActive('admit_patient.php') ?>"><i class="fas fa-procedures"></i> Admissions</a>
-                <a href="/hospital_system/clinical/discharge_patient.php" class="<?= isActive('discharge_patient.php') ?>"><i class="fas fa-sign-out-alt"></i> Discharge</a>
-                <a href="/hospital_system/diagnostics/diagnostics.php" class="<?= isActive('diagnostics.php') ?>"><i class="fas fa-diagnoses"></i> Diagnostics</a>
             </div>
         </div>
         <?php endif; ?>
