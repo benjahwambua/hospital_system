@@ -13,7 +13,7 @@ $patientId = (int)($_GET['patient_id'] ?? $_POST['patient_id'] ?? 0);
 $visitId = (int)($_GET['visit_id'] ?? $_POST['visit_id'] ?? 0);
 $message = '';
 
-if ($patientId <= 0) { header('Location: consultations.php'); exit; }
+if ($patientId <= 0) { header('Location: /hospital_system/patients/patient_list.php?notice=select_patient_for_orders'); exit; }
 if ($visitId <= 0) $visitId = get_or_create_current_visit($conn, $patientId);
 
 $p = $conn->prepare("SELECT id, full_name, patient_number FROM patients WHERE id=? LIMIT 1");
@@ -131,7 +131,7 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 </div></div>
 <div class="card shadow-sm"><div class="card-header">Lab & Radiology Orders</div><div class="card-body"><table class="table table-sm"><tr><th>Department</th><th>Service</th><th>Status</th><th>Amount</th><th>Time</th></tr><?php while($o=$orderRows->fetch_assoc()): ?><tr><td><?=htmlspecialchars(ucfirst($o['category']))?></td><td><?=htmlspecialchars($o['service_name'])?></td><td><?=htmlspecialchars($o['status']??'Pending')?></td><td>KES <?=number_format($o['price'],2)?></td><td><?=htmlspecialchars($o['created_at'])?></td></tr><?php endwhile; ?></table></div></div>
 <?php if($rxRows): ?><div class="card shadow-sm mt-4"><div class="card-header">Pharmacy Orders</div><div class="card-body"><table class="table table-sm"><tr><th>Medicine</th><th>Qty</th><th>Unit Price</th><th>Time</th></tr><?php while($r=$rxRows->fetch_assoc()): ?><tr><td><?=htmlspecialchars($r['drug_name'])?></td><td><?=$r['quantity']?></td><td>KES <?=number_format($r['unit_price'],2)?></td><td><?=htmlspecialchars($r['created_at'])?></td></tr><?php endwhile; ?></table></div></div><?php endif; ?>
-<a class="btn btn-outline-primary mt-3" href="care.php?patient_id=<?=$patientId?>&visit_id=<?=$visitId?>">Back to Clinical Care</a>
+<a class="btn btn-outline-primary mt-3" href="../patients/patient_dashboard.php?id=<?=$patientId?>&tab=clinical">Back to Clinical Care</a>
 </div></div>
 <script>
 function toggleOrder(){var t=document.getElementById('orderType').value;document.getElementById('serviceBox').style.display=t==='pharmacy'?'none':'block';document.getElementById('medicineBox').style.display=t==='pharmacy'?'block':'none';}
