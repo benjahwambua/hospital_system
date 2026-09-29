@@ -322,6 +322,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/accounting/reconciliation.php" class="<?= isActive('reconciliation.php') ?>"><i class="fas fa-balance-scale"></i> Financial Reconciliation</a>
                 <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
                 <a href="/hospital_system/expenses/view_expenses.php" class="<?= isActive('view_expenses.php') ?>"><i class="fas fa-file-contract"></i> Expense History</a>
+                <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('reports/sales_report.php') ?>"><i class="fas fa-chart-line"></i> Sales Report</a>
             </div>
         </div>
         <?php endif; ?>
@@ -357,7 +358,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
                 <a href="/hospital_system/users/access_rights.php" class="<?= isActive('access_rights.php') ?>"><i class="fas fa-user-shield"></i> Access Rights</a>
                 <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
-                <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('sales_report.php') ?>"><i class="fas fa-chart-line"></i> System Reports</a>
+                <a href="/hospital_system/reports/reports.php" class="<?= isActive('reports/reports.php') ?>"><i class="fas fa-file-alt"></i> System Reports</a>
             </div>
         </div>
         <?php endif; ?>
