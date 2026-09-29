@@ -126,21 +126,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient','Maternity');
                 $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
 
-                $consultationFee=500.00;
-                $consultItem=add_invoice_item($conn,$invoiceId,'Maternity Consultation/Procedure',1,$consultationFee,'maternity',null);
-                post_invoice_journal($conn,$invoiceId,$patientId,$consultationFee,'Maternity consultation',$consultItem);
-
+                // Maternity billing uses the central Service Catalogue. There is no
+                // hard-coded maternity consultation fee and no free-text service charge.
                 if (!empty($_POST['service_id'])) {
                     foreach ($_POST['service_id'] as $idx => $serviceId) {
                         $serviceId=(int)$serviceId;
                         if($serviceId<=0) continue;
-                        $s=$conn->prepare("SELECT id,service_name FROM services_master WHERE id=? AND active=1 LIMIT 1");
+                        $s=$conn->prepare("SELECT id,service_name,category,department FROM services_master WHERE id=? AND active=1 AND (category='maternity' OR LOWER(department)='maternity') LIMIT 1");
                         if(!$s) throw new Exception('Unable to load maternity service.');
                         $s->bind_param('i',$serviceId);$s->execute();$service=$s->get_result()->fetch_assoc();$s->close();
-                        if(!$service) throw new Exception('Invalid maternity service selected.');
-                        $resolved=get_service_price($conn,$serviceId,null,null);
+                        if(!$service) throw new Exception('Invalid maternity service selected. Select a service from the Maternity catalogue.');
+                        add_patient_service($conn,$patientId,$serviceId,$visitId,null,null,1,0,'Completed',null);
+                        $resolved=get_service_price_for_patient($conn,$patientId,$serviceId);
                         $servicePrice=(float)$resolved['price'];
-                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$service['service_name'],1,$servicePrice,'maternity',$serviceId);
+                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$resolved['service_name'],1,$servicePrice,'maternity',$serviceId);
                         post_invoice_journal($conn,$invoiceId,$patientId,$servicePrice,'Maternity service',$itemId);
                     }
                 }
