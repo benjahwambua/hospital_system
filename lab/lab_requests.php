@@ -96,8 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                         $invoiceId = get_or_create_visit_invoice($conn, $walkinPatientId, $visitId);
                         $invoiceItemId = add_invoice_item($conn, $invoiceId, 'Lab: ' . $labService['service_name'], 1, $price, 'lab', $service_id);
                         post_invoice_journal($conn, $invoiceId, $walkinPatientId, $price, 'Walk-in laboratory', $invoiceItemId);
-
-                        // No payment is recorded here. Central Cashier is the single collection point.
                         $conn->commit();
                         header('Location: lab_results.php?created=1&patient_id=' . $walkinPatientId . '&service_id=' . $service_id);
                         exit;
