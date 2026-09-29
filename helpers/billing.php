@@ -84,6 +84,57 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
+    // If the patient has payer coverage but no payer-specific service_prices row,
+    // fall back to the insurer/SHA tariff before using the standard cash price.
+    if ($row && $payerId !== null && (int)($row['payer_id'] ?? 0) === 0) {
+        $tariffTable = $conn->query("SHOW TABLES LIKE 'payer_tariffs'");
+        if ($tariffTable && $tariffTable->num_rows > 0) {
+            $tariffStmt = $conn->prepare(
+                "SELECT pt.plan_id,
+                        COALESCE(NULLIF(pt.approved_price,0), pt.base_price) AS tariff_price
+                 FROM payer_tariffs pt
+                 INNER JOIN services_master sm ON sm.id = pt.service_id
+                 WHERE pt.payer_id = ?
+                   AND pt.item_code = sm.service_code
+                   AND pt.active = 1
+                   AND (
+                        pt.plan_id = ?
+                        OR pt.plan_id IS NULL
+                   )
+                   AND (
+                        (sm.category = 'consultation' AND pt.item_type = 'Consultation')
+                        OR (sm.category = 'lab' AND pt.item_type = 'Lab')
+                        OR (sm.category = 'radiology' AND pt.item_type = 'Radiology')
+                        OR (sm.category = 'procedure' AND pt.item_type = 'Procedure')
+                        OR (sm.category = 'pharmacy' AND pt.item_type = 'Pharmacy')
+                        OR (sm.category IN ('treatment','maternity','other') AND pt.item_type = 'Service')
+                        OR pt.item_type = 'Other'
+                   )
+                 ORDER BY CASE WHEN pt.plan_id = ? THEN 1 ELSE 2 END,
+                          pt.id DESC
+                 LIMIT 1"
+            );
+            if ($tariffStmt) {
+                $tariffStmt->bind_param('iii', $payerId, $planId, $planId);
+                $tariffStmt->execute();
+                $tariff = $tariffStmt->get_result()->fetch_assoc();
+                $tariffStmt->close();
+                if ($tariff && $tariff['tariff_price'] !== null) {
+                    return [
+                        'price_id' => null,
+                        'price' => (float)$tariff['tariff_price'],
+                        'service_code' => (string)($row['service_code'] ?? ''),
+                        'service_name' => (string)($row['service_name'] ?? ''),
+                        'category' => (string)($row['category'] ?? ''),
+                        'unit' => (string)($row['unit'] ?? 'Each'),
+                        'payer_id' => $payerId,
+                        'plan_id' => $tariff['plan_id'] !== null ? (int)$tariff['plan_id'] : null,
+                    ];
+                }
+            }
+        }
+    }
+
     if (!$row) {
         // Backward-compatible fallback while old databases are being migrated.
         $stmt = $conn->prepare("SELECT id AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
