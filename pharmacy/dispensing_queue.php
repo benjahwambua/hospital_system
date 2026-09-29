@@ -91,7 +91,7 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
 <div class="main-content"><div class="container-fluid pt-4">
 <div class="card shadow-sm"><div class="card-header"><h4 class="mb-0">Pharmacy Dispensing Queue</h4></div><div class="card-body">
 <?php if($message):?><div class="alert alert-info"><?=htmlspecialchars($message)?></div><?php endif;?>
-<p class="text-muted">Prescriptions arrive here from Clinical Care. Stock is deducted only when Pharmacy dispenses. The prescription creates the central billing line; Pharmacy does not charge the patient a second time.</p>
+
 <table class="table table-bordered"><thead><tr><th>Client / Patient Name</th><th>Visit</th><th>Medicine</th><th>Qty</th><th>Requested</th><th>Action</th></tr></thead><tbody>
 <?php if($rows&&$rows->num_rows):while($r=$rows->fetch_assoc()):?><tr>
 <td><strong><?=htmlspecialchars($r['full_name'])?></strong><br><small><?=htmlspecialchars($r['patient_number'])?></small></td>
