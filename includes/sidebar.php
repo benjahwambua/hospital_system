@@ -154,7 +154,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'finance_admin')): ?>
         <div class="menu-title">Finance & Billing Administration</div>
-        <div class="has-submenu <?= isParentActive(['accounting/', 'billing/', 'expenses/']) ?>">
+        <div class="has-submenu <?= isParentActive(['finance/', 'accounting/', 'billing/', 'expenses/', 'reports/sales_report.php']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-coins icon-main"></i> Finance & Billing <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/finance/dashboard.php" class="<?= isActive('finance/dashboard.php') ?>"><i class="fas fa-th-large"></i> Finance Dashboard</a>
