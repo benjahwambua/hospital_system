@@ -12,7 +12,7 @@ include __DIR__.'/../../includes/header.php'; include __DIR__.'/../../includes/s
 ?>
 <div class="container-fluid">
 <div class="d-flex justify-content-between align-items-center mb-4"><h2><i class="fas fa-boxes"></i> Laboratory Inventory</h2><a class="btn btn-primary" href="add_item.php"><i class="fas fa-plus"></i> Add Stock Item</a></div>
-<div class="alert alert-info">Laboratory reagents, test kits, tubes, gloves and other consumables are managed here separately from pharmacy medicines.</div>
+
 <div class="card shadow"><div class="card-body table-responsive">
 <table class="table table-bordered table-hover"><thead><tr><th>Item</th><th>Category</th><th>Unit</th><th>Qty</th><th>Reorder</th><th>Buying Price</th><th>Expiry</th><th>Status</th></tr></thead><tbody>
 <?php while($r=$items->fetch_assoc()): $low=(float)$r['quantity']<=(float)$r['reorder_level']; ?>
