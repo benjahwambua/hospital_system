@@ -175,7 +175,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-receipt"></i> Record M-Pesa Payment</h6>
             </div>
             <div class="card-body">
-                <p class="text-muted">M-Pesa recording does not require Daraja/STK configuration. Phone number and receipt are optional and can be added when available.</p>
+                
                 <form method="POST" class="row align-items-end">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, "UTF-8") ?>">
                     <div class="col-md-3">
@@ -227,7 +227,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         </button>
                     </div>
                 </form>
-                <small class="text-muted d-block mt-2">STK Push is optional. It requires Daraja credentials and a reachable callback URL. Manual M-Pesa recording above does not require STK configuration.</small>
+                
             </div>
         </div>
 
