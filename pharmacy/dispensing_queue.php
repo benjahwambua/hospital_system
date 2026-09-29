@@ -1,3 +1,16 @@
+<style>
+/* HMS operational page styling */
+.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
+.main-content>.container-fluid{max-width:1500px}
+.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
+.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
+.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
+.main-content .table td{border-color:#edf0f5;vertical-align:middle}
+.main-content .table tbody tr:hover{background:#f8fbff}
+.main-content .form-control{border-color:#d7dee8;border-radius:9px}
+.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
+.main-content .btn{border-radius:8px;font-weight:700}
+</style>
 <?php
 require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/session.php';
