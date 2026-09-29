@@ -11,14 +11,16 @@ $sql = "
 SELECT 
     i.id AS invoice_id,
     i.created_at,
-    i.total,
+    COALESCE(SUM(ii.total),0) AS pharmacy_total,
     i.status,
     p.full_name AS patient_name,
     w.full_name AS walkin_name
 FROM invoices i
+INNER JOIN invoice_items ii ON ii.invoice_id = i.id AND (LOWER(COALESCE(ii.source,'')) = 'pharmacy' OR LOWER(COALESCE(ii.item_type,'')) = 'pharmacy')
 LEFT JOIN patients p ON p.id = i.patient_id
 LEFT JOIN walkin_customers w ON w.id = i.walkin_id
 WHERE DATE(i.created_at) BETWEEN ? AND ?
+GROUP BY i.id, i.created_at, i.status, p.full_name, w.full_name
 ORDER BY i.created_at DESC
 ";
 
@@ -63,13 +65,13 @@ include __DIR__ . '/../includes/sidebar.php';
         $i=1; 
         $grand = 0;
         while($r = $res->fetch_assoc()):
-            $grand += $r['total'];
+            $grand += (float)$r['pharmacy_total'];
         ?>
             <tr>
                 <td><?= $i++ ?></td>
                 <td><?= date('d M Y H:i', strtotime($r['created_at'])) ?></td>
                 <td><?= htmlspecialchars($r['patient_name'] ?? $r['walkin_name'] ?? 'N/A') ?></td>
-                <td><?= number_format($r['total'],2) ?></td>
+                <td><?= number_format((float)$r['pharmacy_total'],2) ?></td>
                 <td><?= strtoupper($r['status']) ?></td>
                 <td>
                     <a class="btn btn-sm btn-secondary"
