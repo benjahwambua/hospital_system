@@ -120,7 +120,10 @@ if ($patient_id <= 0) {
         }
     }
 
-    // No schema creation or billing is performed merely by viewing the dashboard.\n    // These operations belong to migrations and transactional encounter workflows.\n\n    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // No schema creation or billing is performed merely by viewing the dashboard.
+    // These operations belong to migrations and transactional encounter workflows.
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedCsrf = (string)($_POST['csrf_token'] ?? '');
         if ($postedCsrf === '' || !verify_csrf_token($postedCsrf)) {
             http_response_code(419);
