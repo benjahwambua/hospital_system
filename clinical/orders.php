@@ -1,4 +1,9 @@
 <style>
+.orders-page{padding:28px 24px 40px;background:#f5f7fb;min-height:calc(100vh - 72px)}
+.orders-shell{max-width:1500px;margin:0 auto}
+.orders-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:18px;padding:24px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 4px 18px rgba(31,45,61,.08)}
+.orders-hero h1{margin:3px 0 5px;color:#fff;font-size:26px;font-weight:800}.orders-hero p{margin:0;color:rgba(255,255,255,.8);font-size:13px}.orders-kicker{text-transform:uppercase;letter-spacing:1.5px;font-size:10px;font-weight:800;color:#bfe8ff}
+.orders-nav{display:flex;gap:8px;flex-wrap:wrap}.orders-nav a{border-radius:8px;font-weight:700}
 /* HMS operational page styling */
 .main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
 .main-content>.container-fluid{max-width:1500px}
