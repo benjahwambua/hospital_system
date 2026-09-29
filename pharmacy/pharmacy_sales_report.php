@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'pharmacy', 'view');
 
 $from = $_GET['from'] ?? date('Y-m-d');
 $to   = $_GET['to'] ?? date('Y-m-d');
@@ -17,11 +18,15 @@ SELECT
 FROM invoices i
 LEFT JOIN patients p ON p.id = i.patient_id
 LEFT JOIN walkin_customers w ON w.id = i.walkin_id
-WHERE DATE(i.created_at) BETWEEN '$from' AND '$to'
+WHERE DATE(i.created_at) BETWEEN ? AND ?
 ORDER BY i.created_at DESC
 ";
 
-$res = $conn->query($sql);
+$stmt = $conn->prepare($sql);
+if (!$stmt) { http_response_code(500); exit('Unable to load pharmacy sales report.'); }
+$stmt->bind_param('ss', $from, $to);
+$stmt->execute();
+$res = $stmt->get_result();
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -68,7 +73,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <td><?= strtoupper($r['status']) ?></td>
                 <td>
                     <a class="btn btn-sm btn-secondary"
-                       href="/hospital_system/invoices/print_invoice.php?id=<?= $r['invoice_id'] ?>">
+                       href="/hospital_system/billing/view_invoice.php?id=<?= $r['invoice_id'] ?>">
                         Print
                     </a>
                 </td>
@@ -85,4 +90,5 @@ include __DIR__ . '/../includes/sidebar.php';
     </table>
 </div>
 
+<?php if (isset($stmt) && $stmt instanceof mysqli_stmt) $stmt->close(); ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
