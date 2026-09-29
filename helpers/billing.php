@@ -110,6 +110,33 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
 }
 
 
+function get_patient_active_coverage($conn, int $patientId): ?array {
+    if ($patientId <= 0) return null;
+    $tables = $conn->query("SHOW TABLES LIKE 'patient_coverages'");
+    if (!$tables || $tables->num_rows === 0) return null;
+    $stmt = $conn->prepare("SELECT pc.id AS coverage_id, pc.payer_id, pc.plan_id, pc.member_number, pc.eligibility_status
+        FROM patient_coverages pc
+        WHERE pc.patient_id = ? AND pc.eligibility_status = 'Verified'
+          AND (pc.start_date IS NULL OR pc.start_date <= CURDATE())
+          AND (pc.end_date IS NULL OR pc.end_date >= CURDATE())
+        ORDER BY pc.is_primary DESC, pc.id DESC LIMIT 1");
+    if (!$stmt) return null;
+    $stmt->bind_param('i', $patientId); $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
+    return $row ?: null;
+}
+
+function get_service_price_for_patient($conn, int $patientId, int $serviceId, ?int $payerId = null, ?int $planId = null, ?string $asOfDate = null): array {
+    if ($payerId === null) {
+        $coverage = get_patient_active_coverage($conn, $patientId);
+        if ($coverage) {
+            $payerId = (int)$coverage['payer_id'];
+            $planId = $coverage['plan_id'] !== null ? (int)$coverage['plan_id'] : null;
+        }
+    }
+    return get_service_price($conn, $serviceId, $payerId, $planId, $asOfDate);
+}
+
 function add_patient_service(
     $conn,
     int $patientId,
@@ -132,7 +159,7 @@ function add_patient_service(
         throw new Exception('Discount cannot be negative.');
     }
 
-    $resolved = get_service_price($conn, $serviceId, $payerId, $planId);
+    $resolved = get_service_price_for_patient($conn, $patientId, $serviceId, $payerId, $planId);
     $unitPrice = (float)$resolved['price'];
     $gross = round($unitPrice * $quantity, 2);
     $discount = round($discountAmount, 2);
