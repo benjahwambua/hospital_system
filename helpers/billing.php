@@ -646,7 +646,7 @@ function ensure_registered_consultation_charge($conn, int $patient_id, float $fe
 
     if ($service) {
         $sid=(int)$service['id'];
-        $resolved=get_service_price($conn,$sid,null,null);
+        $resolved=get_service_price_for_patient($conn,$patient_id,$sid);
         $fee=(float)$resolved['price'];
         $check = $conn->prepare(
             "SELECT id FROM patient_services
