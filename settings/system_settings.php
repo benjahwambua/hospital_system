@@ -147,68 +147,100 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<div class="main-content">
-    <div class="container-fluid pt-4">
-        <div class="card shadow-sm border-0 col-lg-12 mx-auto">
-            <div class="card-header bg-white py-3">
-                <h5 class="m-0 font-weight-bold text-primary"><i class="fas fa-tools mr-2"></i>Global System Configuration</h5>
+<div class="main-content settings-page">
+    <div class="settings-shell">
+        <div class="settings-hero">
+            <div>
+                <div class="eyebrow"><i class="fas fa-shield-alt"></i> Administration</div>
+                <h1>System Settings</h1>
+                <p>Manage hospital-wide configuration from one place.</p>
             </div>
-            <div class="card-body p-4">
-                <?= $message ?>
+            <div class="settings-icon"><i class="fas fa-sliders-h"></i></div>
+        </div>
 
-                <!-- Tab Navigation -->
-                <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
-                    <?php foreach ($tabs as $key => $tab): ?>
-                        <li class="nav-item">
-                            <a class="nav-link <?= $key === 'general' ? 'active' : '' ?>" id="<?= $key ?>-tab" data-toggle="tab" href="#<?= $key ?>" role="tab">
-                                <i class="<?= $tab['icon'] ?> mr-2"></i><?= htmlspecialchars($tab['title']) ?>
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
+        <?= $message ?>
 
-                <form method="POST">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-                    <div class="tab-content mt-4" id="settingsTabContent">
-                        <?php foreach ($tabs as $category => $tab): ?>
-                            <div class="tab-pane fade <?= $category === 'general' ? 'show active' : '' ?>" id="<?= $category ?>" role="tabpanel">
-                                <div class="row">
-                                    <?php foreach ($tab['fields'] as $key => $field): ?>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="small font-weight-bold"><?= htmlspecialchars($field['label']) ?></label>
-                                            <?php if ($field['type'] === 'textarea'): ?>
-                                                <textarea name="<?= $category ?>[<?= htmlspecialchars($key) ?>]" class="form-control" rows="3"><?= render_setting_value($settings, $category, $key) ?></textarea>
-                                            <?php elseif ($field['type'] === 'select'): ?>
-                                                <select name="<?= $category ?>[<?= htmlspecialchars($key) ?>]" class="form-control">
-                                                    <?php foreach ($field['options'] as $optKey => $optLabel): ?>
-                                                        <option value="<?= htmlspecialchars($optKey) ?>" <?= (render_setting_value($settings, $category, $key) === $optKey) ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($optLabel) ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            <?php else: ?>
-                                                <input type="<?= htmlspecialchars($field['type']) ?>" name="<?= $category ?>[<?= htmlspecialchars($key) ?>]" class="form-control" value="<?= render_setting_value($settings, $category, $key) ?>" <?= isset($field['step']) ? 'step="' . htmlspecialchars($field['step']) . '"' : '' ?>>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endforeach; ?>
+        <div class="settings-card">
+            <div class="settings-tabs" role="tablist">
+                <?php foreach ($tabs as $key => $tab): ?>
+                    <button type="button" class="settings-tab <?= $key === 'general' ? 'active' : '' ?>" data-target="<?= $key ?>">
+                        <span class="tab-icon"><i class="<?= $tab['icon'] ?>"></i></span>
+                        <span><?= htmlspecialchars($tab['title']) ?></span>
+                    </button>
+                <?php endforeach; ?>
+            </div>
+
+            <form method="POST" id="settingsForm">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <div class="settings-content">
+                    <?php foreach ($tabs as $category => $tab): ?>
+                        <section class="settings-panel <?= $category === 'general' ? 'active' : '' ?>" id="panel-<?= $category ?>">
+                            <div class="panel-heading">
+                                <div>
+                                    <h2><?= htmlspecialchars($tab['title']) ?></h2>
+                                    <span>Configuration</span>
                                 </div>
+                                <i class="<?= $tab['icon'] ?>"></i>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <hr>
-                    <button type="submit" class="btn btn-primary px-5 font-weight-bold">Save All Settings</button>
-                </form>
-            </div>
+                            <div class="field-grid">
+                                <?php foreach ($tab['fields'] as $key => $field): ?>
+                                    <div class="setting-field">
+                                        <label for="<?= $category ?>_<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($field['label']) ?></label>
+                                        <?php if ($field['type'] === 'textarea'): ?>
+                                            <textarea id="<?= $category ?>_<?= htmlspecialchars($key) ?>" name="<?= $category ?>[<?= htmlspecialchars($key) ?>]" class="form-control" rows="4"><?= render_setting_value($settings, $category, $key) ?></textarea>
+                                        <?php elseif ($field['type'] === 'select'): ?>
+                                            <select id="<?= $category ?>_<?= htmlspecialchars($key) ?>" name="<?= $category ?>[<?= htmlspecialchars($key) ?>]" class="form-control">
+                                                <?php foreach ($field['options'] as $optKey => $optLabel): ?>
+                                                    <option value="<?= htmlspecialchars($optKey) ?>" <?= render_setting_value($settings, $category, $key) === $optKey ? 'selected' : '' ?>><?= htmlspecialchars($optLabel) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php else: ?>
+                                            <input id="<?= $category ?>_<?= htmlspecialchars($key) ?>" type="<?= htmlspecialchars($field['type']) ?>" name="<?= $category ?>[<?= htmlspecialchars($key) ?>]" class="form-control" value="<?= render_setting_value($settings, $category, $key) ?>" <?= isset($field['step']) ? 'step="' . htmlspecialchars($field['step']) . '"' : '' ?>>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                    <?php endforeach; ?>
+                </div>
+                <div class="settings-footer">
+                    <span><i class="fas fa-lock"></i> Super-user access</span>
+                    <button type="submit" class="save-settings"><i class="fas fa-save"></i> Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
+<style>
+.settings-page{padding:30px 25px 50px;min-height:calc(100vh - 75px)}
+.settings-shell{max-width:1180px;margin:0 auto}
+.settings-hero{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;padding:25px 28px;border-radius:16px;background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;box-shadow:0 10px 28px rgba(6,59,115,.16)}
+.settings-hero .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.6px;opacity:.8;font-weight:800;margin-bottom:7px}.settings-hero h1{margin:0;font-size:28px;font-weight:800}.settings-hero p{margin:6px 0 0;color:#dceeff;font-size:13px}.settings-icon{width:58px;height:58px;border-radius:15px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:24px}
+.settings-card{background:#fff;border:1px solid #e5ebf2;border-radius:16px;box-shadow:0 8px 28px rgba(25,55,90,.08);overflow:hidden}
+.settings-tabs{display:flex;gap:4px;padding:10px;background:#f5f8fb;border-bottom:1px solid #e5ebf2;overflow-x:auto}
+.settings-tab{border:0;background:transparent;color:#58708a;padding:11px 16px;border-radius:10px;display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;transition:.2s}
+.settings-tab:hover{background:#e9f2fa;color:#063b73}.settings-tab.active{background:#fff;color:#063b73;box-shadow:0 3px 10px rgba(25,55,90,.09)}
+.tab-icon{width:28px;height:28px;border-radius:8px;background:#edf5fb;display:flex;align-items:center;justify-content:center;color:#0876b9}.settings-content{padding:27px}
+.settings-panel{display:none}.settings-panel.active{display:block}.panel-heading{display:flex;justify-content:space-between;align-items:center;padding-bottom:18px;margin-bottom:22px;border-bottom:1px solid #edf1f5}.panel-heading h2{margin:0;color:#183b5c;font-size:19px;font-weight:800}.panel-heading span{color:#8a9bad;font-size:11px}.panel-heading>i{font-size:22px;color:#b9c9d8}
+.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px}.setting-field label{display:block;margin-bottom:7px;color:#41566b;font-size:12px;font-weight:800}.setting-field .form-control{width:100%;box-sizing:border-box;border:1px solid #dce5ed;border-radius:9px;background:#fbfcfe;padding:10px 12px;color:#24384a;font-size:13px;outline:none;transition:.2s}.setting-field .form-control:focus{border-color:#53a9d6;box-shadow:0 0 0 3px rgba(83,169,214,.12);background:#fff}.settings-footer{display:flex;justify-content:space-between;align-items:center;padding:17px 27px;border-top:1px solid #edf1f5;background:#fbfcfd}.settings-footer span{font-size:11px;color:#8495a5;font-weight:700}.settings-footer i{margin-right:5px}.save-settings{border:0;border-radius:9px;padding:11px 20px;background:#0876b9;color:#fff;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 5px 12px rgba(8,118,185,.18)}.save-settings:hover{background:#063b73}
+.alert{border-radius:9px;margin-bottom:18px}
+@media(max-width:760px){.settings-page{padding:20px 12px 35px}.settings-hero{padding:20px}.settings-hero h1{font-size:23px}.settings-icon{display:none}.settings-content{padding:20px}.field-grid{grid-template-columns:1fr}.settings-footer{padding:15px 20px;gap:15px;align-items:flex-start;flex-direction:column}.save-settings{width:100%}}
+</style>
+
 <script>
-$(document).ready(function() {
-    $('#settingsTabs a').on('click', function (e) {
-        e.preventDefault();
-        $(this).tab('show');
+document.addEventListener('DOMContentLoaded', function () {
+    const tabs = document.querySelectorAll('.settings-tab');
+    const panels = document.querySelectorAll('.settings-panel');
+    tabs.forEach(function(tab){
+        tab.addEventListener('click', function(){
+            const target = this.dataset.target;
+            tabs.forEach(t => t.classList.remove('active'));
+            panels.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            const panel = document.getElementById('panel-' + target);
+            if (panel) panel.classList.add('active');
+        });
     });
 });
 </script>
