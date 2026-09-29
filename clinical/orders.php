@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 }
 
                 if($hasSnapshots){
-                    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,service_code_snapshot,service_name_snapshot,quantity,gross_amount,discount_amount,net_amount,price_id,visit_id,created_at,status) VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),'Pending')");
+                    $ins=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,service_code_snapshot,service_name_snapshot,quantity,gross_amount,discount_amount,net_amount,price_id,visit_id,created_at,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),'Pending')");
                     if (!$ins) throw new Exception('Unable to create order: '.$conn->error);
                     $code=$resolved['service_code']; $name=$resolved['service_name']; $qty=1; $gross=$price; $discount=0.0; $net=$price; $priceId=(int)$resolved['price_id'];
                     $ins->bind_param('iisdssddddii', $patientId,$serviceId,$type,$price,$code,$name,$qty,$gross,$discount,$net,$priceId,$visitId);
