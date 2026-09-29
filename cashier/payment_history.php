@@ -86,7 +86,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-receipt"></i> Payment History</h2>
-                <p class="text-muted mb-0">Invoice-linked payments recorded through the Central Cashier.</p>
+                
             </div>
             <a href="/hospital_system/cashier/index.php" class="btn btn-primary"><i class="fas fa-cash-register"></i> Central Cashier</a>
         </div>
