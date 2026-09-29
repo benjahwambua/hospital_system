@@ -22,6 +22,28 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
 
     // Pricing precedence:
     // exact payer + plan -> payer-wide tariff -> standard/cash price.
+    // Keep older installations working until service_prices is migrated.
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'service_prices'");
+    if (!$tableCheck || $tableCheck->num_rows === 0) {
+        $stmt = $conn->prepare("SELECT id AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
+        if (!$stmt) throw new Exception('Unable to load service pricing: ' . $conn->error);
+        $stmt->bind_param('i', $serviceId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$row) throw new Exception('No active price found for the selected service.');
+        return [
+            'price_id' => (int)($row['price_id'] ?? 0),
+            'price' => (float)$row['price'],
+            'service_code' => (string)($row['service_code'] ?? ''),
+            'service_name' => (string)($row['service_name'] ?? ''),
+            'category' => (string)($row['category'] ?? ''),
+            'unit' => (string)($row['unit'] ?? 'Each'),
+            'payer_id' => $payerId,
+            'plan_id' => $planId,
+        ];
+    }
+
     $stmt = $conn->prepare(
         "SELECT sp.id AS price_id, sp.price, sp.payer_id, sp.plan_id,
                 sm.service_code, sm.service_name, sm.category, sm.unit
