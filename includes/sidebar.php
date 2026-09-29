@@ -23,180 +23,23 @@ function isParentActive($paths) {
 ?>
 
 <style>
-    :root {
-        --primary-bright: #007bff;
-        --sidebar-bg: #004a99;
-        --hover-bg: #005bc1;
-        --active-bg: #ffffff;
-        --text-light: #e0f2ff;
-        --accent-glow: #00d4ff;
-        --icon-glow: rgba(0, 212, 255, 0.4);
-    }
-
-    .sidebar {
-        width: 260px;
-        background: var(--sidebar-bg);
-        color: var(--text-light);
-        transition: all 0.3s;
-        height: 100vh;
-        position: fixed;
-        overflow-y: auto;
-        box-shadow: 4px 0 15px rgba(0,0,0,0.15);
-        z-index: 1000;
-    }
-
-    /* Scrollbar styling for sidebar */
-    .sidebar::-webkit-scrollbar { width: 6px; }
-    .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
-
-    .brand {
-        background: rgba(0, 0, 0, 0.2);
-        color: #ffffff;
-        padding: 25px 20px;
-        text-align: center;
-        font-weight: 800;
-        font-size: 1.2em;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-        min-height: 70px;
-    }
-
-    .user-profile {
-        padding: 20px;
-        background: rgba(255, 255, 255, 0.05);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        display: flex;
-        align-items: center;
-    }
-    .user-avatar {
-        width: 40px;
-        height: 40px;
-        background: var(--accent-glow);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        color: var(--sidebar-bg);
-        margin-right: 12px;
-    }
-    .user-info .name { font-size: 0.9em; font-weight: 700; display: block; color: #fff; }
-    .user-info .role { font-size: 0.75em; opacity: 0.8; }
-
-    .sidebar nav { padding-bottom: 30px; }
-
-    .sidebar nav a {
-        padding: 12px 18px;
-        display: flex;
-        align-items: center;
-        color: var(--text-light);
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 500;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        margin: 4px 12px;
-        border-radius: 8px;
-    }
-
-    .sidebar nav a i.icon-main {
-        margin-right: 14px;
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        transition: all 0.3s ease;
-        text-shadow: 0 0 8px var(--icon-glow);
-    }
-
-    .sidebar nav a:hover {
-        background: var(--hover-bg);
-        color: #ffffff;
-        transform: translateX(4px);
-    }
-
-    .sidebar nav a:hover i.icon-main {
-        transform: scale(1.2);
-        color: var(--accent-glow);
-    }
-
-    .sidebar nav a.active {
-        background: var(--active-bg);
-        color: var(--sidebar-bg);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        font-weight: 700;
-    }
-
-    .sidebar nav a.active i.icon-main {
-        color: var(--sidebar-bg);
-        text-shadow: none;
-    }
-
-    .menu-title {
-        padding: 24px 25px 8px;
-        font-size: 10px;
-        text-transform: uppercase;
-        color: var(--accent-glow);
-        font-weight: 800;
-        letter-spacing: 2px;
-        display: flex;
-        align-items: center;
-    }
-    .menu-title::after {
-        content: "";
-        height: 1px;
-        flex-grow: 1;
-        background: rgba(0, 212, 255, 0.2);
-        margin-left: 10px;
-    }
-
-    /* Submenu Styles */
-    .has-submenu > a { position: relative; }
-    .caret {
-        position: absolute;
-        right: 15px;
-        font-size: 12px;
-        transition: transform 0.3s ease;
-    }
-    .has-submenu.open > a .caret { transform: rotate(180deg); }
-    .has-submenu.open > a { background: rgba(0,0,0,0.15); border-left: 3px solid var(--accent-glow); }
-    
-    .submenu {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.4s ease-out;
-        background: rgba(0,0,0,0.08);
-        margin: 0 12px;
-        border-radius: 0 0 8px 8px;
-    }
-    .has-submenu.open .submenu {
-        max-height: 500px; 
-        padding: 5px 0;
-        margin-bottom: 10px;
-    }
-    
-    .submenu a {
-        padding: 10px 15px 10px 45px;
-        margin: 2px 0;
-        font-size: 13px;
-        border-radius: 0;
-    }
-    .submenu a:hover { transform: translateX(2px); background: rgba(255,255,255,0.05); }
-    .submenu a i { margin-right: 10px; font-size: 14px; opacity: 0.7; }
-
-    .logout-link {
-        background: rgba(255, 77, 77, 0.1) !important;
-        color: #ff9e9e !important;
-        margin-top: 25px !important;
-        border: 1px dashed rgba(255, 77, 77, 0.4);
-    }
-    .logout-link:hover {
-        background: #ff4d4d !important;
-        color: #fff !important;
-        border-style: solid;
-    }
+:root{--sidebar-bg:#063b73;--sidebar-bg-2:#052f5c;--sidebar-hover:rgba(255,255,255,.09);--sidebar-active:#fff;--sidebar-text:#dbeafe;--sidebar-muted:#8fb4dc;--sidebar-accent:#36c5f0}
+.sidebar{width:260px;background:linear-gradient(180deg,var(--sidebar-bg),var(--sidebar-bg-2));color:var(--sidebar-text);height:100vh;position:fixed;left:0;top:0;overflow-y:auto;box-shadow:5px 0 24px rgba(15,42,74,.16);z-index:1000;padding-bottom:24px}
+.sidebar::-webkit-scrollbar{width:5px}.sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:10px}
+.brand{padding:22px 18px;text-align:center;font-weight:800;font-size:1.08rem;letter-spacing:1.2px;color:#fff;background:rgba(0,0,0,.13);border-bottom:1px solid rgba(255,255,255,.08)}
+.brand i{color:var(--sidebar-accent);margin-right:7px}
+.user-profile{margin:14px 12px;padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.055);display:flex;align-items:center}
+.user-avatar{width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:var(--sidebar-accent);color:#063b73;display:flex;align-items:center;justify-content:center;font-weight:800;margin-right:11px}
+.user-info{min-width:0}.user-info .name{display:block;color:#fff;font-size:.84rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.user-info .role{display:block;color:var(--sidebar-muted);font-size:.72rem;margin-top:2px}
+.sidebar nav{padding:2px 9px 25px}.sidebar nav>a,.has-submenu>a{position:relative;display:flex;align-items:center;gap:11px;margin:3px 3px;padding:10px 12px;border-radius:9px;color:var(--sidebar-text);text-decoration:none;font-size:13px;font-weight:600;transition:background .2s ease,transform .2s ease,color .2s ease,box-shadow .2s ease}
+.sidebar nav a .icon-main{width:20px;text-align:center;font-size:15px;color:#b9d8f3}.sidebar nav a:hover{background:var(--sidebar-hover);color:#fff;transform:translateX(2px)}.sidebar nav a:hover .icon-main{color:var(--sidebar-accent)}
+.sidebar nav a.active{background:var(--sidebar-active);color:#063b73;box-shadow:0 5px 14px rgba(0,0,0,.13)}.sidebar nav a.active .icon-main{color:#063b73}
+.menu-title{display:flex;align-items:center;gap:8px;padding:17px 8px 6px;color:var(--sidebar-muted);font-size:9px;text-transform:uppercase;font-weight:800;letter-spacing:1.6px}.menu-title:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.1)}
+.has-submenu>a{margin-top:4px}.has-submenu.open>a{background:rgba(255,255,255,.075);color:#fff;border-left:3px solid var(--sidebar-accent);padding-left:9px}.caret{margin-left:auto;font-size:10px;color:var(--sidebar-muted);transition:transform .2s}.has-submenu.open>a .caret{transform:rotate(180deg);color:var(--sidebar-accent)}
+.submenu{max-height:0;overflow:hidden;transition:max-height .25s ease;background:rgba(0,0,0,.09);margin:0 3px;border-radius:0 0 10px 10px}.has-submenu.open .submenu{max-height:620px;padding:4px 3px 6px;margin-bottom:5px}
+.submenu a{display:flex;align-items:center;gap:9px;margin:1px 0;padding:8px 10px 8px 34px;border-radius:7px;color:#c9def2;text-decoration:none;font-size:12px;font-weight:500;transition:.2s}.submenu a i{width:16px;text-align:center;font-size:12px;color:#91b9dc}.submenu a:hover{background:rgba(255,255,255,.07);color:#fff;transform:translateX(2px)}.submenu a.active{background:rgba(255,255,255,.96);color:#063b73;font-weight:700}.submenu a.active i{color:#063b73}
+.logout-link{margin-top:8px!important;background:rgba(255,92,92,.08)!important;color:#ffb0b0!important;border:1px solid rgba(255,120,120,.18)}.logout-link:hover{background:#d9534f!important;color:#fff!important}
+@media(max-width:768px){.sidebar{width:230px}.submenu a{padding-left:30px}}
 </style>
 
 <aside class="sidebar" role="navigation">
@@ -315,14 +158,13 @@ function isParentActive($paths) {
             <a href="#" class="menu-toggle"><i class="fas fa-coins icon-main"></i> Finance & Billing <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/finance/dashboard.php" class="<?= isActive('finance/dashboard.php') ?>"><i class="fas fa-th-large"></i> Finance Dashboard</a>
-                <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-bar"></i> Finance Dashboard</a>
-                <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
+                                <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
                 <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
                 <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('accounting/ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
                 <a href="/hospital_system/accounting/reconciliation.php" class="<?= isActive('reconciliation.php') ?>"><i class="fas fa-balance-scale"></i> Financial Reconciliation</a>
                 <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
                 <a href="/hospital_system/expenses/view_expenses.php" class="<?= isActive('view_expenses.php') ?>"><i class="fas fa-file-contract"></i> Expense History</a>
-                <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('reports/sales_report.php') ?>"><i class="fas fa-chart-line"></i> Sales Report</a>
+                <a href="/hospital_system/reports/sales_report.php" class="<?= isActive('reports/sales_report.php') ?>"><i class="fas fa-chart-line"></i><span>Sales Report</span></a>
             </div>
         </div>
         <?php endif; ?>
