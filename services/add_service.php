@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $service_code = 'SVC-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
     }
 
-    $valid_categories = ['consultation', 'procedure', 'treatment', 'laboratory', 'radiology', 'maternity', 'other'];
+    $valid_categories = ['consultation', 'procedure', 'treatment', 'lab', 'radiology', 'maternity', 'other'];
 
     if ($name === '' || !in_array($category, $valid_categories, true) || $department === '' || $unit === '' || $price < 0 || $cost_price < 0) {
         $error = 'Service name, category, department and valid prices are required.';
@@ -113,7 +113,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <option value="consultation">Consultation</option>
                 <option value="procedure">Procedure</option>
                 <option value="treatment">Treatment</option>
-                <option value="laboratory">Laboratory</option>
+                <option value="lab">Laboratory</option>
                 <option value="radiology">Radiology</option>
                 <option value="maternity">Maternity</option>
                 <option value="other">Other</option>
