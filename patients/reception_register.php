@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // from the KES 200 consultation charge, but they still need a patient record so
             // their visit, services, laboratory work and payments can be tracked separately.
             if ($isWalkin) {
-                $patientNumber = 'W-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+                $patientNumber = 'TEMP-WLK-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
                 $walkinName = $fullName !== '' ? $fullName : 'Walk-in Patient';
                 $walkinGender = $gender !== '' ? $gender : '';
                 $walkinFlag = 1;
@@ -160,6 +160,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $patientId = $stmt->insert_id;
                 $stmt->close();
+
+                // Walk-in patient numbers use the short WLK format, e.g. WLK0011.
+                $patientNumber = 'WLK' . str_pad((string)$patientId, 4, '0', STR_PAD_LEFT);
+                $numberStmt = $conn->prepare('UPDATE patients SET patient_number = ? WHERE id = ?');
+                if (!$numberStmt) throw new Exception("Walk-in patient number update failed: " . $conn->error);
+                $numberStmt->bind_param('si', $patientNumber, $patientId);
+                if (!$numberStmt->execute()) throw new Exception("Walk-in patient number update failed: " . $numberStmt->error);
+                $numberStmt->close();
             } else {
                 // Full registration creates a new patient record.
                 $patientNumber = 'TEMP-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
