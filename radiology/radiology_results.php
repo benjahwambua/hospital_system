@@ -29,7 +29,7 @@ $jobs=$conn->query($sql);
 include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sidebar.php';
 ?>
 <div class="main-content"><div class="container-fluid pt-4">
-<div class="card shadow-sm"><div class="card-header bg-white"><h4 class="mb-0 font-weight-bold">Radiology Results Worklist</h4><small class="text-muted">Complete imaging findings here so Clinical Care can review them.</small></div>
+<div class="card shadow-sm"><div class="card-header bg-white"><h4 class="mb-0 font-weight-bold">Radiology Results Worklist</h4></div>
 <div class="card-body"><?= $message ? '<div class="alert alert-info">'.htmlspecialchars($message).'</div>' : '' ?>
 <div class="table-responsive"><table class="table table-bordered table-sm"><thead><tr><th>Date</th><th>Patient</th><th>Visit</th><th>Investigation</th><th>Findings</th><th>Action</th></tr></thead><tbody>
 <?php if($jobs && $jobs->num_rows): while($j=$jobs->fetch_assoc()): ?><tr>
