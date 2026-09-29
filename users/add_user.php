@@ -14,14 +14,26 @@ if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_byt
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     // Improved Sanitization
-    $fullname = trim(filter_input(INPUT_POST, 'full_name', FILTER_SANITIZE_STRING));
-    $username = trim(strtolower(filter_input(INPUT_POST, 'username', FILTER_SANITIZE_STRING))); // Usernames usually lowercase
-    $role = $_POST['role'];
+    $fullname = trim((string)($_POST['full_name'] ?? ''));
+    $username = trim(strtolower((string)($_POST['username'] ?? '')));
+    $role = trim((string)($_POST['role'] ?? ''));
+
+    // Server-side validation: never trust the role selected in the browser.
+    $allowedRoles = ['admin', 'doctor', 'nurse', 'pharmacist', 'lab_tech', 'reception', 'receptionist', 'cashier', 'accountant', 'procurement', 'storekeeper'];
+    if ($fullname === '' || mb_strlen($fullname) > 150) {
+        $error = 'Please provide a valid staff full name.';
+    } elseif (!preg_match('/^[a-z0-9._-]{3,50}$/', $username)) {
+        $error = 'Username must be 3–50 characters and contain only letters, numbers, dots, underscores or hyphens.';
+    } elseif (!in_array($role, $allowedRoles, true)) {
+        $error = 'Invalid staff role selected.';
+    }
     $is_super = isset($_POST['is_super']) ? 1 : 0;
     $raw_password = $_POST['password'];
 
-    // --- NEW: Password Strength Validation ---
-    if (strlen($raw_password) < 8) {
+    // --- Password Strength Validation ---
+    if ($error !== '') {
+        // Keep the validation error and do not touch the database.
+    } elseif (strlen($raw_password) < 8) {
         $error = "Security Error: Password must be at least 8 characters long.";
     } else {
         $password = password_hash($raw_password, PASSWORD_DEFAULT);
