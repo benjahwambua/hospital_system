@@ -134,11 +134,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     foreach ($_POST['service_id'] as $idx => $serviceId) {
                         $serviceId=(int)$serviceId;
                         if($serviceId<=0) continue;
-                        $s=$conn->prepare("SELECT service_name,price FROM services_master WHERE id=? AND active=1 LIMIT 1");
+                        $s=$conn->prepare("SELECT id,service_name FROM services_master WHERE id=? AND active=1 LIMIT 1");
                         if(!$s) throw new Exception('Unable to load maternity service.');
                         $s->bind_param('i',$serviceId);$s->execute();$service=$s->get_result()->fetch_assoc();$s->close();
                         if(!$service) throw new Exception('Invalid maternity service selected.');
-                        $servicePrice=(float)$service['price'];
+                        $resolved=get_service_price($conn,$serviceId,null,null);
+                        $servicePrice=(float)$resolved['price'];
                         $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$service['service_name'],1,$servicePrice,'maternity',$serviceId);
                         post_invoice_journal($conn,$invoiceId,$patientId,$servicePrice,'Maternity service',$itemId);
                     }
