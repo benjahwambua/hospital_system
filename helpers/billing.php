@@ -25,7 +25,7 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
     // Keep older installations working until service_prices is migrated.
     $tableCheck = $conn->query("SHOW TABLES LIKE 'service_prices'");
     if (!$tableCheck || $tableCheck->num_rows === 0) {
-        $stmt = $conn->prepare("SELECT id AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
+        $stmt = $conn->prepare("SELECT NULL AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
         if (!$stmt) throw new Exception('Unable to load service pricing: ' . $conn->error);
         $stmt->bind_param('i', $serviceId);
         $stmt->execute();
