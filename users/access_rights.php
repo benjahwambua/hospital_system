@@ -70,7 +70,52 @@ include __DIR__.'/../includes/sidebar.php';
 </style>
 <div class="admin-page"><div class="admin-shell">
 <div class="admin-hero"><div><div class="eyebrow">Administration</div><h1>Access Rights</h1><p>Assign module permissions to individual users.</p></div><i class="fas fa-user-shield fa-2x"></i></div>
-
+<?php if($message): ?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif; ?>
+<?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; ?>
+<div class="admin-card">
+  <div class="admin-card-body">
+    <form method="get" class="form-inline">
+      <label class="font-weight-bold mr-2">Select User</label>
+      <select name="user_id" class="form-control user-select mr-2" onchange="this.form.submit()" required>
+        <option value="">-- Select user --</option>
+        <?php while($u=$users->fetch_assoc()): ?>
+        <option value="<?=$u['id']?>" <?=$selectedUser===$u['id']?'selected':''?>><?=htmlspecialchars($u['full_name'])?> (<?=htmlspecialchars($u['role'])?>)<?=$u['is_super']?' — SUPER':''?></option>
+        <?php endwhile; ?>
+      </select>
+      <noscript><button class="btn btn-primary">Load</button></noscript>
+    </form>
+  </div>
+</div>
+<?php if($selectedUser>0): ?>
+<form method="post">
+<input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>">
+<input type="hidden" name="user_id" value="<?=$selectedUser?>">
+<div class="admin-card">
+  <div class="admin-card-head"><strong>Module Permissions</strong><span class="small text-muted">View is required before other actions.</span></div>
+  <div class="admin-card-body p-0">
+    <div class="table-responsive"><table class="table mb-0 permission-table">
+      <thead><tr><th>Module</th><th>Description</th><th class="text-center">View</th><th class="text-center">Create</th><th class="text-center">Edit</th><th class="text-center">Delete</th><th class="text-center">Approve</th></tr></thead>
+      <tbody>
+      <?php $modules->data_seek(0); while($m=$modules->fetch_assoc()): $a=$access[(int)$m['id']]??[]; ?>
+      <tr>
+        <td class="font-weight-bold"><?=htmlspecialchars($m['module_name'])?></td>
+        <td class="text-muted small"><?=htmlspecialchars($m['description']??'')?></td>
+        <td class="text-center"><input type="checkbox" class="perm-view permission-check" name="modules[]" value="<?=$m['id']?>" data-module="<?=$m['id']?>" <?=!empty($a['can_view'])?'checked':''?>></td>
+        <td class="text-center"><input type="checkbox" class="perm-action permission-check" name="create[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_create'])?'checked':''?>></td>
+        <td class="text-center"><input type="checkbox" class="perm-action permission-check" name="edit[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_edit'])?'checked':''?>></td>
+        <td class="text-center"><input type="checkbox" class="perm-action permission-check" name="delete[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_delete'])?'checked':''?>></td>
+        <td class="text-center"><input type="checkbox" class="perm-action permission-check" name="approve[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_approve'])?'checked':''?>></td>
+      </tr>
+      <?php endwhile; ?>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="save-bar"><button class="btn btn-primary"><i class="fas fa-save mr-1"></i> Save Access Rights</button></div>
+</div>
+</form>
+<?php endif; ?>
+</div></div>
+<script>
 document.addEventListener('DOMContentLoaded', function () {
     function syncActionPermissions() {
         document.querySelectorAll('.perm-view').forEach(function (view) {
