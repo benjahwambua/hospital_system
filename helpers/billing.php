@@ -13,6 +13,80 @@ function hms_visits_available($conn): bool {
     return $check && $check->num_rows > 0;
 }
 
+function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $planId = null, ?string $asOfDate = null): array {
+    if ($serviceId <= 0) {
+        throw new Exception('Invalid service.');
+    }
+
+    $date = $asOfDate ?: date('Y-m-d');
+
+    // Pricing precedence:
+    // exact payer + plan -> payer-wide tariff -> standard/cash price.
+    $stmt = $conn->prepare(
+        "SELECT sp.id AS price_id, sp.price, sp.payer_id, sp.plan_id,
+                sm.service_code, sm.service_name, sm.category, sm.unit
+         FROM service_prices sp
+         INNER JOIN services_master sm ON sm.id = sp.service_id
+         WHERE sp.service_id = ?
+           AND sp.active = 1
+           AND sp.effective_from <= ?
+           AND (sp.effective_to IS NULL OR sp.effective_to >= ?)
+           AND (
+                (sp.payer_id = ? AND sp.plan_id = ?)
+                OR (sp.payer_id = ? AND sp.plan_id IS NULL)
+                OR (sp.payer_id IS NULL AND sp.plan_id IS NULL)
+           )
+         ORDER BY
+           CASE
+             WHEN sp.payer_id = ? AND sp.plan_id = ? THEN 1
+             WHEN sp.payer_id = ? AND sp.plan_id IS NULL THEN 2
+             WHEN sp.payer_id IS NULL AND sp.plan_id IS NULL THEN 3
+             ELSE 9
+           END,
+           sp.effective_from DESC,
+           sp.id DESC
+         LIMIT 1"
+    );
+
+    if (!$stmt) {
+        throw new Exception('Unable to prepare service pricing lookup: ' . $conn->error);
+    }
+
+    $stmt->bind_param(
+        'issiiii',
+        $serviceId, $date, $date,
+        $payerId, $planId, $payerId,
+        $payerId, $planId, $payerId
+    );
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        // Backward-compatible fallback while old databases are being migrated.
+        $stmt = $conn->prepare("SELECT id AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
+        $stmt->bind_param('i', $serviceId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+    }
+
+    if (!$row) {
+        throw new Exception('No active price found for the selected service.');
+    }
+
+    return [
+        'price_id' => (int)($row['price_id'] ?? 0),
+        'price' => (float)$row['price'],
+        'service_code' => (string)($row['service_code'] ?? ''),
+        'service_name' => (string)($row['service_name'] ?? ''),
+        'category' => (string)($row['category'] ?? ''),
+        'unit' => (string)($row['unit'] ?? 'Each'),
+        'payer_id' => $row['payer_id'] ?? $payerId,
+        'plan_id' => $row['plan_id'] ?? $planId,
+    ];
+}
+
 function get_or_create_current_visit($conn, int $patient_id, string $visitType = 'Outpatient', string $clinicCategory = 'General', int $doctorId = 0): int {
     if ($patient_id <= 0 || !hms_visits_available($conn)) {
         return 0;
