@@ -43,15 +43,15 @@ if ($method !== '' && $method !== 'All') {
     $params[] = $method;
 }
 if ($search !== '') {
-    $where[] = "(p.full_name LIKE ? OR p.patient_number LIKE ? OR CAST(pay.invoice_id AS CHAR) LIKE ? OR pay.reference LIKE ?)";
-    $types .= 'ssss';
+    $where[] = "(p.full_name LIKE ? OR p.patient_number LIKE ? OR w.full_name LIKE ? OR CAST(pay.invoice_id AS CHAR) LIKE ? OR pay.reference LIKE ?)";
+    $types .= 'sssss';
     $like = '%' . $search . '%';
-    array_push($params, $like, $like, $like, $like);
+    array_push($params, $like, $like, $like, $like, $like);
 }
 
 $sql = "SELECT pay.id, pay.invoice_id, pay.amount, pay.method, pay.reference, pay.created_at,
                p.full_name AS patient_name, p.patient_number,
-               v.visit_number,
+               w.full_name AS walkin_name, v.visit_number,
                cs.id AS shift_id, cs.opened_at AS shift_opened_at,
                u.full_name AS cashier_name
         FROM payments pay
@@ -175,7 +175,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                     <td><?= htmlspecialchars($payment['reference'] ?: '—') ?></td>
                                     <td><a href="/hospital_system/billing/view_invoice.php?id=<?= (int)$payment['invoice_id'] ?>">#<?= str_pad((string)$payment['invoice_id'], 5, '0', STR_PAD_LEFT) ?></a></td>
                                     <td>
-                                        <strong><?= htmlspecialchars($payment['patient_name'] ?: 'Unknown') ?></strong><br>
+                                        <strong><?= htmlspecialchars($payment['patient_name'] ?: ($payment['walkin_name'] ?: 'Walk-in Customer')) ?></strong><br>
                                         <small class="text-muted"><?= htmlspecialchars($payment['patient_number'] ?: 'N/A') ?></small>
                                     </td>
                                     <td><?= htmlspecialchars($payment['visit_number'] ?: 'Legacy / Unassigned') ?></td>
