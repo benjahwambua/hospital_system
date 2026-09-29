@@ -193,7 +193,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover">
                         <thead class="thead-light">
-                            <tr><th>Age</th><th>Client / Patient</th><th>Invoice / Visit</th><th>Invoice Date</th><th>Bill</th><th>Paid</th><th>Outstanding</th><th>Last Payment</th><th>Action</th></tr>
+                            <tr><th>Age</th><th>Client Name</th><th>Invoice / Visit</th><th>Invoice Date</th><th>Bill</th><th>Paid</th><th>Outstanding</th><th>Last Payment</th><th>Action</th></tr>
                         </thead>
                         <tbody>
                         <?php foreach ($rows as $row): ?>
