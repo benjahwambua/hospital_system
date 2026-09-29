@@ -130,6 +130,7 @@ $lab_jobs = $conn->query($query);
                         <td>
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                 <input type="hidden" name="record_id" value="<?= $job['id'] ?>">
+                                <input type="hidden" name="result_action" value="complete">
                                 <button type="submit" name="save_lab_result" class="btn-action btn-save">
                                     <?= $is_done ? 'Update Result' : 'Save & Close' ?>
                                 </button>
