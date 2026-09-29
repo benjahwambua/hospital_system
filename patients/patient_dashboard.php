@@ -755,6 +755,8 @@ if ($currentAdmission && can_module_action($conn,'clinical','approve')) {
     $quickActions[] = ['label'=>'Admit Patient','icon'=>'fa-bed','url'=>'/hospital_system/clinical/admit_patient.php?patient_id='.(int)$patient_id,'allowed'=>true];
 }
 
+}
+
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 
