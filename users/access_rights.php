@@ -63,55 +63,14 @@ if ($selectedUser>0) {
 include __DIR__.'/../includes/header.php';
 include __DIR__.'/../includes/sidebar.php';
 ?>
-<div class="main-content" style="padding:25px;">
-<div class="container-fluid">
-<h2 class="h4 font-weight-bold text-gray-800 mb-2">Access Rights</h2>
-<p class="text-muted mb-4">Configure which HMS modules each user can access. Super Users always have full access.</p>
-<?php if($message): ?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif; ?>
-<?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; ?>
+<style>
+.admin-page{padding:28px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 72px)}
+.admin-shell{max-width:1500px;margin:auto}.admin-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:18px;padding:26px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:20px;box-shadow:0 10px 28px rgba(6,59,115,.16)}.admin-hero h1{font-size:26px;margin:4px 0}.admin-hero p{margin:0;color:#d9edff;font-size:13px}.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#9edcff}.admin-card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}.admin-card-head{padding:16px 20px;border-bottom:1px solid #edf0f5;display:flex;justify-content:space-between;align-items:center;gap:12px}.admin-card-body{padding:20px}.permission-table th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#687386;white-space:nowrap}.permission-table td{vertical-align:middle}.permission-table tbody tr:hover{background:#f8fbff}.permission-check{width:18px;height:18px;accent-color:#075b9d}.user-select{max-width:520px}.save-bar{padding:15px 20px;background:#fbfcfe;border-top:1px solid #edf0f5;text-align:right}
+@media(max-width:700px){.admin-page{padding:18px 12px 32px}.admin-hero{padding:22px;align-items:flex-start;flex-direction:column}.admin-card-body{padding:14px}.permission-table{min-width:760px}}
+</style>
+<div class="admin-page"><div class="admin-shell">
+<div class="admin-hero"><div><div class="eyebrow">Administration</div><h1>Access Rights</h1><p>Assign module permissions to individual users.</p></div><i class="fas fa-user-shield fa-2x"></i></div>
 
-<div class="card shadow-sm border-0 mb-4"><div class="card-body">
-<form method="get" class="form-inline">
-<label class="font-weight-bold mr-2">Select User</label>
-<select name="user_id" class="form-control mr-2" onchange="this.form.submit()" required>
-<option value="">-- Select user --</option>
-<?php while($u=$users->fetch_assoc()): ?>
-<option value="<?=$u['id']?>" <?=$selectedUser===$u['id']?'selected':''?>><?=htmlspecialchars($u['full_name'])?> (<?=htmlspecialchars($u['role'])?>)<?=$u['is_super']?' — SUPER':''?></option>
-<?php endwhile; ?>
-</select>
-<noscript><button class="btn btn-primary">Load</button></noscript>
-</form>
-</div></div>
-
-<?php if($selectedUser>0): ?>
-<form method="post">
-<input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>">
-<input type="hidden" name="user_id" value="<?=$selectedUser?>">
-<div class="card shadow-sm border-0"><div class="card-header bg-white d-flex justify-content-between align-items-center">
-<strong>Module Permissions</strong><span class="small text-muted">View is required before other actions.</span>
-</div><div class="card-body p-0">
-<div class="table-responsive"><table class="table mb-0">
-<thead class="bg-light"><tr><th>Module</th><th>Description</th><th class="text-center">View</th><th class="text-center">Create</th><th class="text-center">Edit</th><th class="text-center">Delete</th><th class="text-center">Approve</th></tr></thead>
-<tbody>
-<?php $modules->data_seek(0); while($m=$modules->fetch_assoc()): $a=$access[(int)$m['id']]??[]; ?>
-<tr>
-<td class="font-weight-bold"><?=htmlspecialchars($m['module_name'])?></td>
-<td class="text-muted small"><?=htmlspecialchars($m['description']??'')?></td>
-<td class="text-center"><input type="checkbox" class="perm-view" name="modules[]" value="<?=$m['id']?>" data-module="<?=$m['id']?>" <?=!empty($a['can_view'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" class="perm-action" name="create[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_create'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" class="perm-action" name="edit[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_edit'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" class="perm-action" name="delete[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_delete'])?'checked':''?>></td>
-<td class="text-center"><input type="checkbox" class="perm-action" name="approve[<?=$m['id']?>]" value="1" data-view="<?=$m['id']?>" <?=!empty($a['can_approve'])?'checked':''?>></td>
-</tr>
-<?php endwhile; ?>
-</tbody></table></div>
-</div><div class="card-footer bg-white text-right">
-<button class="btn btn-primary"><i class="fas fa-save"></i> Save Access Rights</button>
-</div></div>
-</form>
-<?php endif; ?>
-</div></div>
-<script>
 document.addEventListener('DOMContentLoaded', function () {
     function syncActionPermissions() {
         document.querySelectorAll('.perm-view').forEach(function (view) {
