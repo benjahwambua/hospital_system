@@ -31,8 +31,15 @@ include __DIR__ . '/../includes/sidebar.php';
 .clinical-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#bfe8ff;margin-bottom:5px}
 .clinical-hero h1{font-size:29px;margin:5px 0 8px;color:#fff;font-weight:800}
 .clinical-hero p{margin:0;color:rgba(255,255,255,.82);font-size:14px}
-.clinical-actions{display:flex;gap:9px;flex-wrap:wrap}
-.clinical-actions a{white-space:nowrap}
+.clinical-actions{display:grid;grid-template-columns:repeat(2,minmax(150px,1fr));gap:10px;min-width:330px}
+.clinical-action{display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid rgba(255,255,255,.22);border-radius:11px;text-decoration:none;color:#fff;background:rgba(255,255,255,.09);transition:.15s}
+.clinical-action:hover{transform:translateY(-1px);background:rgba(255,255,255,.15);color:#fff;text-decoration:none}
+.clinical-action i{width:30px;text-align:center;font-size:17px}
+.clinical-action span{font-weight:800;font-size:13px;flex:1}
+.clinical-action small{display:block;font-size:10px;color:rgba(255,255,255,.7)}
+.clinical-action.primary{background:#fff;color:#063b73;border-color:#fff}
+.clinical-action.primary:hover{color:#063b73;background:#f5f9fd}
+
 .metric-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
 .metric-card{background:#fff;border:1px solid #e7ebf2;border-radius:12px;padding:18px;min-height:118px;box-shadow:0 3px 12px rgba(31,45,61,.045);text-decoration:none;display:block;transition:transform .15s,box-shadow .15s}
 .metric-card:hover{transform:translateY(-2px);box-shadow:0 7px 20px rgba(31,45,61,.09);text-decoration:none}
@@ -54,13 +61,16 @@ include __DIR__ . '/../includes/sidebar.php';
 .action-link i{width:28px;color:#2f6fed}.action-link span{flex:1}.action-link small{color:#98a2b3}
 .queue-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
 .queue-item{padding:15px;border-radius:10px;background:#f8fafc;border:1px solid #edf0f5}.queue-item strong{display:block;font-size:21px;color:#25324a}.queue-item span{font-size:12px;color:#7b8798}
-@media(max-width:1200px){.metric-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:800px){.clinical-page{padding:18px 12px}.clinical-hero{align-items:flex-start;flex-direction:column}.dashboard-grid{grid-template-columns:1fr}.workflow{grid-template-columns:1fr}.queue-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.metric-grid{grid-template-columns:1fr 1fr}.queue-grid{grid-template-columns:1fr}.clinical-hero h1{font-size:21px}}
+@media(max-width:1200px){.metric-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:800px){.clinical-page{padding:18px 12px}.clinical-hero{align-items:flex-start;flex-direction:column}.clinical-actions{min-width:0;width:100%;grid-template-columns:1fr 1fr}.dashboard-grid{grid-template-columns:1fr}.workflow{grid-template-columns:1fr}.queue-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.metric-grid{grid-template-columns:1fr 1fr}.queue-grid{grid-template-columns:1fr}.clinical-hero h1{font-size:21px}}
 </style>
 
 <div class="clinical-page"><div class="clinical-shell">
   <div class="clinical-hero">
     <div><div class="clinical-kicker">Clinical Care</div><h1>Clinical Dashboard</h1><p>Start with appointments, open the patient record, and continue the clinical encounter from one workspace.</p></div>
-    <div class="clinical-actions"><a href="../patients/appointments.php" class="btn btn-primary"><i class="fas fa-calendar-check mr-1"></i>Appointments</a><a href="../patients/patient_list.php" class="btn btn-outline-primary"><i class="fas fa-users mr-1"></i>Patient List</a></div>
+    <div class="clinical-actions">
+      <a href="../patients/appointments.php" class="clinical-action primary"><i class="fas fa-calendar-check"></i><span>Appointments</span><small>Attend patients</small></a>
+      <a href="../patients/patient_list.php" class="clinical-action"><i class="fas fa-users"></i><span>Patient List</span><small>Open records</small></a>
+    </div>
   </div>
 
   <div class="metric-grid">
@@ -77,25 +87,25 @@ include __DIR__ . '/../includes/sidebar.php';
       <div class="panel-head"><strong>Clinical Workflow</strong><small>Odoo-style care flow</small></div>
       <div class="panel-body">
         <div class="workflow">
-          <div class="workflow-step"><div class="num">1</div><h3>Appointments</h3><p>Review scheduled patients and open the correct encounter.</p><a href="../patients/appointments.php" class="btn btn-sm btn-primary">Open Appointments</a></div>
-          <div class="workflow-step"><div class="num">2</div><h3>Patient Record</h3><p>Search registered patients and open their complete clinical workspace.</p><a href="../patients/patient_list.php" class="btn btn-sm btn-outline-primary">Patient List</a></div>
-          <div class="workflow-step"><div class="num">3</div><h3>Clinical Care</h3><p>Document assessment, orders, prescriptions, investigations and follow-up.</p><span class="badge badge-info">Patient Dashboard</span></div>
+          <div class="workflow-step"><div class="num">1</div><h3>Appointments</h3><p>Open scheduled patients and continue the encounter.</p><a href="../patients/appointments.php" class="btn btn-sm btn-primary">Open Appointments</a></div>
+          <div class="workflow-step"><div class="num">2</div><h3>Patient Record</h3><p>Find a patient and open the clinical workspace.</p><a href="../patients/patient_list.php" class="btn btn-sm btn-outline-primary">Patient List</a></div>
+          <div class="workflow-step"><div class="num">3</div><h3>Clinical Care</h3><p>Continue assessment, orders, prescriptions and follow-up.</p><a href="../patients/patient_list.php" class="btn btn-sm btn-outline-primary">Open Patient Record</a></div>
         </div>
         <div class="queue-grid">
-          <?php if($canLabView): ?><div class="queue-item"><strong><?= $pendingLab ?></strong><span>Laboratory items awaiting completion</span></div><?php endif; ?>
-          <?php if($canRadiologyView): ?><div class="queue-item"><strong><?= $pendingRad ?></strong><span>Radiology items awaiting completion</span></div><?php endif; ?>
-          <?php if($canPharmacyView): ?><div class="queue-item"><strong><?= $pendingRx ?></strong><span>Prescriptions awaiting dispensing</span></div><?php endif; ?>
+          <?php if($canLabView): ?><div class="queue-item"><strong><?= $pendingLab ?></strong><span>Lab awaiting completion</span></div><?php endif; ?>
+          <?php if($canRadiologyView): ?><div class="queue-item"><strong><?= $pendingRad ?></strong><span>Radiology awaiting completion</span></div><?php endif; ?>
+          <?php if($canPharmacyView): ?><div class="queue-item"><strong><?= $pendingRx ?></strong><span>Pharmacy awaiting dispensing</span></div><?php endif; ?>
         </div>
       </div>
     </div>
     <div class="panel">
       <div class="panel-head"><strong>Clinical Actions</strong><small>Quick access</small></div>
       <div class="panel-body"><div class="action-list">
-        <a class="action-link" href="../patients/appointments.php"><i class="fas fa-calendar-check"></i><span>Appointments</span><small>Schedule / attend</small></a>
-        <a class="action-link" href="../patients/patient_list.php"><i class="fas fa-address-book"></i><span>Patient List</span><small>Find patient</small></a>
-        <a class="action-link" href="../clinical/orders.php"><i class="fas fa-flask"></i><span>Orders & Referrals</span><small>Clinical orders</small></a>
-        <a class="action-link" href="ward_management.php"><i class="fas fa-bed"></i><span>Ward / IPD</span><small>Inpatients</small></a>
-        <a class="action-link" href="../diagnostics/diagnostics.php"><i class="fas fa-diagnoses"></i><span>Diagnostics</span><small>Investigations</small></a>
+        <a class="action-link" href="../patients/appointments.php"><i class="fas fa-calendar-check"></i><span>Appointments</span><small>Open</small></a>
+        <a class="action-link" href="../patients/patient_list.php"><i class="fas fa-address-book"></i><span>Patient List</span><small>Open</small></a>
+        <a class="action-link" href="../clinical/orders.php"><i class="fas fa-flask"></i><span>Orders & Referrals</span><small>Open</small></a>
+        <a class="action-link" href="ward_management.php"><i class="fas fa-bed"></i><span>Ward / IPD</span><small>Open</small></a>
+        <a class="action-link" href="../diagnostics/diagnostics.php"><i class="fas fa-diagnoses"></i><span>Diagnostics</span><small>Open</small></a>
       </div></div>
     </div>
   </div>
