@@ -11,6 +11,7 @@ $paymentId=(int)($_GET['id'] ?? $_POST['payment_id'] ?? 0);
 $message=''; $error=''; $transactionStarted=false;
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
+    if (!can_module_action($conn, 'finance', 'approve')) { http_response_code(403); exit('Forbidden'); }
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('Invalid security token.'); }
     try {
         $amount=(float)($_POST['amount'] ?? 0);
