@@ -51,7 +51,6 @@ SET category = 'procedure'
 WHERE LOWER(category) IN ('procedures', 'procedure');
 
 UPDATE services_master
-UPDATE services_master
 SET category = 'radiology'
 WHERE LOWER(category) = 'radiology';
 
