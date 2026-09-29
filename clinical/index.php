@@ -27,10 +27,10 @@ include __DIR__ . '/../includes/sidebar.php';
 <style>
 .clinical-page{padding:28px 24px 40px;background:#f5f7fb;min-height:calc(100vh - 60px)}
 .clinical-shell{max-width:1500px;margin:0 auto}
-.clinical-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:24px 26px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px}
-.clinical-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;color:#6c7a91;margin-bottom:5px}
-.clinical-hero h1{font-size:25px;margin:0 0 6px;color:#25324a;font-weight:700}
-.clinical-hero p{margin:0;color:#718096;font-size:14px}
+.clinical-hero{background:linear-gradient(135deg,#0b3d91,#1261c9);color:#fff;border:0;border-radius:20px;padding:30px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px}
+.clinical-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#bfe8ff;margin-bottom:5px}
+.clinical-hero h1{font-size:29px;margin:5px 0 8px;color:#fff;font-weight:800}
+.clinical-hero p{margin:0;color:rgba(255,255,255,.82);font-size:14px}
 .clinical-actions{display:flex;gap:9px;flex-wrap:wrap}
 .clinical-actions a{white-space:nowrap}
 .metric-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
