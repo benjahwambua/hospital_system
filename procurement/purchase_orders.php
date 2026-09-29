@@ -46,8 +46,66 @@ if ($viewId > 0):
     // PO accounting is recognized at GRN/receiving, when inventory is actually received.
 ?>
 <style>
-.proc-page{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 60px)}.proc-shell{max-width:1500px;margin:auto}.proc-hero{background:linear-gradient(135deg,#344e41,#588157);color:#fff;border-radius:18px;padding:26px 30px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:18px;box-shadow:0 12px 30px rgba(52,78,65,.16)}.proc-hero h1{margin:4px 0;font-size:27px}.proc-hero p{margin:0;color:rgba(255,255,255,.8);font-size:13px}.proc-kicker{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d9f0da}.proc-actions{display:flex;gap:8px;flex-wrap:wrap}.proc-card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:16px}.proc-card .card-body{padding:20px}.proc-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.proc-filter .form-control{min-height:42px;border-radius:9px;border:1px solid #d7dee8}.proc-table{margin:0}.proc-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#667085;background:#fafbfc;border-top:0}.proc-table td{vertical-align:middle;border-color:#edf0f5;font-size:13px}.proc-table tbody tr:hover{background:#f8fbff}.proc-status{display:inline-flex;padding:5px 9px;border-radius:20px;background:#eef5ff;color:#245ea8;font-size:11px;font-weight:800}.proc-actions-cell{white-space:nowrap}.proc-actions-cell .btn{border-radius:8px;font-size:11px;padding:6px 9px}.proc-detail{max-width:1100px;margin:auto}.po-card{border-radius:16px;box-shadow:0 6px 24px rgba(31,45,61,.07);border:1px solid #e5eaf1}.po-branding{padding-bottom:18px;border-bottom:1px solid #edf0f5}.status-pill{background:#eef5ff;color:#245ea8}.po-table th{background:#f8fafc}.po-total{color:#075b9d}
-@media(max-width:700px){.proc-page{padding:18px 12px}.proc-hero{padding:22px;align-items:flex-start;flex-direction:column}.proc-filter{display:grid;grid-template-columns:1fr;width:100%}.proc-actions-cell{white-space:normal}}
+.proc-page{padding:28px 24px 40px;background:#f5f7fb;min-height:calc(100vh - 60px)}
+.proc-shell{max-width:1500px;margin:0 auto}
+.proc-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border:0;border-radius:20px;padding:30px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px}
+.proc-hero h1{font-size:29px;margin:5px 0 8px;color:#fff;font-weight:800}
+.proc-hero p{margin:0;color:rgba(255,255,255,.82);font-size:14px}
+.proc-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#bfe8ff;margin-bottom:5px}
+.proc-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.proc-actions .btn{border-radius:10px;font-weight:700;padding:10px 14px}
+.proc-actions>div{display:none}
+.proc-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 3px 14px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}
+.proc-card .card-body{padding:20px}
+.proc-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.proc-filter .form-control,.proc-card .form-control{height:42px;border:1px solid #d7dee8;border-radius:9px;box-shadow:none}
+.proc-card .form-control:focus{border-color:#2f6fed;box-shadow:0 0 0 3px rgba(47,111,237,.08)}
+.proc-table{margin:0;width:100%;border-collapse:separate;border-spacing:0}
+.proc-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.45px;color:#748198;background:#f8fafc;border-top:0;border-bottom:1px solid #e7ebf2;padding:13px 12px;font-weight:800}
+.proc-table tbody td{vertical-align:middle;border-color:#edf0f5;padding:14px 12px;font-size:13px;color:#344054}
+.proc-table tbody tr{transition:background .15s}
+.proc-table tbody tr:hover{background:#f7f9fc}
+.proc-table tbody td:first-child strong{color:#25324a;font-size:13px}
+.proc-table tbody td:nth-child(5){font-weight:700;color:#25324a}
+.proc-status{display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;background:#edf3ff;color:#2f6fed;font-size:11px;font-weight:800}
+.proc-actions-cell{white-space:nowrap}
+.proc-actions-cell .btn,.proc-table td .btn{border-radius:8px;font-size:11px;padding:7px 10px;font-weight:700;margin-right:3px}
+.proc-table td .btn-info{background:#eef4ff;border-color:#dbe7ff;color:#2f6fed}
+.proc-table td .btn-secondary{background:#f2f4f7;border-color:#e4e7ec;color:#344054}
+.proc-table td .btn-warning{background:#fff7e6;border-color:#ffe1a8;color:#9a6700}
+.proc-table td .btn-danger{background:#fff1f1;border-color:#ffd5d5;color:#c92a2a}
+.proc-table td .btn-success{background:#edf9f1;border-color:#ccebd5;color:#19713a}
+.proc-table td form{display:inline-block;margin:0}
+.proc-detail{max-width:1100px;margin:0 auto}
+.po-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 3px 14px rgba(31,45,61,.05);overflow:hidden}
+.po-content{padding:26px}
+.po-branding{padding-bottom:18px;border-bottom:1px solid #edf0f5}
+.po-hospital h2{color:#25324a;font-weight:800}
+.status-pill{display:inline-flex;padding:6px 10px;border-radius:20px;background:#edf3ff;color:#2f6fed;font-size:11px;font-weight:800}
+.po-table{width:100%;border-collapse:separate;border-spacing:0}
+.po-table th{background:#f8fafc;color:#748198;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:12px;border-bottom:1px solid #e7ebf2}
+.po-table td{padding:13px 12px;border-bottom:1px solid #edf0f5;color:#344054}
+.po-total{color:#075b9d;font-size:20px;font-weight:800}
+@media(max-width:900px){
+ .proc-page{padding:20px 14px}
+ .proc-hero{padding:24px;align-items:flex-start;flex-direction:column}
+ .proc-actions{width:100%;justify-content:flex-start}
+ .proc-card .card-body{padding:16px}
+ .proc-table{min-width:820px}
+ .proc-card.table-responsive{overflow-x:auto}
+}
+@media(max-width:520px){
+ .proc-page{padding:16px 10px}
+ .proc-hero{border-radius:15px;padding:20px}
+ .proc-hero h1{font-size:22px}
+ .proc-actions .btn{width:100%}
+ .po-content{padding:18px}
+}
+@media print{
+ .no-print{display:none!important}
+ .proc-page{padding:0;background:#fff}
+ .proc-hero,.proc-card,.po-card{box-shadow:none}
+}
 </style>
 
 <div class="proc-page"><div class="proc-shell"><div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Orders</h1><p>Create, approve and track procurement orders.</p></div><div class="proc-actions"><a href="purchase_orders.php" class="btn btn-light">Purchase Orders</a><?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-outline-light">New Order</a><?php endif; ?></div></div><div class="proc-detail"><div class="po-container">
