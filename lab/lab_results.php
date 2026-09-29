@@ -95,7 +95,6 @@ $lab_jobs = $conn->query($query);
 <div class="container">
     <div class="worklist-card">
         <h2 style="margin-top:0; color:#333;">🔬 Laboratory Worklist</h2>
-        <p style="color:#666; font-size:14px;">Update findings to sync with Doctor's Dashboard. Use the print icon for completed reports.</p>
 
         <?php if (isset($_GET['saved'])): ?>
             <div class="alert-success">Laboratory result saved successfully.</div>
