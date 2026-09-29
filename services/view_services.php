@@ -144,7 +144,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <th>Category</th>
                 <th>Department</th>
                 <th>Unit</th>
-                <th>Cash Price (KSH)</th>
+                <th>Cash Price (KSH)</th><th>History</th>
                 <th>Active</th>
                 <?php if (current_user_is_super() || current_user_role() === 'admin'): ?><th>Pricing</th><?php endif; ?>
             </tr>
@@ -156,7 +156,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <td><?= htmlspecialchars(ucfirst($s['category'])) ?></td>
                 <td><?= htmlspecialchars($s['department'] ?? '') ?></td>
                 <td><?= htmlspecialchars($s['unit'] ?? 'Each') ?></td>
-                <td><?= number_format((float)$s['current_cash_price'], 2) ?></td>
+                <td><?= number_format((float)$s['current_cash_price'], 2) ?></td><td><a href="price_history.php?service_id=<?= (int)$s['id'] ?>">View</a></td>
                 <td><?= !empty($s['active']) ? 'Yes' : 'No' ?></td>
                 <?php if (current_user_is_super() || current_user_role() === 'admin'): ?>
                 <td>
