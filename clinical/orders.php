@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 if (!$s) throw new Exception('Unable to load service.');
                 $s->bind_param('is',$serviceId,$type); $s->execute(); $service=$s->get_result()->fetch_assoc(); $s->close();
                 if (!$service) throw new Exception('Select a valid service.');
-                $resolved=get_service_price($conn,$serviceId,null,null);
+                $resolved=get_service_price_for_patient($conn,$patientId,$serviceId);
                 $price=(float)$resolved['price'];
                 $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
 
