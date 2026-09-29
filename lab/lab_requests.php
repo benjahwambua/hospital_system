@@ -82,17 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
 
                         // Put the walk-in laboratory request under the same Visit/Encounter.
                         $visitId = get_or_create_current_visit($conn, $walkinPatientId, 'Walk-in', 'Laboratory');
-                        if ($visitId > 0) {
-                            $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at, status) VALUES (?, ?, 'lab', ?, ?, NOW(), 'Pending')");
-                            if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
-                            $serviceInsert->bind_param('iidi', $walkinPatientId, $service_id, $price, $visitId);
-                        } else {
-                            $serviceInsert = $conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, created_at, status) VALUES (?, ?, 'lab', ?, NOW(), 'Pending')");
-                            if (!$serviceInsert) throw new Exception('Unable to prepare walk-in laboratory request: ' . $conn->error);
-                            $serviceInsert->bind_param('iid', $walkinPatientId, $service_id, $price);
-                        }
-                        if (!$serviceInsert->execute()) throw new Exception('Unable to create walk-in laboratory request: ' . $serviceInsert->error);
-                        $serviceInsert->close();
+                        add_patient_service($conn, $walkinPatientId, $service_id, $visitId, null, null, 1, 0, 'Pending', null);
 
                         $invoiceId = get_or_create_visit_invoice($conn, $walkinPatientId, $visitId);
                         $invoiceItemId = add_invoice_item($conn, $invoiceId, 'Lab: ' . $labService['service_name'], 1, $price, 'lab', $service_id);
