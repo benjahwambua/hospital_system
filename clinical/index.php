@@ -103,9 +103,8 @@ include __DIR__ . '/../includes/sidebar.php';
       <div class="panel-body"><div class="action-list">
         <a class="action-link" href="../patients/appointments.php"><i class="fas fa-calendar-check"></i><span>Appointments</span><small>Open</small></a>
         <a class="action-link" href="../patients/patient_list.php"><i class="fas fa-address-book"></i><span>Patient List</span><small>Open</small></a>
-        <a class="action-link" href="../clinical/orders.php"><i class="fas fa-flask"></i><span>Orders & Referrals</span><small>Open</small></a>
-        <a class="action-link" href="ward_management.php"><i class="fas fa-bed"></i><span>Ward / IPD</span><small>Open</small></a>
-        <a class="action-link" href="../diagnostics/diagnostics.php"><i class="fas fa-diagnoses"></i><span>Diagnostics</span><small>Open</small></a>
+        <a class="action-link" href="../clinical/orders.php"><i class="fas fa-flask"></i><span>Orders & Referrals</span><small>Lab · Radiology · Pharmacy</small></a>
+        <a class="action-link" href="ward_management.php"><i class="fas fa-bed"></i><span>Ward / IPD</span><small>Admissions · Discharge · Beds</small></a>
       </div></div>
     </div>
   </div>
