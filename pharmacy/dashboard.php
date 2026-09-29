@@ -41,5 +41,50 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 .hms-empty{padding:60px 20px;text-align:center;color:#98a2b3}.hms-empty i{font-size:38px;color:#c5ccd6;margin-bottom:12px}
 @media(max-width:900px){.hms-hero{flex-direction:column}.hms-actions{justify-content:flex-start}.hms-workspace{padding:20px 12px 35px}}
 </style>
-<div class="main-content"><div class="container-fluid hms-workspace"><div class="hms-hero"><div><div class="hms-kicker">Pharmacy · Operations</div><h1><i class="fas fa-prescription-bottle-medical mr-2"></i> Pharmacy</h1><p>Manage dispensing, stock and medicine sales from one operational workspace.</p></div><div class="hms-actions"><a href="dispensing_queue.php" class="btn btn-primary"><i class="fas fa-clipboard-check mr-1"></i> Dispensing Queue</a></div></div><div class="row mb-4"><div class="col-lg-4 col-md-6 mb-3"><div class="card"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Pending Dispensing</div><div class="value"><?=$queue?></div><div class="hint">Prescriptions awaiting action</div></div><div class="hms-icon"><i class="fas fa-clipboard-check"></i></div></div></div></div><div class="col-lg-4 col-md-6 mb-3"><div class="card"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Stock Items</div><div class="value"><?=$stock?></div><div class="hint">Medicine records</div></div><div class="hms-icon"><i class="fas fa-boxes-stacked"></i></div></div></div></div><div class="col-lg-4 col-md-6 mb-3"><div class="card"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Low Stock</div><div class="value"><?=$low?></div><div class="hint">Below replenishment threshold</div></div><div class="hms-icon"><i class="fas fa-arrow-trend-down"></i></div></div></div></div></div><div class="d-none"><a href="dispensing_queue.php" class="pc text-decoration-none"><small>Pending Dispensing</small><strong><?= $queue ?></strong></a><a href="view_stock.php" class="pc text-decoration-none"><small>Stock Items</small><strong><?= $stock ?></strong></a><a href="view_stock.php" class="pc text-decoration-none"><small>Low Stock</small><strong><?= $low ?></strong></a></div></div>
-<div class="row"><div class="card mb-4"><div class="card-header py-3"><strong>Pharmacy Operations</strong></div><div class="card-body"><div class="plinks"><a href="dispensing_queue.php"><i class="fas fa-clipboard-check"></i><strong>Dispensing Queue</strong></a><?php if($canCreate): ?><a href="sell_medicine.php"><i class="fas fa-prescription"></i><strong>Sell Medicine</strong></a><?php endif; ?><?php if($canEdit): ?><a href="add_stock.php"><i class="fas fa-box-open"></i><strong>Add Stock</strong></a><?php endif; ?><a href="view_stock.php"><i class="fas fa-capsules"></i><strong>View Stock</strong></a></div></div></div><div class="pp"><div class="pph"><strong>Queue</strong></div><div class="ppb"><h2><?= $queue ?></h2><small class="text-muted">prescriptions pending dispensing</small><?php if($canApprove): ?><a href="dispensing_queue.php" class="btn btn-primary btn-block mt-3">Open Queue</a><?php endif; ?></div></div></div></div></div><?php include __DIR__.'/../includes/footer.php'; ?>
+<div class="main-content">
+<div class="container-fluid hms-workspace">
+    <div class="hms-hero">
+        <div>
+            <div class="hms-kicker">Pharmacy · Operations</div>
+            <h1><i class="fas fa-prescription-bottle-medical mr-2"></i> Pharmacy</h1>
+            <p>Manage dispensing, stock and medicine sales from one operational workspace.</p>
+        </div>
+        <div class="hms-actions">
+            <a href="dispensing_queue.php" class="btn btn-primary"><i class="fas fa-clipboard-check mr-1"></i> Dispensing Queue</a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-lg-4 col-md-6 mb-3"><div class="card h-100"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Pending Dispensing</div><div class="value"><?=$queue?></div><div class="hint">Prescriptions awaiting action</div></div><div class="hms-icon"><i class="fas fa-clipboard-check"></i></div></div></div></div>
+        <div class="col-lg-4 col-md-6 mb-3"><div class="card h-100"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Stock Items</div><div class="value"><?=$stock?></div><div class="hint">Medicine records</div></div><div class="hms-icon"><i class="fas fa-boxes-stacked"></i></div></div></div></div>
+        <div class="col-lg-4 col-md-6 mb-3"><div class="card h-100"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Low Stock</div><div class="value"><?=$low?></div><div class="hint">Below replenishment threshold</div></div><div class="hms-icon"><i class="fas fa-arrow-trend-down"></i></div></div></div></div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header py-3"><strong>Pharmacy Operations</strong><div class="small text-muted">Daily dispensing and inventory workflows.</div></div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3"><a href="dispensing_queue.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-clipboard-check text-primary mr-2"></i><strong>Dispensing Queue</strong><small class="d-block text-muted ml-4">Process prescribed medicines</small></a></div>
+                        <?php if($canCreate): ?><div class="col-md-6 mb-3"><a href="sell_medicine.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-prescription text-primary mr-2"></i><strong>Sell Medicine</strong><small class="d-block text-muted ml-4">Process pharmacy sales</small></a></div><?php endif; ?>
+                        <?php if($canEdit): ?><div class="col-md-6 mb-3"><a href="add_stock.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-box-open text-primary mr-2"></i><strong>Add Stock</strong><small class="d-block text-muted ml-4">Receive or record stock</small></a></div><?php endif; ?>
+                        <div class="col-md-6 mb-3"><a href="view_stock.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-capsules text-primary mr-2"></i><strong>View Stock</strong><small class="d-block text-muted ml-4">Monitor quantities and expiry</small></a></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header py-3"><strong>Dispensing Queue</strong></div>
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="h1 font-weight-bold text-primary mb-1"><?=$queue?></div>
+                    <div class="text-muted mb-3">prescriptions pending dispensing</div>
+                    <?php if($canApprove): ?><a href="dispensing_queue.php" class="btn btn-primary btn-block">Open Queue</a><?php else: ?><a href="dispensing_queue.php" class="btn btn-outline-primary btn-block">View Queue</a><?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<?php include __DIR__.'/../includes/footer.php'; ?>
