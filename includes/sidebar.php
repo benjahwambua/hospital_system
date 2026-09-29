@@ -190,12 +190,14 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
-        <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/']) ?>">
+        <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/', 'services/']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-cogs icon-main"></i> Administration <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/administration/dashboard.php" class="<?= isActive('administration/dashboard.php') ?>"><i class="fas fa-th-large"></i> Administration Dashboard</a>
                 <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
                 <a href="/hospital_system/users/access_rights.php" class="<?= isActive('access_rights.php') ?>"><i class="fas fa-user-shield"></i> Access Rights</a>
+                <a href="/hospital_system/services/view_services.php" class="<?= isActive('services/view_services.php') ?>"><i class="fas fa-list-alt"></i> Service Catalogue</a>
+                <a href="/hospital_system/services/price_history.php" class="<?= isActive('services/price_history.php') ?>"><i class="fas fa-history"></i> Price History</a>
                 <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
                 <a href="/hospital_system/reports/reports.php" class="<?= isActive('reports/reports.php') ?>"><i class="fas fa-file-alt"></i> System Reports</a>
             </div>
