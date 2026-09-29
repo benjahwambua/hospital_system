@@ -305,7 +305,7 @@ if ($patient_id <= 0) {
             $serviceStmt->close();
 
             if(!$service) throw new Exception('Selected service is not active or does not exist.');
-            $resolved = get_service_price($conn, $service_id, null, null);
+            $resolved = get_service_price_for_patient($conn, $patient_id, $service_id);
             $price = (float)$resolved['price'];
             $service['service_name'] = $resolved['service_name'];
             if($price < 0) throw new Exception('Invalid service price.');
@@ -340,7 +340,7 @@ if ($patient_id <= 0) {
             $labService=$stmt->get_result()->fetch_assoc();
             $stmt->close();
             if(!$labService) throw new Exception('Selected laboratory service is invalid.');
-            $resolved = get_service_price($conn, $service_id, null, null);
+            $resolved = get_service_price_for_patient($conn, $patient_id, $service_id);
             $price = (float)$resolved['price'];
             $labService['service_name'] = $resolved['service_name'];
 
