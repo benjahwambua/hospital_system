@@ -46,65 +46,86 @@ if ($viewId > 0):
     // PO accounting is recognized at GRN/receiving, when inventory is actually received.
 ?>
 <style>
-.proc-page{padding:28px 24px 40px;background:#f5f7fb;min-height:calc(100vh - 60px)}
-.proc-shell{max-width:1500px;margin:0 auto}
-.proc-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border:0;border-radius:20px;padding:30px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px}
-.proc-hero h1{font-size:29px;margin:5px 0 8px;color:#fff;font-weight:800}
-.proc-hero p{margin:0;color:rgba(255,255,255,.82);font-size:14px}
-.proc-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#bfe8ff;margin-bottom:5px}
-.proc-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.proc-actions .btn{border-radius:10px;font-weight:700;padding:10px 14px}
-.proc-actions>div{display:none}
-.proc-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 3px 14px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}
-.proc-card .card-body{padding:20px}
-.proc-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.proc-filter .form-control,.proc-card .form-control{height:42px;border:1px solid #d7dee8;border-radius:9px;box-shadow:none}
-.proc-card .form-control:focus{border-color:#2f6fed;box-shadow:0 0 0 3px rgba(47,111,237,.08)}
-.proc-table{margin:0;width:100%;border-collapse:separate;border-spacing:0}
-.proc-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.45px;color:#748198;background:#f8fafc;border-top:0;border-bottom:1px solid #e7ebf2;padding:13px 12px;font-weight:800}
-.proc-table tbody td{vertical-align:middle;border-color:#edf0f5;padding:14px 12px;font-size:13px;color:#344054}
-.proc-table tbody tr{transition:background .15s}
-.proc-table tbody tr:hover{background:#f7f9fc}
-.proc-table tbody td:first-child strong{color:#25324a;font-size:13px}
-.proc-table tbody td:nth-child(5){font-weight:700;color:#25324a}
-.proc-status{display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;background:#edf3ff;color:#2f6fed;font-size:11px;font-weight:800}
-.proc-actions-cell{white-space:nowrap}
-.proc-actions-cell .btn,.proc-table td .btn{border-radius:8px;font-size:11px;padding:7px 10px;font-weight:700;margin-right:3px}
-.proc-table td .btn-info{background:#eef4ff;border-color:#dbe7ff;color:#2f6fed}
-.proc-table td .btn-secondary{background:#f2f4f7;border-color:#e4e7ec;color:#344054}
-.proc-table td .btn-warning{background:#fff7e6;border-color:#ffe1a8;color:#9a6700}
-.proc-table td .btn-danger{background:#fff1f1;border-color:#ffd5d5;color:#c92a2a}
-.proc-table td .btn-success{background:#edf9f1;border-color:#ccebd5;color:#19713a}
-.proc-table td form{display:inline-block;margin:0}
-.proc-detail{max-width:1100px;margin:0 auto}
-.po-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 3px 14px rgba(31,45,61,.05);overflow:hidden}
-.po-content{padding:26px}
-.po-branding{padding-bottom:18px;border-bottom:1px solid #edf0f5}
-.po-hospital h2{color:#25324a;font-weight:800}
-.status-pill{display:inline-flex;padding:6px 10px;border-radius:20px;background:#edf3ff;color:#2f6fed;font-size:11px;font-weight:800}
-.po-table{width:100%;border-collapse:separate;border-spacing:0}
-.po-table th{background:#f8fafc;color:#748198;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:12px;border-bottom:1px solid #e7ebf2}
-.po-table td{padding:13px 12px;border-bottom:1px solid #edf0f5;color:#344054}
-.po-total{color:#075b9d;font-size:20px;font-weight:800}
+/* Procurement page visual language — aligned with Clinical */
+.proc-page{padding:28px 24px 40px!important;background:#f5f7fb!important;min-height:calc(100vh - 60px)!important}
+.proc-shell{max-width:1500px!important;margin:0 auto!important}
+.proc-hero{background:linear-gradient(135deg,#063b73 0%,#075b9d 100%)!important;color:#fff!important;border:0!important;border-radius:20px!important;padding:30px!important;box-shadow:0 4px 18px rgba(31,45,61,.08)!important;display:flex!important;justify-content:space-between!important;align-items:center!important;gap:20px!important;margin-bottom:22px!important}
+.proc-kicker{font-size:11px!important;text-transform:uppercase!important;letter-spacing:1.8px!important;font-weight:800!important;color:#bfe8ff!important;margin-bottom:5px!important}
+.proc-hero h1{font-size:29px!important;line-height:1.2!important;margin:5px 0 8px!important;color:#fff!important;font-weight:800!important}
+.proc-hero p{margin:0!important;color:rgba(255,255,255,.82)!important;font-size:14px!important}
+.proc-actions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;flex-wrap:wrap!important}
+.proc-actions>div{display:none!important}
+.proc-actions .btn{border-radius:10px!important;font-weight:800!important;padding:10px 15px!important;min-height:40px!important}
+.proc-actions .btn-light{background:#fff!important;color:#063b73!important;border-color:#fff!important}
+.proc-actions .btn-outline-light{background:rgba(255,255,255,.10)!important;color:#fff!important;border-color:rgba(255,255,255,.45)!important}
+.proc-actions .btn:hover{transform:translateY(-1px)!important}
+
+.proc-card{background:#fff!important;border:1px solid #e7ebf2!important;border-radius:14px!important;box-shadow:0 3px 14px rgba(31,45,61,.05)!important;overflow:hidden!important;margin-bottom:18px!important}
+.proc-card .card-body{padding:20px!important}
+.proc-card form.form-row{display:flex!important;align-items:center!important;gap:12px!important;margin:0!important}
+.proc-card form.form-row>div{padding:0!important;margin:0!important}
+.proc-card .form-control{height:44px!important;border:1px solid #d7dee8!important;border-radius:9px!important;box-shadow:none!important;color:#344054!important;background:#fff!important}
+.proc-card .form-control:focus{border-color:#2f6fed!important;box-shadow:0 0 0 3px rgba(47,111,237,.08)!important}
+.proc-card form.form-row .btn{height:44px!important;border-radius:9px!important;font-weight:800!important;padding:0 14px!important}
+.proc-card form.form-row .btn-primary{background:#2f6fed!important;border-color:#2f6fed!important}
+.proc-card form.form-row .btn-dark{background:#25324a!important;border-color:#25324a!important}
+.proc-card form.form-row .btn-light{background:#f2f4f7!important;border-color:#e4e7ec!important;color:#344054!important}
+
+.proc-table{margin:0!important;width:100%!important;border-collapse:separate!important;border-spacing:0!important}
+.proc-table thead th{font-size:11px!important;text-transform:uppercase!important;letter-spacing:.55px!important;color:#748198!important;background:#f8fafc!important;border-top:0!important;border-bottom:1px solid #e7ebf2!important;padding:14px 14px!important;font-weight:800!important;white-space:nowrap!important}
+.proc-table tbody td{vertical-align:middle!important;border-top:0!important;border-bottom:1px solid #edf0f5!important;padding:15px 14px!important;font-size:13px!important;color:#344054!important;background:#fff!important}
+.proc-table tbody tr:hover td{background:#f7f9fc!important}
+.proc-table tbody tr:last-child td{border-bottom:0!important}
+.proc-table tbody td:first-child strong{color:#25324a!important;font-size:14px!important;font-weight:800!important}
+.proc-table tbody td:nth-child(5){font-weight:800!important;color:#25324a!important;white-space:nowrap!important}
+.proc-status{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:78px!important;padding:6px 11px!important;border-radius:20px!important;background:#edf3ff!important;color:#2f6fed!important;font-size:11px!important;font-weight:800!important}
+.proc-actions-cell,.proc-table td:last-child{white-space:nowrap!important}
+.proc-table td .btn{border-radius:8px!important;font-size:11px!important;padding:7px 10px!important;font-weight:800!important;margin:2px 3px 2px 0!important;box-shadow:none!important}
+.proc-table td .btn-info{background:#eef4ff!important;border-color:#dbe7ff!important;color:#2f6fed!important}
+.proc-table td .btn-secondary{background:#f2f4f7!important;border-color:#e4e7ec!important;color:#344054!important}
+.proc-table td .btn-warning{background:#fff7e6!important;border-color:#ffe1a8!important;color:#9a6700!important}
+.proc-table td .btn-danger{background:#fff1f1!important;border-color:#ffd5d5!important;color:#c92a2a!important}
+.proc-table td .btn-success{background:#edf9f1!important;border-color:#ccebd5!important;color:#19713a!important}
+.proc-table td .btn:disabled{opacity:.45!important}
+.proc-table td form{display:inline-block!important;margin:0!important}
+.proc-card>.card-body.table-responsive{padding:0!important}
+.proc-card>.card-body.table-responsive>.mb-2{padding:16px 18px 12px!important;margin:0!important;border-bottom:1px solid #edf0f5!important}
+.proc-card>.card-body.table-responsive>.d-flex:last-child{padding:14px 18px!important}
+.proc-card>.card-body.table-responsive>small{color:#8792a5!important}
+
+.proc-detail{max-width:1100px!important;margin:0 auto!important}
+.po-card{background:#fff!important;border:1px solid #e7ebf2!important;border-radius:14px!important;box-shadow:0 3px 14px rgba(31,45,61,.05)!important;overflow:hidden!important}
+.po-content{padding:26px!important}
+.po-branding{padding-bottom:18px!important;border-bottom:1px solid #edf0f5!important}
+.po-hospital h2{color:#25324a!important;font-weight:800!important}
+.status-pill{display:inline-flex!important;padding:6px 10px!important;border-radius:20px!important;background:#edf3ff!important;color:#2f6fed!important;font-size:11px!important;font-weight:800!important}
+.po-table{width:100%!important;border-collapse:separate!important;border-spacing:0!important}
+.po-table th{background:#f8fafc!important;color:#748198!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.4px!important;padding:12px!important;border-bottom:1px solid #e7ebf2!important}
+.po-table td{padding:13px 12px!important;border-bottom:1px solid #edf0f5!important;color:#344054!important}
+.po-total{color:#075b9d!important;font-size:20px!important;font-weight:800!important}
+
 @media(max-width:900px){
- .proc-page{padding:20px 14px}
- .proc-hero{padding:24px;align-items:flex-start;flex-direction:column}
- .proc-actions{width:100%;justify-content:flex-start}
- .proc-card .card-body{padding:16px}
- .proc-table{min-width:820px}
- .proc-card.table-responsive{overflow-x:auto}
+ .proc-page{padding:20px 14px!important}
+ .proc-hero{padding:24px!important;align-items:flex-start!important;flex-direction:column!important}
+ .proc-actions{width:100%!important;justify-content:flex-start!important}
+ .proc-card .card-body{padding:16px!important}
+ .proc-card form.form-row{display:block!important}
+ .proc-card form.form-row>div{width:100%!important;margin-bottom:10px!important}
+ .proc-card>.card-body.table-responsive{overflow-x:auto!important}
+ .proc-table{min-width:900px!important}
 }
 @media(max-width:520px){
- .proc-page{padding:16px 10px}
- .proc-hero{border-radius:15px;padding:20px}
- .proc-hero h1{font-size:22px}
- .proc-actions .btn{width:100%}
- .po-content{padding:18px}
+ .proc-page{padding:16px 10px!important}
+ .proc-hero{border-radius:15px!important;padding:20px!important}
+ .proc-hero h1{font-size:22px!important}
+ .proc-actions{display:grid!important;grid-template-columns:1fr!important;width:100%!important}
+ .proc-actions .btn{width:100%!important}
+ .po-content{padding:18px!important}
 }
 @media print{
  .no-print{display:none!important}
- .proc-page{padding:0;background:#fff}
- .proc-hero,.proc-card,.po-card{box-shadow:none}
+ .proc-page{padding:0!important;background:#fff!important}
+ .proc-hero,.proc-card,.po-card{box-shadow:none!important}
 }
 </style>
 
