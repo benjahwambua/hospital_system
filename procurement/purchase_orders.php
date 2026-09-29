@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['approve_po'])) {
     $approveId=(int)($_POST['po_id']??0);
     $stmt=$conn->prepare("UPDATE purchase_orders SET status='Approved' WHERE id=? AND status='Pending'");
     $stmt->bind_param('i',$approveId); $stmt->execute(); $stmt->close();
-    header('Location: purchase_orders.php?view_id='.$approveId.'&approved=1'); exit;
+    header('Location: view_po.php?id='.$approveId.'&approved=1'); exit;
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -186,7 +186,7 @@ $listRes = $listStmt->get_result();
 ?>
 <div class="proc-page"><div class="proc-shell">
     <div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Order History</h1><p>Review, approve and receive procurement orders.</p></div><div class="proc-actions">
-        <h2 class="h3 text-gray-800">Purchase Order History</h2>
+        <div><div class="h3 text-gray-800 mb-0">Purchase Order History</div><small class="text-muted">Review, approve, receive, edit or delete procurement orders.</small></div>
         <?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Order</a><?php endif; ?>
     </div></div>
 
@@ -238,8 +238,8 @@ $listRes = $listStmt->get_result();
                             <td><span class="proc-status"><?= htmlspecialchars((string)($row['status'] ?? 'Pending')) ?></span></td>
                             <td>KES <?= number_format((float)$row['total_amount'], 2) ?></td>
                             <td>
-                                <a href="purchase_orders.php?view_id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
-                                <?php if (can_create($conn, 'procurement')): ?><a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a><?php endif; ?> <?php if (can_approve($conn, 'procurement')): ?><form method="post" class="d-inline">
+                                <a href="view_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
+                                <?php if (can_create($conn, 'procurement') && in_array(($row['status']??''), ['Approved','Partial'], true)): ?><a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a><?php endif; ?> <?php if (can_edit($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><a href="edit_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-warning btn-sm mt-1"><i class="fa fa-edit"></i> Edit</a><?php endif; ?> <?php if (can_delete($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><form method="post" action="delete_po.php" class="d-inline" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="id" value="<?= (int)$row['id']?>"><button class="btn btn-danger btn-sm mt-1">Delete</button></form><?php endif; ?> <?php if (can_approve($conn, 'procurement')): ?><form method="post" class="d-inline">
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
 <input type="hidden" name="po_id" value="<?= (int)$row['id']?>">
 <button name="approve_po" class="btn btn-success btn-sm mt-1" <?=($row['status']??'')!=='Pending'?'disabled':''?>>Approve</button>
