@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$service['service_name'],1,$price,$type,$serviceId);
                 post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
                 $conn->commit();
-                $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.' sent to Central Cashier.';
+                $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.'.';
             } elseif ($type==='pharmacy') {
                 $medicineId=(int)($_POST['medicine_id'] ?? 0);
                 $quantity=max(1,(int)($_POST['quantity'] ?? 1));
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                     }
                 }
                 $conn->commit();
-                $message='Prescription sent to Pharmacy for dispensing. Stock and the pharmacy charge are posted when Pharmacy dispenses. Payment is collected only by Central Cashier.';
+                $message='Prescription sent to Pharmacy for dispensing. Stock and the pharmacy charge are posted when Pharmacy dispenses. ';
             } else throw new Exception('Select a department.');
         } catch (Throwable $e) {
             $conn->rollback();
