@@ -46,40 +46,11 @@ if ($viewId > 0):
     // PO accounting is recognized at GRN/receiving, when inventory is actually received.
 ?>
 <style>
-.po-container { max-width: 1000px; margin: 24px auto; padding: 0 12px; width: 100%; }
-.content-wrapper .po-container, .main-content .po-container { margin-left:auto !important; margin-right:auto !important; }
-.po-card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); padding:40px; position:relative; overflow:hidden; }
-.watermark { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%) rotate(-30deg); width:60%; opacity:.05; z-index:0; pointer-events:none; }
-.po-content { position:relative; z-index:2; }
-.po-branding { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:20px; }
-.po-branding img { max-height:75px; }
-.po-hospital { text-align:right; font-size:13px; color:#555; }
-.po-hospital h2 { margin:0; font-size:22px; text-transform:uppercase; color:#1f2937; }
-.po-top { display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:24px; }
-.po-table { width:100%; border-collapse: collapse; margin-top:20px; }
-.po-table th, .po-table td { padding:11px 12px; border-bottom:1px solid #e5e7eb; }
-.po-table th { background:#f8fafc; text-transform:uppercase; font-size:.76rem; color:#6b7280; }
-.po-total { margin-top:20px; text-align:right; font-size:1.35rem; font-weight:800; color:#1d4ed8; }
-.status-pill { display:inline-flex; padding:4px 10px; border-radius:999px; font-size:.78rem; font-weight:700; background:#e0f2fe; color:#075985; }
-.po-signatures { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; margin-top:40px; }
-.sig-box { width:260px; text-align:center; }
-.sig-line { border-top:1px solid #333; margin-bottom:6px; }
-.stamp-space { width:140px; height:140px; border:2px dashed #93c5fd; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#60a5fa; font-size:11px; text-align:center; }
-@media print {
-    @page { size: A4 portrait; margin: 10mm; }
-    html, body, .content-wrapper, .main-content, .container-fluid { width:100% !important; margin:0 !important; padding:0 !important; background:#fff !important; }
-    header, footer, nav, aside, .sidebar, .navbar, .no-print { display:none !important; }
-    .po-container { max-width:180mm !important; margin:0 auto !important; padding:0 !important; }
-    .po-card { box-shadow:none; border:none; padding:6mm !important; }
-    .po-table th, .po-table td { padding:7px 8px; font-size:12px; }
-    .po-hospital { font-size:11px; }
-    .po-total { font-size:18px; }
-    .po-signatures { margin-top:18mm; gap:20mm; }
-    .stamp-space { width:120px; height:120px; }
-}
+.proc-page{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 60px)}.proc-shell{max-width:1500px;margin:auto}.proc-hero{background:linear-gradient(135deg,#344e41,#588157);color:#fff;border-radius:18px;padding:26px 30px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:18px;box-shadow:0 12px 30px rgba(52,78,65,.16)}.proc-hero h1{margin:4px 0;font-size:27px}.proc-hero p{margin:0;color:rgba(255,255,255,.8);font-size:13px}.proc-kicker{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d9f0da}.proc-actions{display:flex;gap:8px;flex-wrap:wrap}.proc-card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:16px}.proc-card .card-body{padding:20px}.proc-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.proc-filter .form-control{min-height:42px;border-radius:9px;border:1px solid #d7dee8}.proc-table{margin:0}.proc-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#667085;background:#fafbfc;border-top:0}.proc-table td{vertical-align:middle;border-color:#edf0f5;font-size:13px}.proc-table tbody tr:hover{background:#f8fbff}.proc-status{display:inline-flex;padding:5px 9px;border-radius:20px;background:#eef5ff;color:#245ea8;font-size:11px;font-weight:800}.proc-actions-cell{white-space:nowrap}.proc-actions-cell .btn{border-radius:8px;font-size:11px;padding:6px 9px}.proc-detail{max-width:1100px;margin:auto}.po-card{border-radius:16px;box-shadow:0 6px 24px rgba(31,45,61,.07);border:1px solid #e5eaf1}.po-branding{padding-bottom:18px;border-bottom:1px solid #edf0f5}.status-pill{background:#eef5ff;color:#245ea8}.po-table th{background:#f8fafc}.po-total{color:#075b9d}
+@media(max-width:700px){.proc-page{padding:18px 12px}.proc-hero{padding:22px;align-items:flex-start;flex-direction:column}.proc-filter{display:grid;grid-template-columns:1fr;width:100%}.proc-actions-cell{white-space:normal}}
 </style>
 
-<div class="po-container">
+<div class="proc-page"><div class="proc-shell"><div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Orders</h1><p>Create, approve and track procurement orders.</p></div><div class="proc-actions"><a href="purchase_orders.php" class="btn btn-light">Purchase Orders</a><?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-outline-light">New Order</a><?php endif; ?></div></div><div class="proc-detail"><div class="po-container">
     <div class="no-print d-flex justify-content-between align-items-center mb-3">
         <a href="purchase_orders.php" class="btn btn-secondary btn-sm">← Back to History</a>
         <button onclick="window.print()" class="btn btn-primary btn-sm">Print Order</button>
@@ -213,13 +184,13 @@ $listStmt->bind_param($listTypes, ...$listParams);
 $listStmt->execute();
 $listRes = $listStmt->get_result();
 ?>
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="proc-page"><div class="proc-shell">
+    <div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Order History</h1><p>Review, approve and receive procurement orders.</p></div><div class="proc-actions">
         <h2 class="h3 text-gray-800">Purchase Order History</h2>
         <?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Order</a><?php endif; ?>
-    </div>
+    </div></div>
 
-    <div class="card shadow mb-3">
+    <div class="proc-card">
         <div class="card-body">
             <form class="form-row">
                 <div class="col-md-4 mb-2"><input type="text" class="form-control" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search supplier or PO number"></div>
@@ -240,13 +211,13 @@ $listRes = $listStmt->get_result();
         </div>
     </div>
 
-    <div class="card shadow">
+    <div class="proc-card">
         <div class="card-body table-responsive">
             <div class="mb-2 d-flex justify-content-end">
                 <button onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')" class="btn btn-sm btn-outline-dark mr-2">Download CSV</button>
                 <button onclick="window.print()" class="btn btn-sm btn-outline-primary">Print Report</button>
             </div>
-            <table class="table table-bordered table-hover">
+            <table class="table proc-table table-hover">
                 <thead class="thead-light">
                     <tr>
                         <th>PO #</th>
@@ -264,7 +235,7 @@ $listRes = $listStmt->get_result();
                             <td><strong>PO-<?= str_pad((string)$row['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
                             <td><?= !empty($row['order_date']) ? date('d M Y', strtotime($row['order_date'])) : 'N/A' ?></td>
                             <td><?= htmlspecialchars((string)$row['s_name']) ?></td>
-                            <td><?= htmlspecialchars((string)($row['status'] ?? 'Pending')) ?></td>
+                            <td><span class="proc-status"><?= htmlspecialchars((string)($row['status'] ?? 'Pending')) ?></span></td>
                             <td>KES <?= number_format((float)$row['total_amount'], 2) ?></td>
                             <td>
                                 <a href="purchase_orders.php?view_id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
