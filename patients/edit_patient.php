@@ -92,32 +92,65 @@ $doctors = $conn->query("SELECT id, full_name FROM users WHERE role='doctor' ORD
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
-<div class="main-content"><div class="container-fluid pt-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div><h2 class="h4 mb-1 text-gray-800"><i class="fas fa-user-edit text-primary mr-2"></i>Edit Patient</h2><p class="text-muted mb-0">Update demographic and registration details without changing the patient number or clinical history.</p></div>
-    <div><a href="/hospital_system/patients/patient_dashboard.php?id=<?= $id ?>" class="btn btn-outline-primary mr-2"><i class="fas fa-notes-medical mr-1"></i>Patient Dashboard</a><a href="/hospital_system/patients/patient_list.php" class="btn btn-light"><i class="fas fa-arrow-left mr-1"></i>Patient List</a></div>
+<style>
+.edit-patient-page{width:100%;padding:28px 30px 40px}
+.edit-hero{background:linear-gradient(135deg,#075b9d,#123d68);border-radius:16px;padding:25px 28px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px;box-shadow:0 8px 24px rgba(18,61,104,.14)}
+.edit-hero h1{font-size:24px;font-weight:800;margin:0 0 5px}.edit-hero p{margin:0;opacity:.86;font-size:13px}
+.edit-hero-actions{display:flex;gap:9px;flex-wrap:wrap}.edit-hero-actions .btn{border-radius:9px;font-weight:700;padding:9px 14px}
+.patient-identity{background:#fff;border:1px solid #e7edf4;border-radius:14px;padding:17px 20px;display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:18px}
+.patient-identity-name{font-size:18px;font-weight:800;color:#25324a}.patient-identity-number{font-size:11px;font-weight:700;color:#075b9d;margin-top:3px}
+.section-card{background:#fff;border:1px solid #e7edf4;border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 3px 12px rgba(31,55,82,.04)}
+.section-head{padding:14px 20px;border-bottom:1px solid #edf1f5;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#075b9d;background:#fbfcfe}
+.section-body{padding:21px 20px}.edit-patient-page label{font-size:12px;font-weight:700;color:#425466;margin-bottom:6px}.edit-patient-page .form-control{height:42px;border-radius:8px;border:1px solid #d9e1ea;font-size:13px}.edit-patient-page .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 .15rem rgba(7,91,157,.1)}.edit-patient-page .form-group{margin-bottom:18px}
+.field-note{font-size:10px;color:#7b8794;margin-top:5px}.readonly-field{background:#f4f7fa!important;color:#5d6b79;font-weight:700}
+.form-actions{padding:17px 20px;border-top:1px solid #edf1f5;background:#fbfcfe;display:flex;justify-content:flex-end;gap:9px}.form-actions .btn{border-radius:8px;font-weight:700;padding:9px 16px}
+@media(max-width:768px){.edit-patient-page{padding:18px 14px 30px}.edit-hero{padding:20px;align-items:flex-start;flex-direction:column}.patient-identity{align-items:flex-start;flex-direction:column}.form-actions{justify-content:stretch;flex-direction:column}.form-actions .btn{width:100%}}
+</style>
+<div class="main-content">
+<div class="edit-patient-page">
+  <div class="edit-hero">
+    <div><h1><i class="fas fa-user-edit mr-2"></i>Edit Patient</h1><p>Update registration details without changing the patient number or clinical history.</p></div>
+    <div class="edit-hero-actions">
+      <a href="/hospital_system/patients/patient_dashboard.php?id=<?= $id ?>" class="btn btn-light"><i class="fas fa-notes-medical mr-1"></i>Patient Dashboard</a>
+      <a href="/hospital_system/patients/patient_list.php" class="btn btn-outline-light"><i class="fas fa-arrow-left mr-1"></i>Patient List</a>
+    </div>
   </div>
   <?php if ($errors): ?><div class="alert alert-danger"><strong>Please correct the following:</strong><ul class="mb-0 mt-2"><?php foreach($errors as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center"><div><strong><?= htmlspecialchars($patient['full_name']) ?></strong><div class="small text-muted"><?= htmlspecialchars($patient['patient_number'] ?? '') ?></div></div><span class="badge badge-<?= !empty($patient['is_walkin']) ? 'warning' : 'success' ?>"><?= !empty($patient['is_walkin']) ? 'Walk-in' : 'Registered Patient' ?></span></div>
-    <div class="card-body"><form method="post" novalidate>
-      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= $id ?>">
-      <h6 class="text-primary font-weight-bold text-uppercase mb-3"><i class="fas fa-id-card mr-2"></i>Patient Identification</h6>
-      <div class="row">
+  <div class="patient-identity">
+    <div><div class="patient-identity-name"><?= htmlspecialchars($patient['full_name']) ?></div><div class="patient-identity-number"><?= htmlspecialchars($patient['patient_number'] ?? '') ?></div></div>
+    <span class="badge badge-<?= !empty($patient['is_walkin']) ? 'warning' : 'success' ?>"><?= !empty($patient['is_walkin']) ? 'Walk-in' : 'Registered Patient' ?></span>
+  </div>
+  <form method="post" novalidate>
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="section-card">
+      <div class="section-head"><i class="fas fa-id-card mr-2"></i>Patient Identification</div>
+      <div class="section-body"><div class="row">
         <div class="col-md-8 form-group"><label>Full Name *</label><input name="full_name" class="form-control" required value="<?= htmlspecialchars($patient['full_name'] ?? '') ?>"></div>
-        <div class="col-md-4 form-group"><label>Patient Number</label><input class="form-control bg-light" readonly value="<?= htmlspecialchars($patient['patient_number'] ?? '') ?>"></div>
+        <div class="col-md-4 form-group"><label>Patient Number</label><input class="form-control readonly-field" readonly value="<?= htmlspecialchars($patient['patient_number'] ?? '') ?>"></div>
         <div class="col-md-4 form-group"><label>Gender</label><select name="gender" class="form-control"><?php foreach($allowedGenders as $g): ?><option value="<?= htmlspecialchars($g) ?>" <?= (($patient['gender'] ?? '')===$g?'selected':'') ?>><?= $g===''?'Not specified':htmlspecialchars($g) ?></option><?php endforeach; ?></select></div>
         <div class="col-md-4 form-group"><label>Date of Birth</label><input type="date" name="dob" class="form-control" value="<?= htmlspecialchars($patient['date_of_birth'] ?? '') ?>"></div>
-        <div class="col-md-4 form-group"><label>Age</label><input class="form-control bg-light" readonly value="<?= (int)($patient['age'] ?? 0) ?>"><small class="text-muted">Calculated from date of birth when supplied.</small></div>
+        <div class="col-md-4 form-group"><label>Age</label><input class="form-control readonly-field" readonly value="<?= (int)($patient['age'] ?? 0) ?>"><div class="field-note">Calculated from date of birth when supplied.</div></div>
         <div class="col-md-6 form-group"><label>Phone</label><input name="phone" class="form-control" value="<?= htmlspecialchars($patient['phone'] ?? '') ?>"></div>
         <div class="col-md-6 form-group"><label>Address</label><input name="address" class="form-control" value="<?= htmlspecialchars($patient['address'] ?? '') ?>"></div>
-      </div>
-      <hr><h6 class="text-primary font-weight-bold text-uppercase mb-3"><i class="fas fa-user-friends mr-2"></i>Next of Kin</h6>
-      <div class="row"><div class="col-md-6 form-group"><label>Next of Kin Name <?= empty($patient['is_walkin']) ? '*' : '' ?></label><input name="next_of_kin_name" class="form-control" value="<?= htmlspecialchars($patient['next_of_kin_name'] ?? '') ?>"></div><div class="col-md-6 form-group"><label>Next of Kin Phone</label><input name="next_of_kin_phone" class="form-control" value="<?= htmlspecialchars($patient['next_of_kin_phone'] ?? '') ?>"></div></div>
-      <hr><h6 class="text-primary font-weight-bold text-uppercase mb-3"><i class="fas fa-route mr-2"></i>Care Routing</h6>
-      <div class="row"><div class="col-md-6 form-group"><label>Clinic / Service Type</label><select name="clinic_category" class="form-control"><?php foreach($allowedClinicalTypes as $type): ?><option value="<?= htmlspecialchars($type) ?>" <?= (($patient['clinic_category'] ?? 'General')===$type?'selected':'') ?>><?= htmlspecialchars($type) ?></option><?php endforeach; ?></select></div><div class="col-md-6 form-group"><label>Assigned Doctor</label><select name="doctor_id" class="form-control"><option value="0">— Not assigned —</option><?php if($doctors): while($d=$doctors->fetch_assoc()): ?><option value="<?= (int)$d['id'] ?>" <?= ((int)($patient['doctor_id'] ?? 0)===(int)$d['id']?'selected':'') ?>><?= htmlspecialchars($d['full_name']) ?></option><?php endwhile; endif; ?></select></div></div>
-      <div class="d-flex justify-content-end mt-3"><a href="/hospital_system/patients/patient_dashboard.php?id=<?= $id ?>" class="btn btn-light mr-2">Cancel</a><button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Save Patient Changes</button></div>
-    </form></div>
-  </div>
+      </div></div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><i class="fas fa-user-friends mr-2"></i>Next of Kin</div>
+      <div class="section-body"><div class="row">
+        <div class="col-md-6 form-group"><label>Next of Kin Name <?= empty($patient['is_walkin']) ? '*' : '' ?></label><input name="next_of_kin_name" class="form-control" value="<?= htmlspecialchars($patient['next_of_kin_name'] ?? '') ?>"></div>
+        <div class="col-md-6 form-group"><label>Next of Kin Phone</label><input name="next_of_kin_phone" class="form-control" value="<?= htmlspecialchars($patient['next_of_kin_phone'] ?? '') ?>"></div>
+      </div></div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><i class="fas fa-route mr-2"></i>Care Routing</div>
+      <div class="section-body"><div class="row">
+        <div class="col-md-6 form-group"><label>Clinic / Service Type</label><select name="clinic_category" class="form-control"><?php foreach($allowedClinicalTypes as $type): ?><option value="<?= htmlspecialchars($type) ?>" <?= (($patient['clinic_category'] ?? 'General')===$type?'selected':'') ?>><?= htmlspecialchars($type) ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-6 form-group"><label>Assigned Doctor</label><select name="doctor_id" class="form-control"><option value="0">— Not assigned —</option><?php if($doctors): while($d=$doctors->fetch_assoc()): ?><option value="<?= (int)$d['id'] ?>" <?= ((int)($patient['doctor_id'] ?? 0)===(int)$d['id']?'selected':'') ?>><?= htmlspecialchars($d['full_name']) ?></option><?php endwhile; endif; ?></select></div>
+      </div></div>
+    </div>
+    <div class="section-card">
+      <div class="form-actions"><a href="/hospital_system/patients/patient_dashboard.php?id=<?= $id ?>" class="btn btn-light">Cancel</a><button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Save Patient Changes</button></div>
+    </div>
+  </form>
 </div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
