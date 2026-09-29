@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 require_module_access($conn, 'front_desk', 'edit');
 require_role(['admin','receptionist']);
@@ -66,18 +67,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $stmt = $conn->prepare("UPDATE patients SET full_name=?, gender=?, phone=?, date_of_birth=?, address=?, age=?, next_of_kin_name=?, next_of_kin_phone=?, doctor_id=NULLIF(?,0), clinic_category=? WHERE id=?");
-        if (!$stmt) {
-            $errors[] = 'Unable to prepare patient update: ' . $conn->error;
-        } else {
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("UPDATE patients SET full_name=?, gender=?, phone=?, date_of_birth=?, address=?, age=?, next_of_kin_name=?, next_of_kin_phone=?, doctor_id=NULLIF(?,0), clinic_category=? WHERE id=?");
+            if (!$stmt) throw new Exception('Unable to prepare patient update: ' . $conn->error);
             $stmt->bind_param('sssssissisi', $fullName, $gender, $phone, $validDob, $address, $age, $nextOfKinName, $nextOfKinPhone, $doctorId, $clinicCategory, $id);
-            if (!$stmt->execute()) $errors[] = 'Unable to update patient: ' . $stmt->error;
-            else {
-                if (function_exists('audit')) audit('patient_update', 'patient_id=' . $id);
-                header('Location: /hospital_system/patients/patient_dashboard.php?id=' . $id . '&updated=1');
-                exit;
-            }
+            if (!$stmt->execute()) throw new Exception('Unable to update patient: ' . $stmt->error);
             $stmt->close();
+
+            // Changing an existing patient to ANC/PNC/Maternity must route the patient
+            // into the maternity module as well, not merely change the label on patients.
+            if (maternity_category($clinicCategory)) {
+                ensure_maternity_record($conn, $id);
+            }
+
+            $conn->commit();
+            if (function_exists('audit')) audit('patient_update', 'patient_id=' . $id);
+            header('Location: /hospital_system/patients/patient_dashboard.php?id=' . $id . '&updated=1');
+            exit;
+        } catch (Throwable $e) {
+            $conn->rollback();
+            $errors[] = $e->getMessage();
         }
     }
 
