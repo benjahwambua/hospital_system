@@ -94,13 +94,13 @@ include __DIR__ . '/../includes/sidebar.php';
 <div class="main-content">
     <div class="container-fluid">
         <?php if (!$openShift): ?>
-            <div class="alert alert-warning mb-4"><i class="fas fa-lock"></i> <strong>No cashier shift is open.</strong> Open your shift before receiving payments. <a href="/hospital_system/cashier/shifts.php" class="btn btn-sm btn-warning ml-2">Open Cashier Shift</a></div>
+            <div class="alert alert-warning mb-4"><i class="fas fa-lock"></i> <strong>No open cashier shift.</strong> <a href="/hospital_system/cashier/shifts.php" class="btn btn-sm btn-warning ml-2">Open Cashier Shift</a></div>
         <?php else: ?>
             <div class="alert alert-success mb-4"><i class="fas fa-unlock"></i> Shift #<?= (int)$openShift['id'] ?> is open. Cash collected: <strong>KSH <?= number_format($shiftTotals['cash'],2) ?></strong> · M-Pesa: <strong>KSH <?= number_format($shiftTotals['mpesa'],2) ?></strong> <a href="/hospital_system/cashier/shifts.php" class="btn btn-sm btn-outline-success ml-2">Manage Shift</a></div>
         <?php endif; ?><div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-cash-register"></i> Central Cashier</h2>
-                <p class="text-muted mb-0">Today's collection queue for the current operational day.</p>
+                
             </div>
             <div>
                 <a href="/hospital_system/cashier/payment_history.php" class="btn btn-outline-primary mr-2">
