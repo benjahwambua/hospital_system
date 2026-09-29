@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                 // A PO is a commitment, not an accounting expense.
                 // Inventory/AP are recognized only when goods are actually received through GRN.
                 $conn->commit();
-                header('Location: purchase_orders.php?view_id=' . $po_id);
+                header('Location: view_po.php?id=' . $po_id);
                 exit;
             } catch (Throwable $e) {
                 $conn->rollback();
