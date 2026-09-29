@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
         if ($service_id <= 0) $walkin_error = 'Please select a laboratory test.';
 
         if ($walkin_error === '') {
-            $serviceStmt = $conn->prepare("SELECT id, service_name, price FROM services_master WHERE id = ? AND active = 1 AND category = 'lab' LIMIT 1");
+            $serviceStmt = $conn->prepare("SELECT id, service_name FROM services_master WHERE id = ? AND active = 1 AND category = 'lab' LIMIT 1");
             if (!$serviceStmt) {
                 $walkin_error = 'Unable to load laboratory service: ' . $conn->error;
             } else {
@@ -48,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                 if (!$labService) {
                     $walkin_error = 'Selected laboratory service is invalid.';
                 } else {
-                    $price = (float)$labService['price'];
+                    $resolved = get_service_price($conn, $service_id, null, null);
+                    $price = (float)$resolved['price'];
                     $conn->begin_transaction();
                     try {
                         // Create a separate walk-in patient for each laboratory visit so the
@@ -129,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 $created = isset($_GET['created']);
-$walkin_lab_services = $conn->query("SELECT id, service_name, price FROM services_master WHERE active = 1 AND category = 'lab' ORDER BY service_name ASC");
+$walkin_lab_services = $conn->query("SELECT id, service_name FROM services_master WHERE active = 1 AND category = 'lab' ORDER BY service_name ASC");
 ?>
 
 <style>
