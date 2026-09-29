@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                     try {
                         // Create a separate walk-in patient for each laboratory visit so the
                         // patient's name, phone, test, invoice and payment remain traceable.
-                        $walkinPatientNumber = 'W-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+                        $walkinPatientNumber = 'TEMP-WLK-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
                         $walkinName = $name !== '' ? $name : 'Walk-in Patient';
                         $walkinGender = '';
                         $walkinFlag = 1;
@@ -70,6 +70,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                         }
                         $walkinPatientId = (int)$walkinPatientStmt->insert_id;
                         $walkinPatientStmt->close();
+
+                        // Walk-in patient numbers use the short WLK format, e.g. WLK0011.
+                        $walkinPatientNumber = 'WLK' . str_pad((string)$walkinPatientId, 4, '0', STR_PAD_LEFT);
+                        $walkinNumberStmt = $conn->prepare('UPDATE patients SET patient_number = ? WHERE id = ?');
+                        if (!$walkinNumberStmt) throw new Exception('Unable to assign walk-in patient number: ' . $conn->error);
+                        $walkinNumberStmt->bind_param('si', $walkinPatientNumber, $walkinPatientId);
+                        if (!$walkinNumberStmt->execute()) throw new Exception('Unable to assign walk-in patient number: ' . $walkinNumberStmt->error);
+                        $walkinNumberStmt->close();
 
                         // Put the walk-in laboratory request under the same Visit/Encounter.
                         $visitId = get_or_create_current_visit($conn, $walkinPatientId, 'Walk-in', 'Laboratory');
