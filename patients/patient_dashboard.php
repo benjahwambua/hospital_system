@@ -306,7 +306,9 @@ if ($patient_id <= 0) {
             $serviceStmt->close();
 
             if(!$service) throw new Exception('Selected service is not active or does not exist.');
-            $price = !empty($_SESSION['is_super']) ? $postedPrice : (float)$service['price'];
+            $resolved = get_service_price($conn, $service_id, null, null);
+            $price = (float)$resolved['price'];
+            $service['service_name'] = $resolved['service_name'];
             if($price < 0) throw new Exception('Invalid service price.');
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category'] ?: 'General', (int)($patient['doctor_id'] ?? 0));
@@ -513,9 +515,9 @@ if ($patient_id <= 0) {
         $encounter = $encounterRes->fetch_assoc();
     }
 
-    $all_services = $conn->query("SELECT id, category, service_name, price, active FROM services_master WHERE active = 1 ORDER BY category, service_name");
+    $all_services = $conn->query("SELECT id, category, service_name, active FROM services_master WHERE active = 1 ORDER BY category, service_name");
     if (!$all_services) {
-        $all_services = $conn->query("SELECT id, category, service_name, price, active FROM services_master ORDER BY category, service_name");
+        $all_services = $conn->query("SELECT id, category, service_name, active FROM services_master ORDER BY category, service_name");
     }
 
     $patient_services = ($activeVisitId > 0 && $hasVisitServices)
