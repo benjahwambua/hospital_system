@@ -591,7 +591,7 @@ function record_manual_mpesa_transaction($conn, int $invoice_id, int $patient_id
     $amount = round($amount, 2);
     $phone = trim($phone);
     $receipt = strtoupper(trim($receipt));
-    if ($invoice_id <= 0 || $patient_id <= 0 || $amount <= 0) {
+    if ($invoice_id <= 0 || $amount <= 0) {
         throw new Exception('Invalid M-Pesa transaction details.');
     }
     // Receipt and phone are optional for manual record keeping. Check for
