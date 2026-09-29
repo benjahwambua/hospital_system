@@ -51,16 +51,13 @@ SET category = 'procedure'
 WHERE LOWER(category) IN ('procedures', 'procedure');
 
 UPDATE services_master
-SET category = 'laboratory'
-WHERE LOWER(category) = 'lab';
-
 UPDATE services_master
 SET category = 'radiology'
 WHERE LOWER(category) = 'radiology';
 
 UPDATE services_master
 SET department = CASE
-    WHEN category = 'laboratory' THEN 'Laboratory'
+    WHEN category = 'lab' THEN 'Laboratory'
     WHEN category = 'radiology' THEN 'Radiology'
     WHEN category = 'procedure' THEN 'Clinical'
     WHEN category = 'treatment' THEN 'Clinical'
