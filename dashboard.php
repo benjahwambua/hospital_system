@@ -3,229 +3,94 @@ require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/config/config.php';
 require_login();
 
+$currentUserId=(int)($_SESSION['user_id']??0);
+$isSuper=false;
+if($currentUserId>0){
+    $s=$conn->prepare("SELECT is_super FROM users WHERE id=? LIMIT 1");
+    if($s){$s->bind_param('i',$currentUserId);$s->execute();$isSuper=(bool)($s->get_result()->fetch_assoc()['is_super']??0);$s->close();}
+}
+function dash_count(mysqli $c,string $sql):int{$q=$c->query($sql);return $q?(int)($q->fetch_assoc()['total']??0):0;}
+function dash_amount(mysqli $c,string $sql):float{$q=$c->query($sql);return $q?(float)($q->fetch_assoc()['total']??0):0.0;}
+
+$patients=dash_count($conn,"SELECT COUNT(*) total FROM patients");
+$todayVisits=dash_count($conn,"SELECT COUNT(*) total FROM visits WHERE visit_date=CURDATE() AND status<>'Cancelled'");
+$appointments=dash_count($conn,"SELECT COUNT(*) total FROM appointments WHERE DATE(appointment_date)=CURDATE() AND COALESCE(status,'') NOT IN ('Cancelled','Closed','Completed')");
+$labPending=dash_count($conn,"SELECT COUNT(*) total FROM patient_services WHERE category='lab' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
+$radPending=dash_count($conn,"SELECT COUNT(*) total FROM patient_services WHERE category='radiology' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
+$rxPending=dash_count($conn,"SELECT COUNT(*) total FROM pharmacy_queue WHERE status='pending'");
+$admitted=dash_count($conn,"SELECT COUNT(*) total FROM admissions WHERE status='Admitted'");
+$lowStock=dash_count($conn,"SELECT COUNT(*) total FROM pharmacy_stock WHERE quantity<15");
+$revenue=$isSuper?dash_amount($conn,"SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) total FROM payments p WHERE DATE(p.created_at)=CURDATE()"):0;
+
+$chartLabels=[];$chartData=[];
+if($isSuper){
+    $q=$conn->query("SELECT DATE_FORMAT(DATE(created_at),'%d %b') day, SUM(amount) total FROM payments WHERE created_at>=DATE_SUB(CURDATE(),INTERVAL 6 DAY) GROUP BY DATE(created_at) ORDER BY DATE(created_at)");
+    if($q)while($r=$q->fetch_assoc()){ $chartLabels[]=$r['day'];$chartData[]=(float)$r['total']; }
+}
+$serviceLabels=[];$serviceData=[];
+$q=$conn->query("SELECT COALESCE(category,'Other') category,COUNT(*) total FROM patient_services GROUP BY category ORDER BY total DESC LIMIT 6");
+if($q)while($r=$q->fetch_assoc()){ $serviceLabels[]=$r['category'];$serviceData[]=(int)$r['total']; }
+
+$lowItems=$conn->query("SELECT drug_name,quantity FROM pharmacy_stock WHERE quantity<15 ORDER BY quantity ASC LIMIT 5");
+
 include __DIR__ . '/includes/header.php';
 include __DIR__ . '/includes/sidebar.php';
-
-$currentUserId = (int)($_SESSION['user_id'] ?? 0);
-$isSuper = 0;
-if ($currentUserId > 0) {
-    $userStmt = $conn->prepare("SELECT is_super FROM users WHERE id = ? LIMIT 1");
-    $userStmt->bind_param('i', $currentUserId);
-    $userStmt->execute();
-    $isSuper = (int)($userStmt->get_result()->fetch_assoc()['is_super'] ?? 0);
-    $userStmt->close();
-}
-
-$stats = [
-    'patients' => $conn->query("SELECT COUNT(*) AS c FROM patients")->fetch_assoc()['c'] ?? 0,
-    'appointments' => $conn->query("SELECT COUNT(*) AS c FROM encounters WHERE DATE(created_at)=CURDATE()")->fetch_assoc()['c'] ?? 0,
-    'lab' => $conn->query("SELECT COUNT(*) AS c FROM lab_requests WHERE status='pending'")->fetch_assoc()['c'] ?? 0,
-    'revenue' => $isSuper ? ($conn->query("SELECT COALESCE(SUM(p.amount),0) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) AS c FROM payments p WHERE DATE(p.created_at)=CURDATE()")->fetch_assoc()['c'] ?? 0) : 0,
-    'pharmacy_val' => $isSuper ? ($conn->query("SELECT COALESCE(SUM(quantity * selling_price),0) AS c FROM pharmacy_stock")->fetch_assoc()['c'] ?? 0) : 0,
-    'stock_units' => $conn->query("SELECT COALESCE(SUM(quantity),0) AS c FROM pharmacy_stock")->fetch_assoc()['c'] ?? 0,
-];
-
-$chart_labels = [];
-$chart_data = [];
-if ($isSuper) {
-    $revenueQuery = $conn->query("SELECT DATE_FORMAT(p.created_at, '%D %b') as day, SUM(p.amount) - COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=DATE(p.created_at) AND r.status='Approved'),0) as total FROM payments p WHERE p.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY DATE(p.created_at) ORDER BY DATE(p.created_at) ASC");
-    while($row = $revenueQuery->fetch_assoc()) {
-        $chart_labels[] = $row['day'];
-        $chart_data[] = (float)$row['total'];
-    }
-}
-
-$low_stock = $conn->query("SELECT drug_name, quantity FROM pharmacy_stock WHERE quantity < 15 ORDER BY quantity ASC LIMIT 6");
-$svc_breakdown = $conn->query("SELECT sm.category, COUNT(*) as count FROM services_master sm JOIN patient_services ps ON sm.id = ps.service_id GROUP BY sm.category");
-$pie_labels = [];
-$pie_data = [];
-while($row = $svc_breakdown->fetch_assoc()){
-    $pie_labels[] = $row['category'];
-    $pie_data[] = (int)$row['count'];
-}
 ?>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
-    :root {
-        --glass-blue: rgba(78, 115, 223, 0.05);
-        --heavy-blue: #2e59d9;
-        --success-green: #1cc88a;
-    }
-    .main-content { background: #f8f9fc; padding: 30px; min-height: 100vh; }
-    .stat-card {
-        background: #fff; border-radius: 15px; padding: 25px;
-        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
-        border-left: 4px solid var(--heavy-blue);
-        transition: all 0.3s ease; position: relative; overflow: hidden; height: 100%;
-    }
-    .stat-card:hover { transform: scale(1.02); }
-    .stat-card i { position: absolute; right: 10px; bottom: -10px; font-size: 4rem; opacity: 0.05; }
-    .grid-main { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-top: 25px; }
-    .analytics-card { background: #fff; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .action-tile {
-        background: #fff; border: 1px solid #e3e6f0; border-radius: 12px;
-        padding: 20px; text-align: center; color: #4e73df; font-weight: 700;
-        text-decoration: none; transition: 0.3s;
-    }
-    .action-tile:hover { background: #4e73df; color: #fff; box-shadow: 0 8px 15px rgba(78,115,223,0.2); }
-    .action-tile i { font-size: 1.8rem; display: block; margin-bottom: 10px; }
-    .pulse-red { color: #e74a3b; animation: pulse-red 2s infinite; font-weight: bold; }
-    .restricted-note { background:#fff3cd; color:#856404; border-left:4px solid #f6c23e; border-radius:8px; padding:12px 16px; }
-    @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-    @media (max-width: 992px) {
-        .grid-main { grid-template-columns: 1fr; }
-    }
+.exec-page{padding:24px 24px 44px;background:#f4f7fb;min-height:calc(100vh - 60px)}.exec-shell{max-width:1550px;margin:0 auto}
+.exec-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b3d91 0%,#1261c9 55%,#13a8b8 100%);border-radius:22px;padding:34px 36px;color:#fff;box-shadow:0 16px 38px rgba(16,77,153,.22);margin-bottom:20px}.exec-hero:before,.exec-hero:after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.08)}.exec-hero:before{width:240px;height:240px;right:-70px;top:-100px}.exec-hero:after{width:160px;height:160px;right:130px;bottom:-100px}.exec-hero-inner{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-end;gap:25px}.exec-kicker{text-transform:uppercase;letter-spacing:2px;font-size:11px;font-weight:800;color:#bfe8ff}.exec-hero h1{font-size:32px;line-height:1.15;margin:7px 0 8px;font-weight:800}.exec-hero p{margin:0;color:rgba(255,255,255,.82);font-size:14px}.exec-time{text-align:right;font-size:12px;color:rgba(255,255,255,.75)}.exec-time strong{display:block;color:#fff;font-size:16px;margin-bottom:3px}
+.exec-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.exec-card{background:#fff;border:1px solid #e7ebf2;border-radius:15px;padding:19px;box-shadow:0 4px 15px rgba(31,45,61,.045);text-decoration:none;display:block;transition:.18s}.exec-card:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(31,45,61,.09);text-decoration:none}.exec-card-top{display:flex;justify-content:space-between;align-items:center}.exec-card small{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#7b8798;font-weight:800}.exec-icon{width:39px;height:39px;border-radius:11px;background:#edf4ff;color:#1261c9;display:flex;align-items:center;justify-content:center}.exec-value{font-size:28px;font-weight:800;color:#24344d;margin-top:11px}.exec-sub{font-size:11px;color:#98a2b3;margin-top:2px}
+.exec-grid{display:grid;grid-template-columns:1.65fr 1fr;gap:18px}.exec-panel{background:#fff;border:1px solid #e7ebf2;border-radius:16px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}.exec-head{padding:17px 20px;border-bottom:1px solid #edf0f5;display:flex;justify-content:space-between;align-items:center}.exec-head strong{color:#25324a;font-size:15px}.exec-head small{color:#98a2b3}.exec-body{padding:20px}
+.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.quick{border:1px solid #e7ebf2;border-radius:12px;padding:15px;text-decoration:none;color:#344054;background:#fbfcfe;display:flex;align-items:center;gap:12px}.quick:hover{background:#f3f8ff;text-decoration:none}.quick i{width:34px;height:34px;border-radius:9px;background:#edf4ff;color:#1261c9;display:flex;align-items:center;justify-content:center}.quick strong{font-size:13px}.quick span{display:block;font-size:10px;color:#98a2b3;margin-top:2px}
+.alert-list{display:grid;gap:9px}.alert-row{display:flex;justify-content:space-between;align-items:center;padding:12px 13px;border:1px solid #edf0f5;border-radius:10px}.alert-row .label{font-size:12px;color:#667085}.alert-row strong{font-size:16px;color:#25324a}.alert-row.danger{border-color:#f7d7d4;background:#fff9f8}.alert-row.danger strong{color:#d64545}
+.bottom-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:18px;margin-top:18px}.stock-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf0f5}.stock-row:last-child{border-bottom:0}.stock-name{font-size:12px;font-weight:700;color:#344054}.stock-qty{font-size:11px;font-weight:800;color:#d64545;background:#fff0ef;padding:4px 8px;border-radius:20px}.empty-state{padding:18px;text-align:center;color:#98a2b3;font-size:13px}
+.restricted{background:#fff8e6;border:1px solid #ffe3a3;color:#805d00;border-radius:10px;padding:12px 14px;font-size:12px}
+@media(max-width:1100px){.exec-grid,.bottom-grid{grid-template-columns:1fr}.exec-metrics{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.exec-page{padding:18px 12px}.exec-hero{padding:25px 22px}.exec-hero-inner{align-items:flex-start;flex-direction:column}.exec-time{text-align:left}.exec-metrics{grid-template-columns:1fr 1fr}.quick-grid{grid-template-columns:1fr}}@media(max-width:450px){.exec-metrics{grid-template-columns:1fr}}
 </style>
 
-<div class="main-content">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="font-weight-bold text-gray-800"><i class="fas fa-chart-line mr-2 text-primary"></i>Executive Overview</h2>
-            <p class="text-muted">Hospital Performance & Resource Tracking</p>
-        </div>
-        <div class="text-right">
-             <button onclick="window.location.reload()" class="btn btn-primary shadow-sm btn-sm px-4">
-                 <i class="fas fa-sync-alt fa-sm text-white-50"></i> Refresh Data
-             </button>
-        </div>
-    </div>
+<div class="exec-page"><div class="exec-shell">
+  <section class="exec-hero"><div class="exec-hero-inner"><div><div class="exec-kicker">Emaqure Medical Centre</div><h1>Hospital Command Centre</h1><p>A clear view of today's patient flow, clinical work and hospital operations.</p></div><div class="exec-time"><strong><?= date('l, d M Y') ?></strong><?= date('H:i') ?> EAT</div></div></section>
 
-    <?php if(!$isSuper): ?>
-        <div class="restricted-note mb-4 small">
-            <i class="fas fa-lock mr-2"></i>Finance cards, finance reports, and revenue analytics are restricted to Super Users only.
-        </div>
-    <?php endif; ?>
+  <section class="exec-metrics">
+    <a class="exec-card" href="patients/patient_list.php"><div class="exec-card-top"><small>Total Patients</small><span class="exec-icon"><i class="fas fa-users"></i></span></div><div class="exec-value"><?= number_format($patients) ?></div><div class="exec-sub">Registered patients</div></a>
+    <a class="exec-card" href="patients/appointments.php"><div class="exec-card-top"><small>Today's Visits</small><span class="exec-icon"><i class="fas fa-user-md"></i></span></div><div class="exec-value"><?= number_format($todayVisits) ?></div><div class="exec-sub"><?= $appointments ?> appointments still open</div></a>
+    <a class="exec-card" href="clinical/index.php"><div class="exec-card-top"><small>Admitted</small><span class="exec-icon"><i class="fas fa-bed"></i></span></div><div class="exec-value"><?= number_format($admitted) ?></div><div class="exec-sub">Current admissions</div></a>
+    <a class="exec-card" href="lab/lab_results.php"><div class="exec-card-top"><small>Diagnostic Queue</small><span class="exec-icon"><i class="fas fa-vials"></i></span></div><div class="exec-value"><?= number_format($labPending+$radPending) ?></div><div class="exec-sub"><?= $labPending ?> lab · <?= $radPending ?> radiology</div></a>
+  </section>
 
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="stat-card" style="border-left-color: #4e73df;">
-                <small class="text-primary font-weight-bold text-uppercase">Total Patients</small>
-                <div class="h3 font-weight-bold mt-1"><?= number_format((int)$stats['patients']) ?></div>
-                <i class="fas fa-user-injured"></i>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="stat-card" style="border-left-color: #1cc88a;">
-                <small class="text-success font-weight-bold text-uppercase"><?= $isSuper ? 'Daily Revenue' : 'Today\'s Encounters' ?></small>
-                <div class="h3 font-weight-bold mt-1"><?= $isSuper ? 'KSh ' . number_format((float)$stats['revenue']) : number_format((int)$stats['appointments']) ?></div>
-                <i class="<?= $isSuper ? 'fas fa-coins' : 'fas fa-stethoscope' ?>"></i>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="stat-card" style="border-left-color: #f6c23e;">
-                <small class="text-warning font-weight-bold text-uppercase"><?= $isSuper ? 'Inventory Value' : 'Stock Units' ?></small>
-                <div class="h3 font-weight-bold mt-1"><?= $isSuper ? 'KSh ' . number_format((float)$stats['pharmacy_val']) : number_format((int)$stats['stock_units']) ?></div>
-                <i class="fas fa-pills"></i>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="stat-card" style="border-left-color: #e74a3b;">
-                <small class="text-danger font-weight-bold text-uppercase">Lab Orders</small>
-                <div class="h3 font-weight-bold mt-1"><?= (int)$stats['lab'] ?> <small style="font-size:12px">Pending</small></div>
-                <i class="fas fa-vial"></i>
-            </div>
-        </div>
-    </div>
+  <section class="exec-grid">
+    <div class="exec-panel"><div class="exec-head"><strong>Quick Access</strong><small>Common hospital actions</small></div><div class="exec-body"><div class="quick-grid">
+      <a class="quick" href="patients/reception_register.php"><i class="fas fa-user-plus"></i><div><strong>Register Patient</strong><span>Front Desk</span></div></a>
+      <a class="quick" href="patients/appointments.php"><i class="fas fa-calendar-check"></i><div><strong>Appointments</strong><span>Today's schedule</span></div></a>
+      <a class="quick" href="clinical/index.php"><i class="fas fa-stethoscope"></i><div><strong>Clinical</strong><span>Patient care</span></div></a>
+      <a class="quick" href="lab/dashboard.php"><i class="fas fa-microscope"></i><div><strong>Laboratory</strong><span>Requests & results</span></div></a>
+      <a class="quick" href="pharmacy/dashboard.php"><i class="fas fa-pills"></i><div><strong>Pharmacy</strong><span>Dispensing & stock</span></div></a>
+      <a class="quick" href="cashier/index.php"><i class="fas fa-cash-register"></i><div><strong>Cashier</strong><span>Patient collections</span></div></a>
+    </div></div></div>
+    <div class="exec-panel"><div class="exec-head"><strong>Operational Pulse</strong><small>Live queue counts</small></div><div class="exec-body"><div class="alert-list">
+      <a href="lab/lab_results.php" class="alert-row text-decoration-none"><span class="label">Pending laboratory</span><strong><?= $labPending ?></strong></a>
+      <a href="radiology/radiology_results.php" class="alert-row text-decoration-none"><span class="label">Pending radiology</span><strong><?= $radPending ?></strong></a>
+      <a href="pharmacy/dispensing_queue.php" class="alert-row text-decoration-none"><span class="label">Pending pharmacy</span><strong><?= $rxPending ?></strong></a>
+      <a href="pharmacy/view_stock.php" class="alert-row danger text-decoration-none"><span class="label">Low pharmacy stock</span><strong><?= $lowStock ?></strong></a>
+    </div></div></div>
+  </section>
 
-    <div class="grid-main">
-        <div class="analytics-card">
-            <?php if($isSuper): ?>
-                <h6 class="font-weight-bold text-primary mb-4"><i class="fas fa-wave-square mr-2"></i>7-Day Financial Performance</h6>
-                <div style="height: 300px;">
-                    <canvas id="revenueChart"></canvas>
-                </div>
-            <?php else: ?>
-                <h6 class="font-weight-bold text-primary mb-4"><i class="fas fa-shield-alt mr-2"></i>Restricted Analytics</h6>
-                <div class="restricted-note">
-                    Revenue and finance analytics are hidden for non-Super Users. Use the operational cards and command tiles below for day-to-day workflow.
-                </div>
-            <?php endif; ?>
-        </div>
+  <section class="bottom-grid">
+    <div class="exec-panel"><div class="exec-head"><strong>Low Stock Watch</strong><a href="pharmacy/view_stock.php" class="small">View stock</a></div><div class="exec-body">
+      <?php if($lowItems && $lowItems->num_rows): while($item=$lowItems->fetch_assoc()): ?><div class="stock-row"><span class="stock-name"><?= htmlspecialchars($item['drug_name']) ?></span><span class="stock-qty"><?= (int)$item['quantity'] ?> left</span></div><?php endwhile; else: ?><div class="empty-state">No low-stock medicines.</div><?php endif; ?>
+    </div></div>
+    <div class="exec-panel"><div class="exec-head"><strong>Service Activity</strong><small>Current records</small></div><div class="exec-body"><canvas id="serviceChart" height="220"></canvas></div></div>
+  </section>
 
-        <div class="d-flex flex-column" style="gap:25px;">
-            <div class="analytics-card">
-                <h6 class="font-weight-bold text-dark mb-3">COMMAND TILES</h6>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <a href="patients/reception_register.php" class="action-tile"><i class="fas fa-hospital-user"></i>Reg. Patient</a>
-                    <a href="pharmacy/sell_medicine.php" class="action-tile"><i class="fas fa-prescription"></i>Dispense</a>
-                    <?php if($isSuper): ?>
-                        <a href="reports/sales_report.php" class="action-tile"><i class="fas fa-file-invoice-dollar"></i>Finance</a>
-                    <?php endif; ?>
-                    <a href="lab/lab_requests.php" class="action-tile"><i class="fas fa-microscope"></i>Lab Stock</a>
-                </div>
-            </div>
-
-            <div class="analytics-card" style="border-top: 3px solid #e74a3b;">
-                <h6 class="font-weight-bold text-danger mb-3"><i class="fas fa-exclamation-circle mr-2"></i>CRITICAL STOCK</h6>
-                <?php while($item = $low_stock->fetch_assoc()): ?>
-                <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded" style="background: #fff5f5;">
-                    <span class="small font-weight-bold text-dark"><?= htmlspecialchars($item['drug_name']) ?></span>
-                    <span class="pulse-red"><?= (int)$item['quantity'] ?> Left</span>
-                </div>
-                <?php endwhile; ?>
-                <button class="btn btn-sm btn-outline-danger btn-block mt-3">Refill Inventory</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-4">
-        <div class="col-md-4">
-             <div class="analytics-card">
-                <h6 class="font-weight-bold text-primary mb-3">Service Distribution</h6>
-                <canvas id="servicePie"></canvas>
-             </div>
-        </div>
-        <div class="col-md-8">
-             <div class="analytics-card">
-                 <h6 class="font-weight-bold text-primary mb-3">Today's System Logs</h6>
-                 <div class="alert alert-info py-2 small">
-                     <i class="fas fa-info-circle mr-2"></i> Database Connected: <strong>Healthy</strong> | Backup Status: <strong>Synced</strong>
-                 </div>
-                 <div class="alert alert-light border py-2 small">
-                     <i class="fas fa-clock mr-2"></i> Server Local Time: <?= date('H:i:s') ?>
-                 </div>
-             </div>
-        </div>
-    </div>
-</div>
+  <?php if($isSuper): ?>
+  <section class="exec-panel mt-3"><div class="exec-head"><strong>Financial Overview</strong><small>Super User</small></div><div class="exec-body"><div class="row align-items-center"><div class="col-md-4"><div class="text-muted small text-uppercase font-weight-bold">Today's Net Collections</div><div style="font-size:30px;font-weight:800;color:#24344d">KES <?= number_format($revenue,2) ?></div><a href="accounting/dashboard.php" class="btn btn-sm btn-outline-primary mt-2">Finance Dashboard</a></div><div class="col-md-8"><canvas id="revenueChart" height="120"></canvas></div></div></div></section>
+  <?php else: ?><div class="restricted mt-3"><i class="fas fa-shield-alt mr-1"></i> Financial analytics are available to Super Users.</div><?php endif; ?>
+</div></div>
 
 <script>
-<?php if($isSuper): ?>
-const ctx = document.getElementById('revenueChart').getContext('2d');
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: <?= json_encode($chart_labels) ?>,
-        datasets: [{
-            label: 'Revenue (KSh)',
-            data: <?= json_encode($chart_data) ?>,
-            borderColor: '#4e73df',
-            backgroundColor: 'rgba(78, 115, 223, 0.1)',
-            fill: true,
-            tension: 0.4,
-            borderWidth: 3,
-            pointRadius: 5,
-            pointBackgroundColor: '#4e73df'
-        }]
-    },
-    options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
-});
-<?php endif; ?>
-
-const pCtx = document.getElementById('servicePie').getContext('2d');
-new Chart(pCtx, {
-    type: 'doughnut',
-    data: {
-        labels: <?= json_encode($pie_labels) ?>,
-        datasets: [{
-            data: <?= json_encode($pie_data) ?>,
-            backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b']
-        }]
-    },
-    options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
-});
+const serviceCtx=document.getElementById('serviceChart');
+if(serviceCtx){new Chart(serviceCtx,{type:'doughnut',data:{labels:<?= json_encode($serviceLabels) ?>,datasets:[{data:<?= json_encode($serviceData) ?>,backgroundColor:['#1261c9','#13a8b8','#5b35d5','#0ca678','#d97706','#64748b'],borderWidth:0}]},options:{cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:14,font:{size:11}}}}}});}
+<?php if($isSuper): ?>const revCtx=document.getElementById('revenueChart');if(revCtx){new Chart(revCtx,{type:'line',data:{labels:<?= json_encode($chartLabels) ?>,datasets:[{label:'Collections',data:<?= json_encode($chartData) ?>,borderColor:'#1261c9',backgroundColor:'rgba(18,97,201,.08)',fill:true,tension:.35,borderWidth:2,pointRadius:3}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});}<?php endif; ?>
 </script>
-
-<?php include "includes/footer.php"; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>
