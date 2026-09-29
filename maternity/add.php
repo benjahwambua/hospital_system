@@ -194,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
                     }
                 }
-                $success='Clinical records saved and all charges posted to the central cashier invoice.';
+                $success='Clinical records saved and all charges posted to the invoice.';
             } else {
                 $success='Clinical records saved successfully (No billing created).';
             }
