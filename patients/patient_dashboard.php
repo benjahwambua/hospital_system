@@ -289,7 +289,6 @@ if ($patient_id <= 0) {
             }
         }
 
-        $conn->commit();
         header("Location: patient_dashboard.php?id=$patient_id&tab=prescriptions&success=1");
         exit;
     }
@@ -310,7 +309,6 @@ if ($patient_id <= 0) {
             $price = !empty($_SESSION['is_super']) ? $postedPrice : (float)$service['price'];
             if($price < 0) throw new Exception('Invalid service price.');
 
-            $conn->begin_transaction();
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category'] ?: 'General', (int)($patient['doctor_id'] ?? 0));
             if ($hasVisitServices && $visitId > 0) {
                 $stmt=$conn->prepare("INSERT INTO patient_services (patient_id, service_id, category, price, visit_id, created_at, status) VALUES (?, ?, ?, ?, ?, NOW(), 'Completed')");
@@ -330,7 +328,6 @@ if ($patient_id <= 0) {
             $itemId=add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
             post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Service order',$itemId);
 
-            $conn->commit();
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
             exit;
         }
@@ -357,7 +354,6 @@ if ($patient_id <= 0) {
             if(!$labService) throw new Exception('Selected laboratory service is invalid.');
             $price = (float)($labService['price'] ?? 0);
 
-            $conn->begin_transaction();
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Laboratory', (int)($patient['doctor_id'] ?? 0));
             if ($hasVisitServices && $visitId > 0) {
                 $stmt=$conn->prepare("INSERT INTO patient_services (patient_id,service_id,category,price,doctor_notes,visit_id,created_at,status) VALUES (?, ?, 'lab', ?, ?, ?, NOW(), 'Pending')");
@@ -377,7 +373,6 @@ if ($patient_id <= 0) {
             $itemId=add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
             post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Laboratory order',$itemId);
 
-            $conn->commit();
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&lab_success=1");
             exit;
         }
