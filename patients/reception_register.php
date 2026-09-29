@@ -331,50 +331,16 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 <style>
-* { box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-.main-container { padding: 30px 20px; min-height: calc(100vh - 60px); width: 100%; }
-.page-wrapper { max-width: 1200px; margin: 0 auto; }
-.form-card { background: #fff; border-radius: 14px; box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18); overflow: hidden; }
-.form-header { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 30px; color: white; }
-.form-header h2 { margin-bottom: 8px; }
-.form-body { padding: 36px; }
-.alert { padding: 15px 18px; margin-bottom: 18px; border-radius: 8px; border-left: 4px solid; font-size: 14px; }
-.alert-danger { background: #fef2f2; color: #991b1b; border-color: #ef4444; }
-.alert-info { background: #eff6ff; color: #1d4ed8; border-color: #3b82f6; }
-.form-section { margin-bottom: 35px; padding-bottom: 25px; border-bottom: 2px solid #f0f0f0; }
-.section-title { font-size: 18px; font-weight: 700; color: #007bff; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; }
-.section-title::before { content: ''; display: inline-block; width: 4px; height: 20px; background: #007bff; border-radius: 2px; margin-right: 12px; }
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 15px; }
-.label-required::after { content: ' *'; color: #dc2626; }
-.label-optional::after { content: ' (optional)'; color: #9ca3af; font-weight: 400; }
-.form-control { width: 100%; padding: 14px 15px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 15px; transition: all 0.2s ease; }
-.form-control:focus { outline: none; border-color: #2563eb; background-color: #f8fbff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.button-group { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn { padding: 14px 28px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; display: inline-block; text-decoration: none; text-align: center; }
-.btn-primary { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; }
-.btn-cancel { background: #6b7280; color: white; }
-.mode-selector { background: #f0f4f8; padding: 20px; border-radius: 10px; margin-bottom: 30px; display: flex; gap: 40px; border: 1px solid #d1d9e6; flex-wrap: wrap; }
-.mode-option { display: flex; align-items: center; cursor: pointer; font-weight: 700; font-size: 16px; color: #0056b3; }
-.mode-option input { width: 18px; height: 18px; margin-right: 12px; }
-.fee-badge { font-size: 12px; padding: 4px 10px; border-radius: 12px; margin-left: 10px; display: inline-block; }
-.badge-waived { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-.badge-standard { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-.maternity-alert { background: #fce7f3; color: #be185d; border: 1px solid #f9a8d4; font-size: 12px; padding: 7px 15px; border-radius: 20px; display: none; margin-top: 10px; font-weight: bold; }
-.walkin-info-alert { background: #e3f2fd; color: #1565c0; border-left: 4px solid #1976d2; padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
-@media (max-width: 992px) { .form-row { grid-template-columns: 1fr; } .form-body { padding: 20px; } }
+.reception-page{padding:28px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 72px)}
+.reception-shell{max-width:1280px;margin:auto}.reception-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:18px;padding:26px 28px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:20px;box-shadow:0 10px 28px rgba(6,59,115,.16)}.reception-hero h1{font-size:27px;margin:4px 0}.reception-hero p{margin:0;color:#d9edff;font-size:13px}.reception-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#9edcff}.reception-hero-icon{width:54px;height:54px;border-radius:15px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:22px}
+.registration-card{background:#fff;border:1px solid #e4eaf1;border-radius:16px;box-shadow:0 5px 20px rgba(31,45,61,.06);overflow:hidden}.registration-body{padding:28px}.mode-selector{background:#f7f9fc;padding:7px;border:1px solid #e3e8ef;border-radius:12px;margin-bottom:26px;display:flex;gap:8px;flex-wrap:wrap}.mode-option{flex:1;min-width:230px;display:flex;align-items:center;cursor:pointer;font-weight:700;font-size:14px;color:#344054;padding:13px 15px;border-radius:9px}.mode-option:hover{background:#fff}.mode-option input{width:18px;height:18px;margin-right:10px;accent-color:#075b9d}.fee-badge{font-size:10px;padding:4px 9px;border-radius:20px;margin-left:auto;text-transform:uppercase;font-weight:800}.badge-waived{background:#e7f8ef;color:#087443;border:1px solid #c9efd9}.badge-standard{background:#fff4d6;color:#8a6200;border:1px solid #f3df9b}
+.form-section{margin-bottom:26px;padding-bottom:24px;border-bottom:1px solid #edf0f5}.section-title{font-size:13px;font-weight:800;color:#344054;text-transform:uppercase;letter-spacing:.7px;margin-bottom:18px;display:flex;align-items:center}.section-title::before{content:'';display:inline-block;width:4px;height:18px;background:#075b9d;border-radius:4px;margin-right:10px}.form-group{margin-bottom:16px}.form-group label{display:block;margin-bottom:7px;font-weight:700;color:#475467;font-size:12px}.label-required::after{content:' *';color:#d92d20}.label-optional::after{content:' (optional)';color:#98a2b3;font-weight:400}.form-control{width:100%;padding:11px 13px;border:1px solid #d7dee8;border-radius:9px;font-size:14px;color:#344054;background:#fff;transition:.2s}.form-control:focus{outline:none;border-color:#2782c4;background:#fbfdff;box-shadow:0 0 0 3px rgba(7,91,157,.08)}textarea.form-control{resize:vertical}.button-group{display:flex;gap:10px;flex-wrap:wrap;padding-top:2px}.btn{padding:11px 18px;border:0;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.btn-primary{background:#075b9d;color:#fff}.btn-primary:hover{background:#064b82;color:#fff}.btn-cancel{background:#eef2f6;color:#344054}.btn-cancel:hover{background:#e2e8f0;color:#1d2939}.alert{padding:13px 16px;margin-bottom:18px;border-radius:10px;font-size:13px}.alert-danger{background:#fff1f0;color:#b42318;border:1px solid #fecdca}.walkin-info-alert{background:#eef8ff;color:#155e8a;border:1px solid #cce8f7;border-left:4px solid #2782c4;padding:11px 14px;border-radius:9px;margin-bottom:20px;font-size:12px}.maternity-alert{background:#fff0f6;color:#b4236a;border:1px solid #f7c6dc;font-size:11px;padding:6px 11px;border-radius:20px;display:none;margin-top:8px;font-weight:700}
+@media(max-width:900px){.reception-page{padding:18px 12px 32px}.registration-body{padding:20px}.form-row{grid-template-columns:1fr!important}.reception-hero{padding:22px;align-items:flex-start}.reception-hero-icon{display:none}}
 </style>
 
-<div class="main-container">
-    <div class="page-wrapper">
-        <div class="form-card">
-            <div class="form-header">
-                <h2>Reception Desk</h2>
-            </div>
-
-            <div class="form-body">
+<div class="reception-page"><div class="reception-shell">
+        <div class="reception-hero"><div><div class="reception-eyebrow">Front Desk</div><h1>Patient Registration</h1><p>Register a patient and assign the appropriate service.</p></div><div class="reception-hero-icon"><i class="fas fa-user-plus"></i></div></div>
+        <div class="registration-card"><div class="registration-body">
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
                         <strong>Please correct the following:</strong>
@@ -499,8 +465,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                 </form>
             </div>
         </div>
-    </div>
-</div>
+    </div></div>
 
 <script>
 function checkMaternity(val) {
