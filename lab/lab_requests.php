@@ -230,7 +230,7 @@ $walkin_lab_services = $conn->query("SELECT id, service_name FROM services_maste
                     <option value="">Select test...</option>
                     <?php if ($walkin_lab_services): while ($ws = $walkin_lab_services->fetch_assoc()): ?>
                         <option value="<?= (int)$ws['id'] ?>">
-                            <?= htmlspecialchars($ws['service_name']) ?> (KES <?= number_format((float)$ws['price'], 2) ?>)
+                            <?= htmlspecialchars($ws['service_name']) ?> (KES <?= number_format((float)get_service_price($conn, (int)$ws['id'])['price'], 2) ?>)
                         </option>
                     <?php endwhile; endif; ?>
                 </select>
