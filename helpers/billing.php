@@ -75,7 +75,7 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
     }
 
     $stmt->bind_param(
-        'issiiii',
+        'issiiiiii',
         $serviceId, $date, $date,
         $payerId, $planId, $payerId,
         $payerId, $planId, $payerId
@@ -176,6 +176,43 @@ function add_patient_service(
         throw new Exception('Unable to create patient service: '.$error);
     }
     $id=(int)$stmt->insert_id;
+    $stmt->close();
+    return $id;
+}
+
+function maternity_category(string $clinicCategory): bool {
+    return in_array(trim($clinicCategory), ['ANC', 'PNC', 'Maternity'], true);
+}
+
+function ensure_maternity_record($conn, int $patientId): int {
+    if ($patientId <= 0) {
+        throw new Exception('Invalid patient for maternity registration.');
+    }
+
+    $check = $conn->prepare('SELECT id FROM maternity WHERE patient_id = ? ORDER BY id DESC LIMIT 1');
+    if (!$check) {
+        throw new Exception('Unable to check maternity record: ' . $conn->error);
+    }
+    $check->bind_param('i', $patientId);
+    $check->execute();
+    $existing = $check->get_result()->fetch_assoc();
+    $check->close();
+    if ($existing) {
+        return (int)$existing['id'];
+    }
+
+    $ancNumber = 'ANC-' . date('Y') . '-' . str_pad((string)$patientId, 4, '0', STR_PAD_LEFT);
+    $stmt = $conn->prepare('INSERT INTO maternity (patient_id, anc_number, created_at) VALUES (?, ?, NOW())');
+    if (!$stmt) {
+        throw new Exception('Unable to create maternity record: ' . $conn->error);
+    }
+    $stmt->bind_param('is', $patientId, $ancNumber);
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new Exception('Unable to create maternity record: ' . $error);
+    }
+    $id = (int)$stmt->insert_id;
     $stmt->close();
     return $id;
 }
