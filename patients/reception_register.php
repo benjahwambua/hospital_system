@@ -261,33 +261,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Vitals are recorded by clinical staff in the Triage & Vitals workflow.
             // This prevents reception and triage from creating competing clinical records.
 
-            // Create maternity record if applicable
-            if (in_array($clinicalType, ['Maternity', 'ANC', 'PNC'], true)) {
-                $checkMaternity = $conn->prepare('SELECT id FROM maternity WHERE patient_id = ? LIMIT 1');
-                
-                if ($checkMaternity) {
-                    $checkMaternity->bind_param('i', $patientId);
-                    $checkMaternity->execute();
-                    $existingMaternity = $checkMaternity->get_result()->fetch_assoc();
-                    $checkMaternity->close();
-
-                    if (!$existingMaternity) {
-                        $ancNumber = 'ANC-' . date('Y') . '-' . str_pad($patientId, 4, '0', STR_PAD_LEFT);
-                        $maternityStmt = $conn->prepare(
-                            'INSERT INTO maternity (patient_id, anc_number, created_at)
-                             VALUES (?, ?, NOW())'
-                        );
-                        
-                        if ($maternityStmt) {
-                            $maternityStmt->bind_param('is', $patientId, $ancNumber);
-                            if (!$maternityStmt->execute()) {
-                                throw new Exception("Maternity insert failed: " . $maternityStmt->error);
-                            }
-                            $maternityStmt->close();
-                        }
-                    }
-                }
-
+            // Clinical Department / Service is the routing source for the encounter.
+            // ANC, PNC and Maternity are maternal-care registrations and MUST have a
+            // corresponding maternity record before registration can commit. This keeps
+            // Reception, Visits and the Maternity module tied to the same patient.
+            if (maternity_category($clinicalType)) {
+                ensure_maternity_record($conn, $patientId);
                 $encounterType = 'maternity';
             } else {
                 $encounterType = 'general';
