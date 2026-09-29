@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_once __DIR__ . '/../includes/permissions.php';
 require_module_access($conn, 'pharmacy', 'view');
 
 if (empty($_SESSION['csrf_token'])) {
@@ -11,6 +12,7 @@ $csrfToken = $_SESSION['csrf_token'];
 $successMessage = $_SESSION['success'] ?? null;
 unset($_SESSION['success']);
 $errorMessage = null;
+$queryError = null;
 
 /* Excel export must happen before page output. */
 if (isset($_GET['export']) && $_GET['export'] === 'excel') {
@@ -113,9 +115,14 @@ if ($stmt && $types !== '') {
     call_user_func_array([$stmt, 'bind_param'], $bind);
 }
 if ($stmt) {
-    $stmt->execute();
-    $result = $stmt->get_result();
+    if (!$stmt->execute()) {
+        $queryError = $stmt->error ?: 'Unable to load pharmacy stock.';
+        $result = false;
+    } else {
+        $result = $stmt->get_result();
+    }
 } else {
+    $queryError = $conn->error ?: 'Unable to prepare the pharmacy stock query.';
     $result = false;
 }
 
@@ -225,6 +232,7 @@ foreach ($rows as $row) {
 
     <?php if ($successMessage): ?><div class="alert alert-success"><i class="fas fa-circle-check mr-1"></i><?= htmlspecialchars($successMessage) ?></div><?php endif; ?>
     <?php if ($errorMessage): ?><div class="alert alert-danger"><i class="fas fa-triangle-exclamation mr-1"></i><?= htmlspecialchars($errorMessage) ?></div><?php endif; ?>
+    <?php if ($queryError): ?><div class="alert alert-danger"><strong>Stock could not be loaded.</strong><div class="small mt-1"><?= htmlspecialchars($queryError) ?></div></div><?php endif; ?>
 
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-3"><div class="card h-100"><div class="stock-stat d-flex justify-content-between"><div><div class="label">Stock Items</div><div class="value"><?= number_format($totalItems) ?></div><div class="hint">Items in inventory</div></div><div class="stock-icon"><i class="fas fa-boxes-stacked"></i></div></div></div></div>
