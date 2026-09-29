@@ -1363,7 +1363,7 @@ function clearForm() {
                         Payments are collected centrally by the Cashier.
                     </p>
                 </div>
-                <div class="badge-info">Central Cashier collects payments</div>
+                <div class="badge-info">Payments</div>
             </div>
 
             <div style="overflow-x:auto; margin-top:18px;">
