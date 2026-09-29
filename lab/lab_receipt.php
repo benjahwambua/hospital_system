@@ -6,7 +6,7 @@ require_login();
 $id = intval($_GET['id'] ?? 0);
 
 // Query to get the service details and price
-$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name, sm.price 
+$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name 
           FROM patient_services ps 
           JOIN patients p ON ps.patient_id = p.id 
           JOIN services_master sm ON ps.service_id = sm.id 
@@ -64,7 +64,7 @@ if (!$res) die("Record not found.");
         <div class="hospital-name bold">EMAQURE MEDICAL CENTRE</div>
         <div style="font-size: 11px;">Biashara Street, Mlolongo</div>
         <div style="font-size: 11px;">Tel: +254 793 069 565</div>
-        <div class="receipt-title bold">OFFICIAL RECEIPT</div>
+        <div class="receipt-title bold">SERVICE CHARGE SLIP</div>
     </div>
 
     <div class="dashed-line"></div>
@@ -94,7 +94,7 @@ if (!$res) die("Record not found.");
         <tbody>
             <tr>
                 <td><?= htmlspecialchars($res['service_name']) ?></td>
-                <td style="text-align: right;"><?= number_format($res['price'], 2) ?></td>
+                <td style="text-align: right;"><?= number_format((float)$res['price'], 2) ?></td>
             </tr>
         </tbody>
     </table>
@@ -111,8 +111,8 @@ if (!$res) die("Record not found.");
 
     <div class="dashed-line"></div>
     <div class="center" style="font-size: 11px; margin-top: 15px;">
-        Payment Status: <span class="bold">PAID</span><br>
-        Served By: Laboratory System<br><br>
+        Charge Status: <span class="bold"><?= htmlspecialchars($res['status'] ?? 'Pending') ?></span><br>
+        Payment: Collect through Central Cashier<br><br>
         * Quick Recovery *
     </div>
 
