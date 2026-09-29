@@ -109,6 +109,77 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
     ];
 }
 
+
+function add_patient_service(
+    $conn,
+    int $patientId,
+    int $serviceId,
+    int $visitId = 0,
+    ?int $payerId = null,
+    ?int $planId = null,
+    float $quantity = 1.0,
+    float $discountAmount = 0.0,
+    ?string $status = 'Pending',
+    ?string $notes = null
+): int {
+    if ($patientId <= 0 || $serviceId <= 0) {
+        throw new Exception('Invalid patient or service.');
+    }
+    if ($quantity <= 0) {
+        throw new Exception('Service quantity must be greater than zero.');
+    }
+    if ($discountAmount < 0) {
+        throw new Exception('Discount cannot be negative.');
+    }
+
+    $resolved = get_service_price($conn, $serviceId, $payerId, $planId);
+    $unitPrice = (float)$resolved['price'];
+    $gross = round($unitPrice * $quantity, 2);
+    $discount = round($discountAmount, 2);
+    $net = round(max(0, $gross - $discount), 2);
+
+    $has = [];
+    $check = $conn->query("SHOW COLUMNS FROM patient_services");
+    if ($check) {
+        while ($col = $check->fetch_assoc()) $has[$col['Field']] = true;
+    }
+
+    $columns = ['patient_id','service_id','category','price'];
+    $values = [$patientId,$serviceId,$resolved['category'],$unitPrice];
+    $types = 'iisd';
+
+    if (isset($has['service_code_snapshot'])) { $columns[]='service_code_snapshot'; $values[]=$resolved['service_code']; $types.='s'; }
+    if (isset($has['service_name_snapshot'])) { $columns[]='service_name_snapshot'; $values[]=$resolved['service_name']; $types.='s'; }
+    if (isset($has['quantity'])) { $columns[]='quantity'; $values[]=$quantity; $types.='d'; }
+    if (isset($has['gross_amount'])) { $columns[]='gross_amount'; $values[]=$gross; $types.='d'; }
+    if (isset($has['discount_amount'])) { $columns[]='discount_amount'; $values[]=$discount; $types.='d'; }
+    if (isset($has['net_amount'])) { $columns[]='net_amount'; $values[]=$net; $types.='d'; }
+    if (isset($has['price_id'])) { $columns[]='price_id'; $values[]=(int)$resolved['price_id']; $types.='i'; }
+    if (isset($has['payer_id'])) { $columns[]='payer_id'; $values[]=$resolved['payer_id'] !== null ? (int)$resolved['payer_id'] : null; $types.='i'; }
+    if (isset($has['plan_id'])) { $columns[]='plan_id'; $values[]=$resolved['plan_id'] !== null ? (int)$resolved['plan_id'] : null; $types.='i'; }
+    if ($notes !== null && isset($has['doctor_notes'])) { $columns[]='doctor_notes'; $values[]=$notes; $types.='s'; }
+    if ($visitId > 0 && isset($has['visit_id'])) { $columns[]='visit_id'; $values[]=$visitId; $types.='i'; }
+
+    $columns[]='created_at'; $columns[]='status';
+    $placeholders = array_fill(0, count($columns)-2, '?');
+    $placeholders[]='NOW()'; $placeholders[]='?';
+    $values[]=$status ?: 'Pending'; $types.='s';
+
+    $sql = "INSERT INTO patient_services (".implode(',', $columns).") VALUES (".implode(',', $placeholders).")";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) throw new Exception('Unable to prepare patient service: '.$conn->error);
+    $bind = [$types];
+    foreach ($values as $k => $v) $bind[] = &$values[$k];
+    call_user_func_array([$stmt,'bind_param'],$bind);
+    if (!$stmt->execute()) {
+        $error=$stmt->error; $stmt->close();
+        throw new Exception('Unable to create patient service: '.$error);
+    }
+    $id=(int)$stmt->insert_id;
+    $stmt->close();
+    return $id;
+}
+
 function get_or_create_current_visit($conn, int $patient_id, string $visitType = 'Outpatient', string $clinicCategory = 'General', int $doctorId = 0): int {
     if ($patient_id <= 0 || !hms_visits_available($conn)) {
         return 0;
