@@ -1,18 +1,3 @@
-
-/* HMS unified operational workspace */
-.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
-.main-content>.container-fluid{max-width:1500px}
-.main-content h1,.main-content h2,.main-content h3{color:#25324a}
-.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
-.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
-.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-.main-content .table td{border-color:#edf0f5;vertical-align:middle;font-size:13px}
-.main-content .table tbody tr:hover{background:#f8fbff}
-.main-content .form-control{border-color:#d7dee8;border-radius:9px}
-.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
-.main-content .btn{border-radius:8px;font-weight:700}
-.main-content .btn-primary{background:#075b9d;border-color:#075b9d}
-.main-content .page-header,.main-content .d-flex.justify-content-between.align-items-center{margin-bottom:20px!important}
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
@@ -182,6 +167,20 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<style>
+.billing-page{padding:26px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 72px)}
+.billing-shell{width:100%;max-width:none;margin:0}
+.billing-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:16px;padding:24px 26px;margin-bottom:20px;box-shadow:0 10px 26px rgba(6,59,115,.14)}
+.billing-hero h1{font-size:25px;margin:0 0 5px;font-weight:800}.billing-hero p{margin:0;color:#d9edff;font-size:13px}
+.billing-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.billing-actions .btn{border-radius:8px;font-weight:700}
+.billing-actions .btn-light{color:#063b73}.billing-card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}
+.stat-card{height:100%;padding:18px 20px;border-left:4px solid #075b9d}.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;color:#667085}.stat-value{font-size:21px;font-weight:800;color:#25324a;margin-top:4px}
+.filter-card{padding:18px}.filter-card label{font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:800;color:#667085}.filter-card .form-control{border-color:#d7dee8;border-radius:8px}
+.billing-table{margin:0}.billing-table thead th{background:#f8fafc;color:#667085;border-top:0;font-size:10px;text-transform:uppercase;letter-spacing:.45px;white-space:nowrap}.billing-table td{border-color:#edf0f5;vertical-align:middle;font-size:13px}.billing-table tbody tr:hover{background:#f8fbff}
+.invoice-number{font-weight:800;color:#075b9d}.customer-name{font-weight:700;color:#25324a}.amount{font-weight:700;white-space:nowrap}.balance-due{color:#c0392b;font-weight:800}.balance-clear{color:#667085}
+.status-pill{display:inline-block;padding:5px 10px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase}.status-paid{background:#e8f5e9;color:#207438}.status-partial{background:#fff4d6;color:#8a6200}.status-unpaid{background:#fdeaea;color:#b42318}
+@media(max-width:768px){.billing-page{padding:18px 12px}.billing-table{min-width:1050px}}
+</style>
 
 <div class="billing-page"><div class="billing-shell">
         <div class="billing-hero">
@@ -411,6 +410,8 @@ function markAsPaid(id) {
         csrfInput.value = <?= json_encode(csrf_token()) ?>;
         form.appendChild(csrfInput);
 
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden'; csrfInput.name = 'csrf_token'; csrfInput.value = <?= json_encode(csrf_token()) ?>; form.appendChild(csrfInput);
         const idInput = document.createElement('input');
         idInput.type = 'hidden';
         idInput.name = 'invoice_id';
