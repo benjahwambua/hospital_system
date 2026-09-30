@@ -1248,3 +1248,44 @@ function post_expense_journal($conn, $expense_id, $category, $amount, $payment_m
     // Credit: Payment Account
     post_journal_entry($conn, $paymentAccount, 0, $amount, $expenseNote, null, 'EXP-' . $expense_id);
 }
+
+function consume_lab_materials_for_service($conn, int $patientServiceId, int $userId = 0): void {
+    if ($patientServiceId <= 0) throw new Exception('Invalid laboratory service record.');
+    $a=$conn->query("SHOW TABLES LIKE 'lab_service_materials'");
+    $b=$conn->query("SHOW TABLES LIKE 'lab_resource_usage'");
+    $d=$conn->query("SHOW TABLES LIKE 'lab_inventory'");
+    if (!$a || !$a->num_rows || !$b || !$b->num_rows || !$d || !$d->num_rows) return;
+
+    $q=$conn->prepare("SELECT patient_id,service_id FROM patient_services WHERE id=? AND category='lab' LIMIT 1");
+    $q->bind_param('i',$patientServiceId);$q->execute();$ps=$q->get_result()->fetch_assoc();$q->close();
+    if(!$ps) throw new Exception('Laboratory service record not found.');
+
+    $m=$conn->prepare("SELECT lsm.inventory_id,lsm.quantity_per_test,COALESCE(lsm.unit,li.unit) unit,li.item_name
+                       FROM lab_service_materials lsm INNER JOIN lab_inventory li ON li.id=lsm.inventory_id
+                       WHERE lsm.service_id=? AND lsm.active=1 AND li.status='active'");
+    $m->bind_param('i',$ps['service_id']);$m->execute();$rs=$m->get_result();$items=[];while($x=$rs->fetch_assoc())$items[]=$x;$m->close();
+
+    foreach($items as $item){
+        $inventoryId=(int)$item['inventory_id'];$qty=(float)$item['quantity_per_test'];if($qty<=0)continue;
+        $check=$conn->prepare("SELECT id FROM lab_resource_usage WHERE patient_service_id=? AND inventory_id=? LIMIT 1");
+        $check->bind_param('ii',$patientServiceId,$inventoryId);$check->execute();$exists=$check->get_result()->fetch_assoc();$check->close();if($exists)continue;
+
+        $lock=$conn->prepare("SELECT quantity,unit FROM lab_inventory WHERE id=? AND status='active' FOR UPDATE");
+        $lock->bind_param('i',$inventoryId);$lock->execute();$stock=$lock->get_result()->fetch_assoc();$lock->close();
+        if(!$stock)throw new Exception('Laboratory inventory item unavailable: '.$item['item_name']);
+        $balance=(float)$stock['quantity'];
+        if($balance<$qty)throw new Exception('Insufficient laboratory stock for '.$item['item_name'].'.');
+
+        $newBalance=$balance-$qty;
+        $u=$conn->prepare("UPDATE lab_inventory SET quantity=? WHERE id=?");$u->bind_param('di',$newBalance,$inventoryId);if(!$u->execute())throw new Exception($u->error);$u->close();
+
+        $reference='LAB-PS-'.$patientServiceId;$note='Consumed for laboratory service #'.$patientServiceId;
+        $mov=$conn->prepare("INSERT INTO lab_inventory_movements(inventory_id,movement_type,quantity,balance_after,reference_no,note,user_id) VALUES(?,'out',?,?,?,?,?)");
+        $mov->bind_param('iddssi',$inventoryId,$qty,$newBalance,$reference,$note,$userId);if(!$mov->execute())throw new Exception($mov->error);$mov->close();
+
+        $unit=(string)($item['unit']??$stock['unit']??'Piece');
+        $usage=$conn->prepare("INSERT INTO lab_resource_usage(patient_service_id,service_id,inventory_id,quantity,unit,reference_no,user_id) VALUES(?,?,?,?,?,?,?)");
+        $usage->bind_param('iidsssi',$patientServiceId,$ps['service_id'],$inventoryId,$qty,$unit,$reference,$userId);if(!$usage->execute())throw new Exception($usage->error);$usage->close();
+    }
+}
+
