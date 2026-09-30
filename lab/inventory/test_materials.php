@@ -22,8 +22,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             if($serviceId<=0||$inventoryId<=0||$qty<=0)$error='Select a laboratory service, inventory item and positive quantity.';
             else{
                 $s=$conn->prepare("INSERT INTO lab_service_materials(service_id,inventory_id,quantity_per_test,unit,active,created_by) VALUES(?,?,?,?,1,?) ON DUPLICATE KEY UPDATE quantity_per_test=VALUES(quantity_per_test),unit=VALUES(unit),active=1");
-                $uid=(int)($_SESSION['user_id']??0);$s->bind_param('iid si',$serviceId,$inventoryId,$qty,$unit,$uid);
-                // mysqli does not accept spaces in a bind type string.
+                $uid=(int)($_SESSION['user_id']??0);
                 $s->bind_param('iidsi',$serviceId,$inventoryId,$qty,$unit,$uid);
                 if(!$s->execute())$error=$s->error;else$success='Laboratory material mapping saved.';
                 $s->close();
