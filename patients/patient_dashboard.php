@@ -584,6 +584,16 @@ if (!empty($patient['is_walkin'])) {
         ORDER BY i.created_at DESC, ii.id DESC
     ");
 
+    $dashboardPayments = [];
+    $dashboardPaymentSql = "SELECT p.id,p.amount,p.method,p.reference,p.created_at,p.invoice_id,i.invoice_number
+        FROM payments p INNER JOIN invoices i ON i.id=p.invoice_id
+        WHERE i.patient_id=".(int)$patient_id
+        .($activeVisitId>0 && $hasVisitInvoices ? " AND i.visit_id=".(int)$activeVisitId : "")
+        ." AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')
+        ORDER BY p.created_at DESC,p.id DESC LIMIT 20";
+    $dashboardPaymentRes=$conn->query($dashboardPaymentSql);
+    if($dashboardPaymentRes) while($dp=$dashboardPaymentRes->fetch_assoc()) $dashboardPayments[]=$dp;
+
     // ==============================================================================
     // 4. BILLING CALCULATIONS
     // ==============================================================================
@@ -617,35 +627,20 @@ if (!empty($patient['is_walkin'])) {
 
     // Payments are invoice-specific, matching billing/view_invoice.php.
     $total_paid = 0.0;
-    $paymentVisitCondition = ($activeVisitId > 0 && $hasVisitInvoices) ? " AND i.visit_id = ?" : "";
-    $paidStmt = $conn->prepare("
-        SELECT COALESCE(SUM(p.amount), 0) - COALESCE((
-            SELECT SUM(r.amount)
-            FROM payment_refunds r
-            INNER JOIN payments rp ON rp.id = r.payment_id
-            WHERE rp.invoice_id = i.id AND r.status = 'Approved'
-        ), 0) AS total_paid
-        FROM payments p
-        INNER JOIN invoices i ON i.id = p.invoice_id
-        WHERE i.patient_id = ?" . $paymentVisitCondition . "
-    ");
+    $paymentTotals = $conn->query("SELECT COALESCE(SUM(p.amount),0) AS paid_total
+        FROM payments p INNER JOIN invoices i ON i.id=p.invoice_id
+        WHERE i.patient_id=".(int)$patient_id
+        .($activeVisitId>0 && $hasVisitInvoices ? " AND i.visit_id=".(int)$activeVisitId : "")
+        ." AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')");
+    if($paymentTotals) $total_paid=(float)($paymentTotals->fetch_assoc()['paid_total']??0);
 
-    if ($paidStmt) {
-        if ($activeVisitId > 0 && $hasVisitInvoices) {
-            $paidStmt->bind_param('ii', $patient_id, $activeVisitId);
-        } else {
-            $paidStmt->bind_param('i', $patient_id);
-        }
-        $paidStmt->execute();
-        $paidRes = $paidStmt->get_result();
-
-        if ($paidRes) {
-            $paidRow = $paidRes->fetch_assoc();
-            $total_paid = (float)($paidRow['total_paid'] ?? 0);
-        }
-
-        $paidStmt->close();
-    }
+    $refundTotals = $conn->query("SELECT COALESCE(SUM(r.amount),0) AS refunded_total
+        FROM payment_refunds r INNER JOIN payments p ON p.id=r.payment_id INNER JOIN invoices i ON i.id=p.invoice_id
+        WHERE i.patient_id=".(int)$patient_id." AND r.status='Approved'"
+        .($activeVisitId>0 && $hasVisitInvoices ? " AND i.visit_id=".(int)$activeVisitId : "")
+        ." AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')");
+    $total_refunded = $refundTotals ? (float)($refundTotals->fetch_assoc()['refunded_total']??0) : 0.0;
+    $total_paid=max($total_paid-$total_refunded,0.0);
 
     // Keep the balance aligned with the same encounter/account scope used above.
     $balance_due = max($total_charges - $total_paid, 0.0);
@@ -902,7 +897,7 @@ if ($patient_id <= 0) {
                 <span class="info-value" style="font-size: 24px;"><?= htmlspecialchars($patient['full_name']) ?></span>
                 <div style="display:flex; gap:30px;">
                     <div><span class="info-label">Patient No</span><span class="info-value"><?= htmlspecialchars($patient['patient_number']) ?></span></div>
-                    <div><span class="info-label">Current Balance</span><span class="info-value" style="color:#ffeb3b;">KSH <?= number_format($balance_due, 2) ?></span></div>
+                    <div><span class="info-label">Current Balance</span><span class="info-value" style="color:#ffeb3b;">KES <?= number_format($balance_due, 2) ?></span></div>
                 </div>
             </div>
             <div style="text-align:right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 20px;">
@@ -929,8 +924,8 @@ if ($patient_id <= 0) {
         </div>
         <div class="patient-command-card <?= $balance_due > 0 ? 'alert-card' : 'ok-card' ?>">
             <div class="command-label">Outstanding Balance</div>
-            <div class="command-value">KSH <?= number_format($balance_due,2) ?></div>
-            <div class="command-meta"><?= htmlspecialchars($currentPayerLabel) ?> · Co-pay estimate KSH <?= number_format($currentCopayEstimate,2) ?></div>
+            <div class="command-value">KES <?= number_format($balance_due,2) ?></div>
+            <div class="command-meta"><?= htmlspecialchars($currentPayerLabel) ?> · Co-pay estimate KES <?= number_format($currentCopayEstimate,2) ?></div>
         </div>
         <div class="patient-command-card <?= $recentAppointment ? 'info-card' : 'ok-card' ?>">
             <div class="command-label">Appointment</div>
@@ -978,7 +973,7 @@ if ($patient_id <= 0) {
                 <?php if ($latestVital): ?><li><strong>Vitals</strong><br><?= htmlspecialchars(date('d M Y H:i',strtotime($latestVital['created_at']))) ?></li><?php endif; ?>
                 <?php if ($encounter): ?><li><strong>Clinical Encounter</strong><br><?= htmlspecialchars($encounter['diagnosis'] ?? 'Clinical record available') ?></li><?php endif; ?>
                 <?php if ($currentAdmission): ?><li><strong>Inpatient</strong><br><?= htmlspecialchars(($currentAdmission['ward_name'] ?? 'Ward').' · Bed '.($currentAdmission['bed_number'] ?? '—')) ?></li><?php endif; ?>
-                <?php if ($balance_due > 0): ?><li><strong>Finance</strong><br>KSH <?= number_format($balance_due,2) ?> outstanding</li><?php else: ?><li><strong>Finance</strong><br>Account currently settled</li><?php endif; ?>
+                <?php if ($balance_due > 0): ?><li><strong>Finance</strong><br>KES <?= number_format($balance_due,2) ?> outstanding</li><?php else: ?><li><strong>Finance</strong><br>Account currently settled</li><?php endif; ?>
             </ul>
         </div>
     </div>
@@ -1255,7 +1250,7 @@ function clearForm() {
             <tr>
                 <td><?= htmlspecialchars($s['service_name']) ?></td>
                 <td><span class="badge-info"><?= htmlspecialchars($s['svc_category']) ?></span></td>
-                <td>KSH <?= number_format($s['price'], 2) ?></td>
+                <td>KES <?= number_format($s['price'], 2) ?></td>
                 <td><form method="post" style="display:inline;" onsubmit="return confirm('Remove this service?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="service"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form></td>
             </tr>
             <?php endwhile; ?>
@@ -1299,8 +1294,8 @@ function clearForm() {
             <tr>
                 <td><strong><?= htmlspecialchars($p['drug_name']) ?></strong></td>
                 <td><?= htmlspecialchars($p['quantity']) ?></td>
-                <td>KSH <?= number_format((float)($p['unit_price'] ?? 0), 2) ?></td>
-                <td>KSH <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
+                <td>KES <?= number_format((float)($p['unit_price'] ?? 0), 2) ?></td>
+                <td>KES <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
                 <td><?= date('d/m/y', strtotime($p['created_at'])) ?></td>
                 <td>
                     <form method="post" style="display:inline;" onsubmit="return confirm('Remove this medication?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="prescription"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form>
@@ -1316,21 +1311,21 @@ function clearForm() {
         <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:var(--accent-blue);">
                 <span class="info-label">Total Invoiced</span><br>
-                <span style="font-size:24px; font-weight:bold; color:var(--secondary-blue);">KSH <?= number_format($total_charges, 2) ?></span>
+                <span style="font-size:24px; font-weight:bold; color:var(--secondary-blue);">KES <?= number_format($total_charges, 2) ?></span>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#e8f5e9;">
                 <span class="info-label">Total Collected</span><br>
-                <span style="font-size:24px; font-weight:bold; color:#2e7d32;">KSH <?= number_format($total_paid, 2) ?></span>
+                <span style="font-size:24px; font-weight:bold; color:#2e7d32;">KES <?= number_format($total_paid, 2) ?></span>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#eef7ff;">
                 <span class="info-label">Covered by Insurance / SHA</span><br>
-                <span style="font-size:24px; font-weight:bold; color:#1565c0;">KSH <?= number_format($insuranceCovered, 2) ?></span>
+                <span style="font-size:24px; font-weight:bold; color:#1565c0;">KES <?= number_format($insuranceCovered, 2) ?></span>
                 <div style="font-size:12px; color:#666; margin-top:6px;">Payer: <?= htmlspecialchars($currentPayerLabel); ?></div>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#ffebee;">
                 <span class="info-label">Amount to Pay</span><br>
-                <span style="font-size:24px; font-weight:bold; color:#c62828;">KSH <?= number_format($amountToPayNow, 2) ?></span>
-                <div style="font-size:12px; color:#666; margin-top:6px;">Co-pay est: KSH <?= number_format($currentCopayEstimate, 2); ?></div>
+                <span style="font-size:24px; font-weight:bold; color:#c62828;">KES <?= number_format($amountToPayNow, 2) ?></span>
+                <div style="font-size:12px; color:#666; margin-top:6px;">Co-pay est: KES <?= number_format($currentCopayEstimate, 2); ?></div>
             </div>
         </div>
 
@@ -1399,8 +1394,8 @@ function clearForm() {
                                     <td><?= htmlspecialchars($department) ?></td>
                                     <td><?= htmlspecialchars($billItem['visit_number'] ?? ($activeVisit['visit_number'] ?? '—')) ?></td>
                                     <td><?= number_format((float)($billItem['quantity'] ?? 1), 2) ?></td>
-                                    <td>KSH <?= number_format((float)($billItem['unit_price'] ?? 0), 2) ?></td>
-                                    <td><strong>KSH <?= number_format((float)($billItem['total'] ?? 0), 2) ?></strong></td>
+                                    <td>KES <?= number_format((float)($billItem['unit_price'] ?? 0), 2) ?></td>
+                                    <td><strong>KES <?= number_format((float)($billItem['total'] ?? 0), 2) ?></strong></td>
                                     <td>#INV-<?= (int)$billItem['invoice_id'] ?></td>
                                     <td><span class="status-chip <?= strtolower($billItem['invoice_status'] ?? '') === 'paid' ? 'completed' : 'pending' ?>"><?= htmlspecialchars($billItem['invoice_status'] ?? 'Pending') ?></span></td>
                                 </tr>
@@ -1415,6 +1410,13 @@ function clearForm() {
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        <div class="sub-card" style="margin-top:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><h4 style="margin:0;color:var(--secondary-blue);"><i class="fas fa-receipt"></i> Payment History</h4><span style="font-size:12px;color:#667085;">Latest 20 payments</span></div>
+            <div style="overflow-x:auto;margin-top:14px;"><table class="table-custom"><thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th>Amount</th><th>Receipt</th></tr></thead><tbody>
+            <?php if($dashboardPayments): foreach($dashboardPayments as $dp): ?><tr><td><?= !empty($dp['created_at']) ? htmlspecialchars(date('d M Y H:i',strtotime($dp['created_at']))) : '—' ?></td><td><?= htmlspecialchars($dp['invoice_number'] ?? ('#'.$dp['invoice_id'])) ?></td><td><?= htmlspecialchars($dp['method'] ?? '—') ?></td><td><?= htmlspecialchars($dp['reference'] ?? '—') ?></td><td><strong>KES <?= number_format((float)$dp['amount'],2) ?></strong></td><td><a class="btn btn-sm btn-outline-primary" target="_blank" href="/hospital_system/billing/print_receipt.php?id=<?= (int)$dp['id'] ?>"><i class="fas fa-receipt"></i> Receipt</a></td></tr><?php endforeach; else: ?><tr><td colspan="6" style="text-align:center;color:#667085;padding:20px;">No payments recorded for this patient in the selected encounter.</td></tr><?php endif; ?>
+            </tbody></table></div>
         </div>
 
         <div style="background:#f8fbff; border:1px solid var(--border-color); padding:20px; border-radius:10px;">
@@ -1457,9 +1459,9 @@ function clearForm() {
             </table>
             <div style="display:flex; justify-content:flex-end; margin-top:22px;">
                 <div style="width:340px; padding:18px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px;">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>Total Bill</strong><strong>KSH <?= number_format($printTotal,2) ?></strong></div>
-                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;color:#28a745;"><span>Amount Paid</span><span>KSH <?= number_format($total_paid,2) ?></span></div>
-                    <div style="border-top:2px solid #007bff;padding-top:10px;display:flex;justify-content:space-between;font-size:19px;color:#007bff;"><strong>Amount to Pay</strong><strong>KSH <?= number_format(max($printTotal-$total_paid,0),2) ?></strong></div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>Total Bill</strong><strong>KES <?= number_format($printTotal,2) ?></strong></div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;color:#28a745;"><span>Amount Paid</span><span>KES <?= number_format($total_paid,2) ?></span></div>
+                    <div style="border-top:2px solid #007bff;padding-top:10px;display:flex;justify-content:space-between;font-size:19px;color:#007bff;"><strong>Amount to Pay</strong><strong>KES <?= number_format(max($printTotal-$total_paid,0),2) ?></strong></div>
                 </div>
             </div>
             <div style="margin-top:28px;padding-top:14px;border-top:1px dashed #ccc;font-size:11px;color:#777;display:flex;justify-content:space-between;"><span>Generated By: <strong><?= htmlspecialchars($_SESSION['full_name']??'System Administrator') ?></strong></span><span>For payment processing — not a receipt.</span></div>
@@ -1497,73 +1499,36 @@ function clearForm() {
 
     <div id="coverage" class="card" style="display:none;">
         <h3>Insurance & SHA</h3>
-        <p style="color:#666; margin-top:-8px; margin-bottom:20px;">Starter coverage module for payer setup, SHA details, insurer capture, pre-authorization and co-pay workflow.</p>
-
+        <p style="color:#666; margin-top:-8px; margin-bottom:20px;">Current payer and coverage information used by the billing engine.</p>
+        <?php $dashboardCoverage = get_patient_active_coverage($conn, $patient_id); ?>
+        <?php if ($dashboardCoverage): ?>
+        <?php
+            $covPayerName='—'; $covPlanName='—';
+            $covPayerId=(int)($dashboardCoverage['payer_id']??0); $covPlanId=(int)($dashboardCoverage['plan_id']??0);
+            $covStmt=$conn->prepare("SELECT p.payer_name, pp.plan_name FROM payers p LEFT JOIN payer_plans pp ON pp.id=? AND pp.payer_id=p.id WHERE p.id=? LIMIT 1");
+            if($covStmt){$covStmt->bind_param('ii',$covPlanId,$covPayerId);$covStmt->execute();$covRow=$covStmt->get_result()->fetch_assoc();$covStmt->close();$covPayerName=(string)($covRow['payer_name']??'—');$covPlanName=(string)($covRow['plan_name']??'—');}
+        ?>
         <div class="coverage-grid">
-            <div class="coverage-card">
-                <h4>Payment Class</h4>
-                <div class="coverage-value">Self Pay / Cash</div>
-                <div class="coverage-subtext">Upgrade this patient to SHA or Insurance once payer schema is introduced.</div>
-            </div>
-            <div class="coverage-card">
-                <h4>SHA Status</h4>
-                <div class="coverage-value">Not Linked</div>
-                <div class="coverage-subtext">Capture SHA number, eligibility and authorization here.</div>
-            </div>
-            <div class="coverage-card">
-                <h4>Insurance Status</h4>
-                <div class="coverage-value">No Active Cover</div>
-                <div class="coverage-subtext">Attach insurer, member number, plan and employer/corporate panel.</div>
-            </div>
-            <div class="coverage-card">
-                <h4>Expected Co-pay</h4>
-                <div class="coverage-value">KSH 0.00</div>
-                <div class="coverage-subtext">Use this area later for co-pay, deductible and authorization balance.</div>
-            </div>
+            <div class="coverage-card"><h4>Payer</h4><div class="coverage-value"><?= htmlspecialchars($covPayerName) ?></div><div class="coverage-subtext">Verified active payer</div></div>
+            <div class="coverage-card"><h4>Plan</h4><div class="coverage-value"><?= htmlspecialchars($covPlanName) ?></div><div class="coverage-subtext">Active plan</div></div>
+            <div class="coverage-card"><h4>Member Number</h4><div class="coverage-value"><?= htmlspecialchars($dashboardCoverage['member_number'] ?? '—') ?></div><div class="coverage-subtext">Registered member/card number</div></div>
+            <div class="coverage-card"><h4>Eligibility</h4><div class="coverage-value"><?= htmlspecialchars($dashboardCoverage['eligibility_status'] ?? 'Verified') ?></div><div class="coverage-subtext">Current eligibility status</div></div>
         </div>
-
-        <form class="coverage-form">
-            <div>
-                <label class="info-label">Funding Type</label>
-                <select>
-                    <option>Cash / Self Pay</option>
-                    <option>SHA</option>
-                    <option>Private Insurance</option>
-                    <option>Corporate / Panel</option>
-                </select>
-            </div>
-            <div>
-                <label class="info-label">Scheme / Plan</label>
-                <input type="text" placeholder="e.g. SHA Outpatient, Jubilee, AAR, Madison">
-            </div>
-            <div>
-                <label class="info-label">Member / Card Number</label>
-                <input type="text" placeholder="Enter SHA or insurance member number">
-            </div>
-            <div>
-                <label class="info-label">Principal / Employer</label>
-                <input type="text" placeholder="Employer, principal member, or sponsor">
-            </div>
-            <div>
-                <label class="info-label">Authorization Number</label>
-                <input type="text" placeholder="Pre-auth / approval number">
-            </div>
-            <div>
-                <label class="info-label">Co-pay Estimate (KSH)</label>
-                <input type="number" step="0.01" placeholder="0.00">
-            </div>
-            <div class="full-width">
-                <label class="info-label">Coverage Notes</label>
-                <textarea placeholder="Capture benefit limits, exclusions, authorization notes, payer instructions and claim comments."></textarea>
-            </div>
-        </form>
-
+        <div class="sub-card"><h4 style="margin-top:0;color:var(--secondary-blue);">Pricing Application</h4>
+            <p style="margin:0;color:#555;font-size:13px;">New service charges resolve exact payer/plan pricing first, then payer tariff, then standard cash pricing. Historical invoice prices remain unchanged.</p>
+        </div>
+        <?php else: ?>
+        <div class="coverage-grid">
+            <div class="coverage-card"><h4>Payment Class</h4><div class="coverage-value">Cash / Self Pay</div><div class="coverage-subtext">No verified active coverage is linked to this patient.</div></div>
+            <div class="coverage-card"><h4>SHA / Insurance</h4><div class="coverage-value">Not Linked</div><div class="coverage-subtext">Payer-specific pricing will not apply until verified coverage is linked.</div></div>
+        </div>
+        <?php endif; ?>
         <div class="coverage-actions">
-            <button type="button" class="btn-save" style="float:none; margin-top:0;">Save Coverage Profile</button>
-            <button type="button" class="btn-save" style="float:none; margin-top:0; background:#6c757d;">Verify SHA Eligibility</button>
-            <button type="button" class="btn-save" style="float:none; margin-top:0; background:#17a2b8;">Create Pre-Authorization</button>
+            <?php if ($canPatientEdit): ?><a class="btn btn-primary" href="/hospital_system/patients/edit_patient.php?id=<?= (int)$patient_id ?>">Edit Patient</a><?php endif; ?>
+            <?php if (can_module_action($conn,'finance','view')): ?><a class="btn btn-outline-primary" href="/hospital_system/billing/view_bills.php">Open Billing</a><?php endif; ?>
         </div>
     </div>
+/div>
 </div>
 
 <script>
