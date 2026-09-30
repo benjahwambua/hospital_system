@@ -1285,7 +1285,7 @@ function consume_lab_materials_for_service($conn, int $patientServiceId, int $us
 
         $unit=(string)($item['unit']??$stock['unit']??'Piece');
         $usage=$conn->prepare("INSERT INTO lab_resource_usage(patient_service_id,service_id,inventory_id,quantity,unit,reference_no,user_id) VALUES(?,?,?,?,?,?,?)");
-        $usage->bind_param('iidsssi',$patientServiceId,$ps['service_id'],$inventoryId,$qty,$unit,$reference,$userId);if(!$usage->execute())throw new Exception($usage->error);$usage->close();
+        $usage->bind_param('iiidssi',$patientServiceId,$ps['service_id'],$inventoryId,$qty,$unit,$reference,$userId);if(!$usage->execute())throw new Exception($usage->error);$usage->close();
     }
 }
 
