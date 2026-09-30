@@ -31,7 +31,75 @@ $patientId = (int)($_GET['patient_id'] ?? $_POST['patient_id'] ?? 0);
 $visitId = (int)($_GET['visit_id'] ?? $_POST['visit_id'] ?? 0);
 $message = '';
 
-if ($patientId <= 0) { header('Location: /hospital_system/patients/patient_list.php?notice=select_patient_for_orders'); exit; }
+if ($patientId <= 0) {
+    // Orders & Referrals is an operational page in its own right. Do not send
+    // users back to Patient List; let them select the patient here.
+    $searchPatient = trim((string)($_GET['search'] ?? ''));
+    $patientRows = [];
+    if ($searchPatient !== '') {
+        $like = '%' . $searchPatient . '%';
+        $ps = $conn->prepare("SELECT id, full_name, patient_number, phone FROM patients WHERE full_name LIKE ? OR patient_number LIKE ? OR phone LIKE ? ORDER BY id DESC LIMIT 50");
+        $ps->bind_param('sss', $like, $like, $like);
+    } else {
+        $ps = $conn->prepare("SELECT id, full_name, patient_number, phone FROM patients ORDER BY id DESC LIMIT 50");
+    }
+    $ps->execute();
+    $patientResult = $ps->get_result();
+    while ($row = $patientResult->fetch_assoc()) $patientRows[] = $row;
+    $ps->close();
+
+    include __DIR__.'/../includes/header.php';
+    include __DIR__.'/../includes/sidebar.php';
+    ?>
+    <div class="orders-page">
+        <div class="orders-shell">
+            <div class="orders-hero">
+                <div>
+                    <div class="orders-kicker">Clinical</div>
+                    <h1>Orders &amp; Referrals</h1>
+                    <p>Select a patient to place Laboratory, Radiology or Pharmacy orders.</p>
+                </div>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <form method="get" class="row align-items-end mb-4">
+                        <div class="col-md-9 mb-2 mb-md-0">
+                            <label class="font-weight-bold">Find Patient</label>
+                            <input type="text" name="search" value="<?=htmlspecialchars($searchPatient)?>" class="form-control" placeholder="Search by patient name, patient number or phone number">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary btn-block"><i class="fas fa-search"></i> Search Patient</button>
+                        </div>
+                    </form>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 font-weight-bold">Select Patient</h5>
+                        <span class="text-muted small"><?=count($patientRows)?> patient(s) shown</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Patient</th><th>Patient Number</th><th>Phone</th><th class="text-right">Action</th></tr></thead>
+                            <tbody>
+                            <?php if ($patientRows): foreach ($patientRows as $row): ?>
+                                <tr>
+                                    <td><strong><?=htmlspecialchars($row['full_name'])?></strong></td>
+                                    <td><?=htmlspecialchars($row['patient_number'])?></td>
+                                    <td><?=htmlspecialchars($row['phone'] ?? '')?></td>
+                                    <td class="text-right"><a class="btn btn-sm btn-primary" href="orders.php?patient_id=<?=(int)$row['id']?>"><i class="fas fa-arrow-right"></i> Open Orders</a></td>
+                                </tr>
+                            <?php endforeach; else: ?>
+                                <tr><td colspan="4" class="text-center text-muted py-4">No patients found.</td></tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php
+    include __DIR__.'/../includes/footer.php';
+    exit;
+}
 if ($visitId <= 0) $visitId = get_or_create_current_visit($conn, $patientId);
 
 $p = $conn->prepare("SELECT id, full_name, patient_number FROM patients WHERE id=? LIMIT 1");
