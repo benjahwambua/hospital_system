@@ -48,7 +48,15 @@ include __DIR__ . '/../includes/sidebar.php';
 // -------------------------
 // Fetch Lab Worklist
 // -------------------------
-$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name, v.visit_number
+$usageExists = $conn->query("SHOW TABLES LIKE 'lab_resource_usage'");
+$usageSelect = ($usageExists && $usageExists->num_rows)
+    ? ", (SELECT GROUP_CONCAT(CONCAT(li.item_name, ' × ', FORMAT(lru.quantity, 4), ' ', COALESCE(lru.unit, li.unit)) SEPARATOR ', ')
+         FROM lab_resource_usage lru
+         INNER JOIN lab_inventory li ON li.id = lru.inventory_id
+         WHERE lru.patient_service_id = ps.id) AS materials_used"
+    : ", NULL AS materials_used";
+
+$query = "SELECT ps.*, p.full_name, p.patient_number, sm.service_name, v.visit_number{$usageSelect}
           FROM patient_services ps
           JOIN patients p ON ps.patient_id = p.id
           JOIN services_master sm ON ps.service_id = sm.id
