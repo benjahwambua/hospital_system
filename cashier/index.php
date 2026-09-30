@@ -149,7 +149,7 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <?php if (isset($_GET['success'])): ?>
-            <div class="alert alert-success"><i class="fas fa-check-circle"></i> Payment received successfully. Patient balance updated. <?php if (!empty($_GET['paid_invoice'])): ?><a class="btn btn-sm btn-success ml-2" target="_blank" href="/hospital_system/billing/view_invoice.php?id=<?= (int)$_GET['paid_invoice'] ?>&print=1"><i class="fas fa-print"></i> View & Print Invoice</a><?php endif; ?></div>
+            <div class="alert alert-success"><i class="fas fa-check-circle"></i> Payment received successfully. Patient balance updated. <?php if (!empty($_GET['paid_invoice'])): ?><?php if (!empty($_GET['payment_id'])): ?><a class="btn btn-sm btn-success ml-2" target="_blank" href="/hospital_system/billing/print_receipt.php?id=<?= (int)$_GET['payment_id'] ?>"><i class="fas fa-receipt"></i> View & Print Receipt</a><?php endif; ?><a class="btn btn-sm btn-outline-primary ml-2" target="_blank" href="/hospital_system/billing/view_invoice.php?id=<?= (int)$_GET['paid_invoice'] ?>"><i class="fas fa-file-invoice"></i> View Invoice</a><?php endif; ?></div>
         <?php endif; ?>
 
         <div class="row mb-4">
