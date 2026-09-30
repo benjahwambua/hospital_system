@@ -126,9 +126,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $returnTo = $_POST['return_to'] ?? '';
             if ($returnTo === 'cashier') {
-                header("Location: /hospital_system/cashier/index.php?success=1&paid_invoice=".$id);
+                header("Location: /hospital_system/cashier/index.php?success=1&paid_invoice=".$id."&payment_id=".$payment['payment_id']);
             } elseif ($returnTo === 'aged_receivables') {
-                header("Location: /hospital_system/cashier/aged_receivables.php?success=1&paid_invoice=".$id);
+                header("Location: /hospital_system/cashier/aged_receivables.php?success=1&paid_invoice=".$id."&payment_id=".$payment['payment_id']);
             } else {
                 header("Location: /hospital_system/billing/view_invoice.php?id=".$id."&success=1");
             }
