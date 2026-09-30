@@ -224,7 +224,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                             <div class="mpesa-fields" style="display:none">
                                                 <div class="input-group input-group-sm">
                                                     <input type="text" name="phone" class="form-control" placeholder="Phone (optional)">
-                                                    <input type="text" name="mpesa_receipt" class="form-control" placeholder="Receipt (optional)">
+                                                    <input type="text" name="reference" class="form-control" placeholder="M-Pesa receipt / transaction">
                                                 </div>
                                             </div>
                                         </form>
