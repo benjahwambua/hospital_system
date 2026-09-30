@@ -125,8 +125,9 @@ $lab_jobs = $conn->query($query);
                     <th width="15%">Date & Time</th>
                     <th width="18%">Patient Details</th>
                     <th width="12%">Visit</th>
-                    <th width="20%">Investigation</th>
-                    <th width="30%">Results/Findings</th>
+                    <th width="17%">Investigation</th>
+                    <th width="22%">Materials Used</th>
+                    <th width="28%">Results/Findings</th>
                     <th width="15%">Action</th>
                 </tr>
             </thead>
@@ -154,6 +155,9 @@ $lab_jobs = $conn->query($query);
                             </span>
                         </td>
                         <td>
+                            <small class="text-muted"><?= htmlspecialchars($job['materials_used'] ?? 'Not yet consumed') ?></small>
+                        </td>
+                        <td>
                             <form method="post">
                                 <textarea name="findings" rows="2" placeholder="Enter results..."><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
                         </td>
@@ -174,7 +178,7 @@ $lab_jobs = $conn->query($query);
                     </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
-                    <tr><td colspan="6" style="text-align:center; padding:30px;">No lab requests found.</td></tr>
+                    <tr><td colspan="7" style="text-align:center; padding:30px;">No lab requests found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
