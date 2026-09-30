@@ -296,6 +296,12 @@ include __DIR__ . '/../includes/sidebar.php';
                 <button type="button" class="close" data-dismiss="alert">&times;</button>
             </div>
         <?php endif; ?>
+        <?php if(isset($_SESSION['error'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+            </div>
+        <?php endif; ?>
 
         <div class="billing-card">
             <div class="card-header py-3 d-flex justify-content-between align-items-center"><div><strong>Invoice Register</strong><div class="small text-muted">Showing <?= count($invoices_data) ?> invoice(s) for the selected period.</div></div></div>
@@ -334,7 +340,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <a href="/hospital_system/pharmacy/view_invoice.php?id=<?= $row['id'] ?>" class="btn btn-outline-primary" title="View Invoice">
+                                        <a href="/hospital_system/billing/view_invoice.php?id=<?= $row['id'] ?>" class="btn btn-outline-primary" title="View Invoice">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                         <?php if ($is_patient): ?>
@@ -410,8 +416,6 @@ function markAsPaid(id) {
         csrfInput.value = <?= json_encode(csrf_token()) ?>;
         form.appendChild(csrfInput);
 
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden'; csrfInput.name = 'csrf_token'; csrfInput.value = <?= json_encode(csrf_token()) ?>; form.appendChild(csrfInput);
         const idInput = document.createElement('input');
         idInput.type = 'hidden';
         idInput.name = 'invoice_id';
