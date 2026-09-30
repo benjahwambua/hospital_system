@@ -252,6 +252,9 @@ include __DIR__ . '/../includes/sidebar.php';
                                             <select name="payment_mode" class="form-control" style="max-width:95px"><option value="Cash">Cash</option><option value="Mpesa">M-Pesa</option></select>
                                             <button class="btn btn-success" type="submit" <?= !$openShift ? 'disabled title="Open a cashier shift first"' : '' ?>><i class="fas fa-check"></i> Receive</button>
                                         </div>
+                                        <div class="mt-1 mpesa-reference" style="display:none">
+                                            <input type="text" name="reference" class="form-control form-control-sm" placeholder="M-Pesa receipt / transaction number">
+                                        </div>
                                     </form>
                                     <?php if (!empty($row['patient_id'])): ?><a class="btn btn-sm btn-outline-secondary btn-block mt-1" target="_blank" href="/hospital_system/patients/patient_dashboard.php?id=<?= (int)$row['patient_id'] ?>"><i class="fas fa-user"></i> View Client / Patient</a><?php endif; ?>
                                     <a class="btn btn-sm btn-outline-primary btn-block mt-1" target="_blank" href="/hospital_system/billing/view_invoice.php?id=<?= (int)$row['id'] ?>"><i class="fas fa-file-invoice"></i> View Invoice</a>
