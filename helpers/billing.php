@@ -551,10 +551,11 @@ function invoice_get_customer_info($conn, array $invoice): array {
 function invoice_load_items($conn, array $invoice): array {
     $items = [];
     $invoiceId = (int)($invoice['id'] ?? 0);
-    if ($invoiceId <= 0) {
-        return $items;
-    }
+    if ($invoiceId <= 0) return $items;
 
+    // Invoice items are the authoritative financial snapshot. Do not rebuild
+    // an invoice from every service belonging to the patient: that can pull
+    // charges from other visits/invoices into this invoice.
     $stmt = $conn->prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC');
     if ($stmt) {
         $stmt->bind_param('i', $invoiceId);
@@ -570,36 +571,6 @@ function invoice_load_items($conn, array $invoice): array {
             ];
         }
         $stmt->close();
-    }
-
-    if (empty($items) && !invoice_is_walkin($invoice) && !empty($invoice['patient_id'])) {
-        $patientId = (int)$invoice['patient_id'];
-
-        $svcRes = $conn->query("SELECT sm.service_name AS description, 1 AS quantity, ps.price AS price, ps.price AS amount, 'service' AS source FROM patient_services ps JOIN services_master sm ON ps.service_id = sm.id WHERE ps.patient_id = {$patientId} AND ps.status != 'Cancelled' ORDER BY ps.created_at ASC");
-        if ($svcRes) {
-            while ($row = $svcRes->fetch_assoc()) {
-                $items[] = [
-                    'description' => $row['description'],
-                    'quantity' => (float)$row['quantity'],
-                    'price' => (float)$row['price'],
-                    'amount' => (float)$row['amount'],
-                    'source' => $row['source'],
-                ];
-            }
-        }
-
-        $rxRes = $conn->query("SELECT s.drug_name AS description, pr.quantity AS quantity, s.selling_price AS price, (pr.quantity * s.selling_price) AS amount, 'pharmacy' AS source FROM prescriptions pr JOIN pharmacy_stock s ON pr.medicine_id = s.id WHERE pr.patient_id = {$patientId} ORDER BY pr.created_at ASC");
-        if ($rxRes) {
-            while ($row = $rxRes->fetch_assoc()) {
-                $items[] = [
-                    'description' => $row['description'],
-                    'quantity' => (float)$row['quantity'],
-                    'price' => (float)$row['price'],
-                    'amount' => (float)$row['amount'],
-                    'source' => $row['source'],
-                ];
-            }
-        }
     }
 
     return $items;
