@@ -52,7 +52,7 @@ if ($viewId > 0):
     background:#f5f7fb!important;
     min-height:calc(100vh - 75px)!important;
 }
-.proc-shell{max-width:1500px!important;margin:0 auto!important}
+.proc-shell{width:100%!important;max-width:none!important;margin:0!important}
 
 /* Header */
 .proc-hero{
@@ -158,7 +158,7 @@ if ($viewId > 0):
 .proc-card .form-control::placeholder{color:#98a2b3!important}
 .proc-card .form-control:focus{
     background:#fff!important;
-    border-color:#b7791f!important;
+    border-color:#075b9d!important;
     box-shadow:0 0 0 3px rgba(7,91,157,.10)!important;
 }
 .proc-card form.form-row .btn{
@@ -199,8 +199,8 @@ if ($viewId > 0):
 }
 .proc-card>.card-body.table-responsive>.mb-2 .btn-outline-primary{
     color:#075b9d!important;
-    border-color:#e7cf9d!important;
-    background:#fffaf0!important;
+    border-color:#d7e6f4!important;
+    background:#f6faff!important;
 }
 
 /* Table */
@@ -507,7 +507,6 @@ $listRes = $listStmt->get_result();
 ?>
 <div class="proc-page"><div class="proc-shell">
     <div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Order History</h1><p>Review, approve and receive procurement orders.</p></div><div class="proc-actions">
-        <div><div class="h3 text-gray-800 mb-0">Purchase Order History</div><small class="text-muted">Review, approve, receive, edit or delete procurement orders.</small></div>
         <?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Order</a><?php endif; ?>
     </div></div>
 
