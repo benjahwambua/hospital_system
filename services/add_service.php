@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit('Invalid security token.');
     }
 
-    $service_code = strtoupper(trim((string)($_POST['service_code'] ?? '')));
+    // Service codes are system-generated from the new service ID; users do not type them.
     $name = trim((string)($_POST['name'] ?? ''));
     $category = strtolower(trim((string)($_POST['category'] ?? '')));
     $department = trim((string)($_POST['department'] ?? ''));
@@ -27,9 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $requires_result = isset($_POST['requires_result']) ? 1 : 0;
     $billable = isset($_POST['billable']) ? 1 : 0;
 
-    if ($service_code === '') {
-        $service_code = 'SVC-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-    }
+    $service_code = 'TMP-' . strtoupper(bin2hex(random_bytes(6)));
 
     $valid_categories = ['consultation', 'procedure', 'treatment', 'lab', 'radiology', 'maternity', 'other'];
 
@@ -63,8 +61,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $price, $cost_price, $requires_order, $requires_result, $billable, $active, $user_id
             );
             $stmt->execute();
-            $service_id = $conn->insert_id;
+            $service_id = (int)$conn->insert_id;
             $stmt->close();
+
+            // The ID is the authoritative sequence, so codes are deterministic: SVC-00001, SVC-00002, ...
+            $service_code = 'SVC-' . str_pad((string)$service_id, 5, '0', STR_PAD_LEFT);
+            $codeUpdate = $conn->prepare("UPDATE services_master SET service_code=? WHERE id=?");
+            $codeUpdate->bind_param("si", $service_code, $service_id);
+            if (!$codeUpdate->execute()) throw new RuntimeException('Unable to generate service code.');
+            $codeUpdate->close();
 
             $stmt = $conn->prepare(
                 "INSERT INTO service_prices
@@ -87,6 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<style>
+.container{max-width:1100px;margin:0 auto;padding:28px 24px;background:#f5f7fb}.card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);padding:28px}.card h2{color:#25324a;margin-top:0}.card label{display:block;font-weight:700;font-size:12px;color:#475467;margin:14px 0 6px}.card input,.card select,.card textarea{width:100%;border:1px solid #d7dee8;border-radius:9px;padding:10px 12px}.card input:focus,.card select:focus,.card textarea:focus{outline:none;border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}.card button{margin-top:18px;background:#075b9d;border:0;color:#fff;border-radius:8px;padding:10px 18px;font-weight:700}.code-preview{margin-bottom:18px;padding:12px 14px;background:#f1f6fb;border:1px solid #dbe8f3;border-radius:9px;display:flex;justify-content:space-between;gap:15px;color:#344054}.code-preview span{color:#667085;font-size:12px}
+</style>
 <div class="container">
     <div class="card">
         <h2>Add New Service</h2>
@@ -101,8 +109,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <form method="POST">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
 
-            <label>Service Code</label>
-            <input type="text" name="service_code" placeholder="e.g. LAB-CBC">
+            <div class="code-preview"><strong>Service Code</strong><span>Generated automatically after saving (e.g. SVC-00068)</span></div>
 
             <label>Service Name</label>
             <input type="text" name="name" required>
