@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+require_module_access($conn, 'finance', 'view');
 
 $invoiceId = max(0, (int)($_GET['id'] ?? 0));
 if ($invoiceId <= 0) {
@@ -24,6 +25,26 @@ $patientName = $invoiceCustomer['patient_name'];
 $patientId = $invoiceCustomer['patient_id'];
 $patientNumber = $invoiceCustomer['patient_number'];
 
+$coverage = $patientId ? get_patient_active_coverage($conn, (int)$patientId) : null;
+$payerName = '';
+$planName = '';
+$memberNumber = (string)($coverage['member_number'] ?? '');
+if ($coverage) {
+    $payerStmt = $conn->prepare("SELECT p.payer_name, pp.plan_name FROM payers p LEFT JOIN payer_plans pp ON pp.id=? WHERE p.id=? LIMIT 1");
+    if ($payerStmt) {
+        $planId = $coverage['plan_id'] !== null ? (int)$coverage['plan_id'] : 0;
+        $payerId = (int)$coverage['payer_id'];
+        $payerStmt->bind_param('ii', $planId, $payerId);
+        $payerStmt->execute();
+        $payerRow = $payerStmt->get_result()->fetch_assoc();
+        $payerStmt->close();
+        if ($payerRow) {
+            $payerName = (string)($payerRow['payer_name'] ?? '');
+            $planName = (string)($payerRow['plan_name'] ?? '');
+        }
+    }
+}
+
 $items = invoice_load_items($conn, $invoice);
 $invoiceTotal = (float)($invoice['total'] ?? 0);
 if ($invoiceTotal <= 0 && $items) {
@@ -37,9 +58,7 @@ $totalRefunded = 0.0;
 $paymentHistory = [];
 $refundHistory = [];
 
-// The payment ledger is invoice-specific. Never use all payments belonging to
-// the patient because that makes one invoice consume another invoice's money.
-$stmt = $conn->prepare('SELECT id, amount, method, reference, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC');
+$stmt = $conn->prepare('SELECT id, amount, method, reference, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC, id DESC');
 if ($stmt) {
     $stmt->bind_param('i', $invoiceId);
     $stmt->execute();
@@ -52,90 +71,49 @@ if ($stmt) {
     $stmt->close();
 }
 
-$refundStmt = $conn->prepare("SELECT r.*, u.full_name AS refunded_by_name FROM payment_refunds r LEFT JOIN users u ON u.id=r.refunded_by WHERE r.invoice_id=? AND r.status='Approved' ORDER BY r.created_at DESC");
+$refundStmt = $conn->prepare("SELECT r.*, u.full_name AS refunded_by_name FROM payment_refunds r LEFT JOIN users u ON u.id=r.refunded_by WHERE r.invoice_id=? AND r.status='Approved' ORDER BY r.created_at DESC, r.id DESC");
 if ($refundStmt) {
-    $refundStmt->bind_param('i',$invoiceId);
+    $refundStmt->bind_param('i', $invoiceId);
     $refundStmt->execute();
-    $rr=$refundStmt->get_result();
-    while($row=$rr->fetch_assoc()){ $refundHistory[]=$row; $totalRefunded+=(float)$row['amount']; }
+    $rr = $refundStmt->get_result();
+    while ($row = $rr->fetch_assoc()) {
+        $refundHistory[] = $row;
+        $totalRefunded += (float)$row['amount'];
+    }
     $refundStmt->close();
 }
-$totalPaid = max(0,$totalPaid-$totalRefunded);
+$netPaid = max($totalPaid - $totalRefunded, 0);
 
-// Legacy billing entries are read-only compatibility data and are not used when modern payments exist.
-if (!$paymentHistory) {
-    $stmt = $conn->prepare('SELECT amount, method, created_at, paid FROM billing WHERE invoice_id = ? ORDER BY created_at DESC');
-    if ($stmt) {
-        $stmt->bind_param('i', $invoiceId);
-        $stmt->execute();
-        $payRes = $stmt->get_result();
-        while ($row = $payRes->fetch_assoc()) {
-            $paymentHistory[] = $row;
-            if (!empty($row['paid'])) $totalPaid += (float)$row['amount'];
-        }
-        $stmt->close();
-    }
-}
+$outstandingBalance = max($invoiceTotal - $netPaid, 0);
 
-$outstandingBalance = max($invoiceTotal - $totalPaid, 0);
-
-// Always derive the displayed status from the actual invoice total and
-// invoice-linked payments. This prevents stale status values on old invoices.
 if ($outstandingBalance <= 0.00001 && $invoiceTotal > 0) {
     $displayStatus = 'Paid';
-} elseif ($totalPaid > 0) {
+} elseif ($netPaid > 0) {
     $displayStatus = 'Partial';
 } else {
     $displayStatus = 'Unpaid';
 }
 
 $paymentMode = trim((string)($invoice['payment_mode'] ?? ''));
-if ($paymentMode === '' && $paymentHistory) {
-    $paymentMode = (string)($paymentHistory[0]['method'] ?? 'Not recorded');
-}
-if ($paymentMode === '') {
-    $paymentMode = 'Not recorded';
-}
+if ($paymentMode === '' && $paymentHistory) $paymentMode = (string)($paymentHistory[0]['method'] ?? 'Not recorded');
+if ($paymentMode === '') $paymentMode = 'Not recorded';
 
 $normalizePaymentMethod = static function (?string $method): string {
     $value = strtolower(trim((string)$method));
-    if ($value === '') {
-        return 'cash';
-    }
-    if (str_contains($value, 'mpesa') || str_contains($value, 'm-pesa')) {
-        return 'mpesa';
-    }
-    if (str_contains($value, 'insurance') || str_contains($value, 'sha') || str_contains($value, 'nhif')) {
-        return 'insurance';
-    }
+    if (str_contains($value, 'mpesa') || str_contains($value, 'm-pesa')) return 'mpesa';
+    if (str_contains($value, 'insurance') || str_contains($value, 'sha') || str_contains($value, 'nhif')) return 'insurance';
+    if (str_contains($value, 'bank') || str_contains($value, 'card') || str_contains($value, 'other')) return 'other';
     return 'cash';
 };
 
-$receivedByMethod = [
-    'cash' => 0.0,
-    'mpesa' => 0.0,
-    'insurance' => 0.0,
-];
-
-if ($paymentHistory) {
-    foreach ($paymentHistory as $payment) {
-        if (!empty($payment['paid'])) {
-            $bucket = $normalizePaymentMethod((string)($payment['method'] ?? ''));
-            $receivedByMethod[$bucket] += (float)$payment['amount'];
-        }
-    }
+$receivedByMethod = ['cash'=>0.0,'mpesa'=>0.0,'insurance'=>0.0,'other'=>0.0];
+foreach ($paymentHistory as $payment) {
+    $bucket = $normalizePaymentMethod((string)($payment['method'] ?? ''));
+    $receivedByMethod[$bucket] += (float)$payment['amount'];
 }
-
-if ($totalPaid > 0 && array_sum($receivedByMethod) <= 0.00001) {
-    $bucket = $normalizePaymentMethod($paymentMode);
-    $receivedByMethod[$bucket] = $totalPaid;
-}
-
 $receivedRows = [];
-foreach (['cash' => 'Cash', 'mpesa' => 'Mpesa', 'insurance' => 'Insurance'] as $key => $label) {
-    if (($receivedByMethod[$key] ?? 0) > 0) {
-        $receivedRows[] = ['label' => $label, 'amount' => (float)$receivedByMethod[$key]];
-    }
+foreach (['cash'=>'Cash','mpesa'=>'M-Pesa','insurance'=>'Insurance / SHA','other'=>'Other'] as $key=>$label) {
+    if ($receivedByMethod[$key] > 0) $receivedRows[]=['label'=>$label,'amount'=>$receivedByMethod[$key]];
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -143,7 +121,7 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-.invoice-container { max-width: 980px; margin: 30px auto; padding: 0 20px; }
+.invoice-container { max-width: 1180px; margin: 30px auto; padding: 0 20px; }
 .invoice-card { background:#fff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.08); padding:30px; position:relative; overflow:hidden; }
 .watermark { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); opacity:.05; width:60%; pointer-events:none; z-index:0; }
 .hospital-branding,.invoice-header,.invoice-meta,.table-container,.total-section,.invoice-extra,.invoice-footer,.payment-panel { position:relative; z-index:2; }
@@ -152,8 +130,8 @@ include __DIR__ . '/../includes/sidebar.php';
 .hospital-details { text-align:right; }
 .hospital-details h2 { margin:0; font-size:22px; text-transform:uppercase; }
 .hospital-details p { margin:2px 0; font-size:13px; color:#555; }
-.invoice-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:2px solid #007bff; }
-.invoice-title { font-size:28px; color:#007bff; margin:0; }
+.invoice-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:2px solid #075b9d; }
+.invoice-title { font-size:28px; color:#075b9d; margin:0; }
 .invoice-number { font-size:14px; color:#666; }
 .invoice-meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-bottom:24px; padding:18px; background:rgba(248,249,250,.9); border-radius:8px; }
 .meta-label { font-size:12px; font-weight:700; color:#666; text-transform:uppercase; margin-bottom:5px; }
@@ -163,13 +141,13 @@ include __DIR__ . '/../includes/sidebar.php';
 .status-paid { background:#d4edda; color:#155724; }
 .status-unpaid,.status-partial { background:#fff3cd; color:#856404; }
 .invoice-table { width:100%; border-collapse:collapse; }
-.invoice-table thead { background:#007bff; color:#fff; }
+.invoice-table thead { background:#075b9d; color:#fff; }
 .invoice-table th,.invoice-table td { padding:12px; border-bottom:1px solid #eee; }
 .amount-col { text-align:right; }
 .total-section { display:flex; justify-content:flex-end; margin-top:24px; }
 .total-box { width:360px; padding:20px; background:#f8f9fa; border-radius:8px; border:1px solid #ddd; }
 .total-row { display:flex; justify-content:space-between; margin-bottom:8px; }
-.total-final { margin-top:10px; padding-top:10px; border-top:2px solid #007bff; font-size:22px; font-weight:700; color:#007bff; }
+.total-final { margin-top:10px; padding-top:10px; border-top:2px solid #075b9d; font-size:22px; font-weight:700; color:#075b9d; }
 .payment-panel { margin-top:28px; display:grid; grid-template-columns:1fr; gap:20px; }
 .panel-card { background:#f8fbff; border:1px solid #dbeafe; border-radius:10px; padding:18px; }
 .panel-card h4 { margin:0 0 12px; color:#1d4ed8; }
@@ -179,17 +157,17 @@ include __DIR__ . '/../includes/sidebar.php';
 .qr-section { text-align:center; font-size:10px; color:#666; }
 .signature-section { text-align:center; width:250px; }
 .signature-line { border-top:1px solid #333; margin-bottom:5px; }
-.stamp-circle { width:100px; height:100px; border:2px dashed #007bff; border-radius:50%; margin:0 auto 10px; display:flex; align-items:center; justify-content:center; color:#007bff; font-size:10px; font-weight:bold; opacity:.3; }
+.stamp-circle { width:100px; height:100px; border:2px dashed #075b9d; border-radius:50%; margin:0 auto 10px; display:flex; align-items:center; justify-content:center; color:#075b9d; font-size:10px; font-weight:bold; opacity:.3; }
 .invoice-footer { margin-top:30px; padding-top:15px; border-top:1px dashed #ddd; display:flex; justify-content:space-between; font-size:12px; color:#777; }
 .action-buttons { display:flex; gap:10px; margin-top:30px; padding-top:20px; border-top:2px solid #eee; flex-wrap:wrap; }
 .btn { padding:10px 20px; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600; text-decoration:none; display:inline-block; border:none; }
-.btn-primary { background:#007bff; color:#fff; } .btn-secondary { background:#6c757d; color:#fff; } .btn-success { background:#28a745; color:#fff; }
+.btn-primary { background:#075b9d; color:#fff; } .btn-secondary { background:#6c757d; color:#fff; } .btn-success { background:#067647; color:#fff; }
 @media print {
     header, footer, nav, aside, .sidebar, .navbar, .action-buttons, .main-footer, .btn { display:none !important; }
     html, body, .content-wrapper, .main-content, .container-fluid, .content { width:100% !important; margin:0 !important; padding:0 !important; background:#fff !important; }
     .invoice-container { width:100% !important; max-width:100% !important; margin:0 !important; padding:10mm !important; }
     .invoice-card { box-shadow:none !important; border:none !important; padding:0 !important; }
-    .invoice-table thead { background-color:#007bff !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .invoice-table thead { background-color:#075b9d !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
 </style>
 
@@ -260,13 +238,14 @@ include __DIR__ . '/../includes/sidebar.php';
         <div class="total-section">
             <div class="total-box">
                 <div class="total-row"><span>Total Bill:</span><span>KSH <?= number_format($invoiceTotal, 2) ?></span></div>
-                <div class="total-row" style="color:#28a745; border-bottom:1px solid #eee; padding-bottom:5px;"><span>Amount Paid:</span><span>- KSH <?= number_format($totalPaid, 2) ?></span></div>
+                <div class="total-row" style="color:#067647; border-bottom:1px solid #eee; padding-bottom:5px;"><span>Net Amount Paid:</span><span>- KES <?= number_format($netPaid, 2) ?></span></div>
                 <div class="total-final">
                     <div style="font-size:11px; color:#666; font-weight:400; text-transform:uppercase; letter-spacing:1px;">Outstanding Balance</div>
                     <span>KSH <?= number_format($outstandingBalance, 2) ?></span>
                 </div>
             </div>
         </div>
+        <?php if ($totalRefunded > 0): ?><div class="text-right text-danger small mt-2">Approved refunds: KES <?= number_format($totalRefunded,2) ?></div><?php endif; ?>
 
         <div class="payment-panel">
             <div class="panel-card">
