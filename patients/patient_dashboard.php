@@ -619,7 +619,12 @@ if (!empty($patient['is_walkin'])) {
     $total_paid = 0.0;
     $paymentVisitCondition = ($activeVisitId > 0 && $hasVisitInvoices) ? " AND i.visit_id = ?" : "";
     $paidStmt = $conn->prepare("
-        SELECT COALESCE(SUM(p.amount), 0) AS total_paid
+        SELECT COALESCE(SUM(p.amount), 0) - COALESCE((
+            SELECT SUM(r.amount)
+            FROM payment_refunds r
+            INNER JOIN payments rp ON rp.id = r.payment_id
+            WHERE rp.invoice_id = i.id AND r.status = 'Approved'
+        ), 0) AS total_paid
         FROM payments p
         INNER JOIN invoices i ON i.id = p.invoice_id
         WHERE i.patient_id = ?" . $paymentVisitCondition . "
@@ -1276,8 +1281,8 @@ function clearForm() {
                     <input type="number" name="quantity" value="1" style="width:100%; padding:10px;">
                 </div>
                 <div>
-                    <label class="info-label">Price Override</label>
-                    <input type="number" id="stock_p" name="selling_price" step="0.01" style="width:100%; padding:10px;">
+                    <label class="info-label">Approved Unit Price</label>
+                    <div id="stock_p" style="width:100%; padding:10px; background:#f3f6fa; border:1px solid #dbe3ec; border-radius:5px; color:#667085;">Select medicine</div>
                 </div>
                 <div>
                     <label class="info-label">Dosage Instructions</label>
@@ -1573,7 +1578,10 @@ function showTab(tabId) {
 
 function updatePrice(selectElement, targetInputId) {
     const price = selectElement.options[selectElement.selectedIndex].getAttribute('data-price');
-    document.getElementById(targetInputId).value = price || '';
+    const target=document.getElementById(targetInputId);
+    if(!target) return;
+    if('value' in target) target.value = price || '';
+    else target.textContent = price ? 'KES ' + Number(price).toFixed(2) : 'Select medicine';
 }
 
 // Automatically load the walk-in's previously selected service and its price.
