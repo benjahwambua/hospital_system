@@ -97,6 +97,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/lab/lab_requests.php" class="<?= isActive('lab_requests.php') ?>"><i class="fas fa-vial"></i> Lab Requests</a>
                 <a href="/hospital_system/lab/lab_results.php" class="<?= isActive('lab_results.php') ?>"><i class="fas fa-poll-h"></i> Lab Results</a>
                 <a href="/hospital_system/lab/inventory/index.php" class="<?= isActive('lab/inventory/') ?>"><i class="fas fa-boxes"></i> Lab Inventory</a>
+                <?php if (can_module_action($conn, 'laboratory', 'edit')): ?><a href="/hospital_system/lab/inventory/test_materials.php" class="<?= isActive('lab/inventory/test_materials.php') ?>"><i class="fas fa-flask"></i> Test Materials</a><?php endif; ?>
             </div>
         </div>
         <?php endif; ?>
