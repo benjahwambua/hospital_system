@@ -377,6 +377,9 @@ if ($patient_id <= 0) {
 
     // Existing Save Clinical Handler
     if(isset($_POST['save_clinical'])){
+        if (!can_module_action($conn, 'clinical', 'create')) {
+            throw new Exception('You do not have permission to save clinical notes.');
+        }
         $params = [
             $patient_id, $_POST['presenting_complaint'] ?? '', $_POST['hpc'] ?? '',
             $_POST['medical_history'] ?? '', $_POST['surgical_history'] ?? '',
