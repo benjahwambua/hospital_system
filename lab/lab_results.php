@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 require_module_access($conn, 'laboratory', 'view');
 
@@ -19,17 +20,24 @@ if (isset($_POST['save_lab_result'])) {
         $findings = $_POST['findings'] ?? '';
         $status = ($action === 'complete') ? 'Completed' : 'Pending';
 
-        $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ? AND category = 'lab'");
-        $stmt->bind_param("ssi", $findings, $status, $record_id);
-
-        if ($stmt->execute()) {
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ? AND category = 'lab'");
+            $stmt->bind_param("ssi", $findings, $status, $record_id);
+            if (!$stmt->execute()) throw new Exception("Error updating laboratory record: " . $stmt->error);
             $stmt->close();
+
+            if ($action === 'complete') {
+                consume_lab_materials_for_service($conn, $record_id, (int)($_SESSION['user_id'] ?? 0));
+            }
+
+            $conn->commit();
             header('Location: lab_results.php?saved=1');
             exit;
-        } else {
-            $error = "Error updating record: " . $conn->error;
+        } catch (Throwable $e) {
+            $conn->rollback();
+            $error = $e->getMessage();
         }
-        $stmt->close();
     }
 }
 
