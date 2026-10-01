@@ -25,7 +25,7 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
     // Keep older installations working until service_prices is migrated.
     $tableCheck = $conn->query("SHOW TABLES LIKE 'service_prices'");
     if (!$tableCheck || $tableCheck->num_rows === 0) {
-        $stmt = $conn->prepare("SELECT NULL AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
+        $stmt = $conn->prepare("SELECT NULL AS price_id, price, service_code, service_name, category, unit, billable, requires_order, requires_result FROM services_master WHERE id=? AND active=1 LIMIT 1");
         if (!$stmt) throw new Exception('Unable to load service pricing: ' . $conn->error);
         $stmt->bind_param('i', $serviceId);
         $stmt->execute();
@@ -39,6 +39,9 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
             'service_name' => (string)($row['service_name'] ?? ''),
             'category' => (string)($row['category'] ?? ''),
             'unit' => (string)($row['unit'] ?? 'Each'),
+            'billable' => (int)($row['billable'] ?? 1) === 1,
+            'requires_order' => (int)($row['requires_order'] ?? 0) === 1,
+            'requires_result' => (int)($row['requires_result'] ?? 0) === 1,
             'payer_id' => $payerId,
             'plan_id' => $planId,
         ];
@@ -46,7 +49,7 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
 
     $stmt = $conn->prepare(
         "SELECT sp.id AS price_id, sp.price, sp.payer_id, sp.plan_id,
-                sm.service_code, sm.service_name, sm.category, sm.unit
+                sm.service_code, sm.service_name, sm.category, sm.unit, sm.billable, sm.requires_order, sm.requires_result
          FROM service_prices sp
          INNER JOIN services_master sm ON sm.id = sp.service_id
          WHERE sp.service_id = ?
@@ -127,6 +130,9 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
                         'service_name' => (string)($row['service_name'] ?? ''),
                         'category' => (string)($row['category'] ?? ''),
                         'unit' => (string)($row['unit'] ?? 'Each'),
+                        'billable' => (int)($row['billable'] ?? 1) === 1,
+                        'requires_order' => (int)($row['requires_order'] ?? 0) === 1,
+                        'requires_result' => (int)($row['requires_result'] ?? 0) === 1,
                         'payer_id' => $payerId,
                         'plan_id' => $tariff['plan_id'] !== null ? (int)$tariff['plan_id'] : null,
                     ];
@@ -137,7 +143,7 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
 
     if (!$row) {
         // Backward-compatible fallback while old databases are being migrated.
-        $stmt = $conn->prepare("SELECT id AS price_id, price, service_code, service_name, category, unit FROM services_master WHERE id=? AND active=1 LIMIT 1");
+        $stmt = $conn->prepare("SELECT id AS price_id, price, service_code, service_name, category, unit, billable, requires_order, requires_result FROM services_master WHERE id=? AND active=1 LIMIT 1");
         $stmt->bind_param('i', $serviceId);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
