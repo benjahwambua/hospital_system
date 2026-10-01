@@ -670,6 +670,7 @@ if (!empty($patient['is_walkin'])) {
           AND LOWER(COALESCE(i.status, '')) NOT IN ('cancelled', 'canceled', 'void')
         ORDER BY i.created_at DESC, ii.id DESC
     ");
+    $billingQueryError = $billingItems === false ? $conn->error : '';
 
     $dashboardPayments = [];
     // Payment history is account-wide, just like the running bill. A payment
@@ -1481,7 +1482,7 @@ function clearForm() {
 <div id="billing" class="card" style="display:none;">
         <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:var(--accent-blue);">
-                <span class="info-label">Total Invoiced</span><br>
+                <span class="info-label">Total Charges</span><br>
                 <span style="font-size:24px; font-weight:bold; color:var(--secondary-blue);">KES <?= number_format($total_charges, 2) ?></span>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#e8f5e9;">
@@ -1518,6 +1519,10 @@ function clearForm() {
                 <div class="dashboard-summary-item"><span class="summary-label">Outstanding Balance</span><span class="summary-value" style="color:#c62828;">KES <?= number_format($balance_due,2) ?></span></div>
             </div>
         </div>
+
+        <?php if ($billingQueryError !== ''): ?>
+            <div class="alert alert-danger"><strong>Billing data could not be loaded.</strong> <?= htmlspecialchars($billingQueryError) ?></div>
+        <?php endif; ?>
 
         <div style="background:#fdfefe; border:1px solid #ddd; padding:22px; border-radius:10px; margin-bottom:24px;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
@@ -1603,9 +1608,9 @@ function clearForm() {
         </div>
 
         <div class="sub-card" style="margin-top:20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><h4 style="margin:0;color:var(--secondary-blue);"><i class="fas fa-receipt"></i> Payment History</h4><span style="font-size:12px;color:#667085;">Latest 20 payments</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><h4 style="margin:0;color:var(--secondary-blue);"><i class="fas fa-receipt"></i> Payment History</h4><span style="font-size:12px;color:#667085;">Account-wide payment history</span></div>
             <div style="overflow-x:auto;margin-top:14px;"><table class="table-custom"><thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th>Amount</th><th>Receipt</th></tr></thead><tbody>
-            <?php if($dashboardPayments): foreach($dashboardPayments as $dp): ?><tr><td><?= !empty($dp['created_at']) ? htmlspecialchars(date('d M Y H:i',strtotime($dp['created_at']))) : '—' ?></td><td><?= htmlspecialchars($dp['invoice_number'] ?? ('#'.$dp['invoice_id'])) ?></td><td><?= htmlspecialchars($dp['method'] ?? '—') ?></td><td><?= htmlspecialchars($dp['reference'] ?? '—') ?></td><td><strong>KES <?= number_format((float)$dp['amount'],2) ?></strong></td><td><a class="btn btn-sm btn-outline-primary" target="_blank" href="/hospital_system/billing/print_receipt.php?id=<?= (int)$dp['id'] ?>"><i class="fas fa-receipt"></i> Receipt</a></td></tr><?php endforeach; else: ?><tr><td colspan="6" style="text-align:center;color:#667085;padding:20px;">No payments recorded for this patient in the selected encounter.</td></tr><?php endif; ?>
+            <?php if($dashboardPayments): foreach($dashboardPayments as $dp): ?><tr><td><?= !empty($dp['created_at']) ? htmlspecialchars(date('d M Y H:i',strtotime($dp['created_at']))) : '—' ?></td><td><?= htmlspecialchars($dp['invoice_number'] ?? ('#'.$dp['invoice_id'])) ?></td><td><?= htmlspecialchars($dp['method'] ?? '—') ?></td><td><?= htmlspecialchars($dp['reference'] ?? '—') ?></td><td><strong>KES <?= number_format((float)$dp['amount'],2) ?></strong></td><td><a class="btn btn-sm btn-outline-primary" target="_blank" href="/hospital_system/billing/print_receipt.php?id=<?= (int)$dp['id'] ?>"><i class="fas fa-receipt"></i> Receipt</a></td></tr><?php endforeach; else: ?><tr><td colspan="6" style="text-align:center;color:#667085;padding:20px;">No payments recorded for this patient account.</td></tr><?php endif; ?>
             </tbody></table></div>
         </div>
 
