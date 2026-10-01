@@ -567,6 +567,17 @@ if ($patient_id <= 0) {
     $patient_services = ($activeVisitId > 0 && $hasVisitServices)
         ? $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " AND ps.visit_id = " . (int)$activeVisitId . " ORDER BY ps.created_at DESC, ps.id DESC")
         : $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " ORDER BY ps.created_at DESC, ps.id DESC");
+
+    // Attach the authoritative invoice charge to each service. The recorded patient_services.price is the encounter snapshot;
+    // invoice_items is used to identify the actual active billing line. Status (Pending/Completed) never hides a charge.
+    $serviceBillingMap = [];
+    $serviceBillingRes = $conn->query("SELECT ii.id AS invoice_item_id, ii.invoice_id, ii.description, ii.total, ii." . $billingItemPriceColumn . " AS unit_price, i.status AS invoice_status FROM invoice_items ii INNER JOIN invoices i ON i.id=ii.invoice_id WHERE i.patient_id=" . (int)$patient_id . $billingVisitCondition . " AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void') AND (LOWER(COALESCE(ii.item_type,'')) IN ('service','lab') OR LOWER(COALESCE(ii.source,''))='service') ORDER BY ii.id DESC");
+    if ($serviceBillingRes) {
+        while ($bi = $serviceBillingRes->fetch_assoc()) {
+            $desc = (string)($bi['description'] ?? '');
+            $serviceBillingMap[$desc] = $bi;
+        }
+    }
     $prescriptions = ($activeVisitId > 0 && $hasVisitPrescriptions)
         ? $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " AND pr.visit_id = " . (int)$activeVisitId . " ORDER BY pr.created_at DESC, pr.id DESC")
         : $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " ORDER BY pr.created_at DESC, pr.id DESC");
@@ -1344,10 +1355,24 @@ function clearForm() {
                         <td style="font-size:12px;color:#667085;">
                             <?php if (!empty($s['visit_id'])): ?>Encounter #<?= (int)$s['visit_id'] ?><?php else: ?>Historical / unlinked<?php endif; ?>
                         </td>
-                        <td><strong>KES <?= number_format((float)($s['price'] ?? 0), 2) ?></strong></td>
+                        <?php
+                        $serviceDescription = ($isLabService ? 'Lab: ' : 'Service: ') . (string)($s['service_name'] ?? 'Service');
+                        $billingRow = $serviceBillingMap[$serviceDescription] ?? null;
+                        $recordedPrice = isset($s['price']) ? (float)$s['price'] : (float)($s['net_amount'] ?? 0);
+                        $displayPrice = $billingRow ? (float)$billingRow['unit_price'] : $recordedPrice;
+                        $displayTotal = $billingRow ? (float)$billingRow['total'] : $recordedPrice * max(1, (float)($s['quantity'] ?? 1));
+                    ?>
                         <td>
-                            <?php if ($isBillableService): ?>
-                                <span class="status-chip completed">Billable</span>
+                            <strong>KES <?= number_format($displayTotal, 2) ?></strong>
+                            <?php if ($billingRow): ?><div style="font-size:11px;color:#667085;margin-top:3px;">Recorded charge</div><?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($billingRow): ?>
+                                <span class="status-chip completed">On Bill</span>
+                                <div style="font-size:11px;color:#667085;margin-top:3px;">Invoice #<?= (int)$billingRow['invoice_id'] ?></div>
+                            <?php elseif ($isBillableService): ?>
+                                <span class="status-chip pending">Billable</span>
+                                <div style="font-size:11px;color:#667085;margin-top:3px;">Charge not linked</div>
                             <?php else: ?>
                                 <span class="status-chip">Non-billable</span>
                             <?php endif; ?>
