@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             if ($actionType === 'save_all') {
                 $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient','Maternity');
-                $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
+                $invoiceId=null;
 
                 // Maternity billing uses the central Service Catalogue. There is no
                 // hard-coded maternity consultation fee and no free-text service charge.
@@ -197,7 +197,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
                     }
                 }
-                $success='Clinical records saved and all charges posted to the invoice.';
+                $success=$invoiceId
+    ? 'Clinical records saved. Billable catalogue services were added to the central invoice; pharmacy charges are posted when medicines are dispensed.'
+    : 'Clinical records saved. No billable catalogue service was added; pharmacy charges are posted when medicines are dispensed.';
             } else {
                 $success='Clinical records saved successfully (No billing created).';
             }
