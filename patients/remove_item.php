@@ -54,7 +54,8 @@ try{
    $del=$conn->prepare("DELETE FROM invoice_items WHERE id=? LIMIT 1");
    if(!$del)throw new Exception('Unable to remove invoice line.');
    $del->bind_param('i',$invoiceItemId);if(!$del->execute())throw new Exception('Unable to remove invoice line: '.$del->error);$del->close();
-   if($conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'")?->num_rows){
+   $hasReference=$conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'");
+   if($hasReference && $hasReference->num_rows){
     $ref='INVITEM-'.$invoiceItemId;
     $ae=$conn->prepare("DELETE FROM accounting_entries WHERE reference_id=?");
     if($ae){$ae->bind_param('s',$ref);$ae->execute();$ae->close();}
