@@ -672,11 +672,12 @@ if (!empty($patient['is_walkin'])) {
     ");
 
     $dashboardPayments = [];
+    // Payment history is account-wide, just like the running bill. A payment
+    // made against an earlier visit still reduces what the patient owes today.
     $dashboardPaymentSql = "SELECT p.id,p.amount,p.method,p.reference,p.created_at,p.invoice_id,i.invoice_number
         FROM payments p INNER JOIN invoices i ON i.id=p.invoice_id
-        WHERE i.patient_id=".(int)$patient_id
-        .($activeVisitId>0 && $hasVisitInvoices ? " AND i.visit_id=".(int)$activeVisitId : "")
-        ." AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')
+        WHERE i.patient_id=".(int)$patient_id."
+          AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')
         ORDER BY p.created_at DESC,p.id DESC LIMIT 20";
     $dashboardPaymentRes=$conn->query($dashboardPaymentSql);
     if($dashboardPaymentRes) while($dp=$dashboardPaymentRes->fetch_assoc()) $dashboardPayments[]=$dp;
@@ -986,7 +987,7 @@ if ($patient_id <= 0) {
                 <span class="info-value" style="font-size: 24px;"><?= htmlspecialchars($patient['full_name']) ?></span>
                 <div style="display:flex; gap:30px;">
                     <div><span class="info-label">Patient No</span><span class="info-value"><?= htmlspecialchars($patient['patient_number']) ?></span></div>
-                    <div><span class="info-label">Current Balance</span><span class="info-value" style="color:#ffeb3b;">KES <?= number_format($balance_due, 2) ?></span></div>
+                    <div><span class="info-label">Current Balance</span><span class="info-value" style="color:#ffeb3b;font-size:20px;font-weight:800;">KES <?= number_format($amountToPayNow, 2) ?></span></div>
                 </div>
             </div>
             <div style="text-align:right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 20px;">
@@ -1012,9 +1013,9 @@ if ($patient_id <= 0) {
             <div class="command-meta"><?= $currentAdmission ? htmlspecialchars(($currentAdmission['ward_name'] ?: 'Ward').' · Bed '.($currentAdmission['bed_number'] ?: '—')) : 'No active inpatient admission.' ?></div>
         </div>
         <div class="patient-command-card <?= $balance_due > 0 ? 'alert-card' : 'ok-card' ?>">
-            <div class="command-label">Outstanding Balance</div>
-            <div class="command-value">KES <?= number_format($balance_due,2) ?></div>
-            <div class="command-meta"><?= htmlspecialchars($currentPayerLabel) ?> · Co-pay estimate KES <?= number_format($currentCopayEstimate,2) ?></div>
+            <div class="command-label">Amount to Pay</div>
+            <div class="command-value">KES <?= number_format($amountToPayNow,2) ?></div>
+            <div class="command-meta">Total charges KES <?= number_format($total_charges,2) ?> · Paid KES <?= number_format($total_paid,2) ?></div>
         </div>
         <div class="patient-command-card <?= $recentAppointment ? 'info-card' : 'ok-card' ?>">
             <div class="command-label">Appointment</div>
@@ -1496,6 +1497,25 @@ function clearForm() {
                 <span class="info-label">Amount to Pay</span><br>
                 <span style="font-size:24px; font-weight:bold; color:#c62828;">KES <?= number_format($amountToPayNow, 2) ?></span>
                 <div style="font-size:12px; color:#666; margin-top:6px;">Co-pay est: KES <?= number_format($currentCopayEstimate, 2); ?></div>
+            </div>
+        </div>
+
+        <div class="running-bill-panel" style="background:#fff;border:1px solid #cfe0ef;padding:22px;border-radius:10px;margin-bottom:24px;box-shadow:0 3px 12px rgba(0,0,0,.05);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:15px;flex-wrap:wrap;">
+                <div>
+                    <h3 style="margin:0;color:var(--secondary-blue);"><i class="fas fa-file-invoice-dollar"></i> Running Patient Bill</h3>
+                    <p style="margin:6px 0 0;color:#667085;font-size:13px;">Cumulative charges for services, laboratory tests and medicines on this patient account.</p>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:11px;text-transform:uppercase;font-weight:800;color:#718096;">Amount to Pay</div>
+                    <div style="font-size:28px;font-weight:800;color:#c62828;">KES <?= number_format($amountToPayNow,2) ?></div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px;">
+                <div class="dashboard-summary-item"><span class="summary-label">Total Charges</span><span class="summary-value">KES <?= number_format($total_charges,2) ?></span></div>
+                <div class="dashboard-summary-item"><span class="summary-label">Payments Received</span><span class="summary-value">KES <?= number_format($total_paid,2) ?></span></div>
+                <div class="dashboard-summary-item"><span class="summary-label">Insurance / SHA</span><span class="summary-value">KES <?= number_format($insuranceCovered,2) ?></span></div>
+                <div class="dashboard-summary-item"><span class="summary-label">Outstanding Balance</span><span class="summary-value" style="color:#c62828;">KES <?= number_format($balance_due,2) ?></span></div>
             </div>
         </div>
 
