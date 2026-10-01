@@ -766,6 +766,14 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
         $types .= 's';
         $values[] = $item_type;
     }
+    // Newer schemas can explicitly link the invoice line back to its source.
+    // Keep this optional so older HMS databases remain compatible.
+    if ($item_type !== null && invoice_item_column_exists($conn, 'source')) {
+        $columns[] = 'source';
+        $placeholders[] = '?';
+        $types .= 's';
+        $values[] = $item_type === 'pharmacy' ? 'pharmacy' : 'service';
+    }
     if ($med_id !== null && invoice_item_column_exists($conn, 'med_id')) {
         $columns[] = 'med_id';
         $placeholders[] = '?';
