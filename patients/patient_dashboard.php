@@ -997,7 +997,7 @@ if ($patient_id <= 0) {
                 <span class="info-value" style="font-size: 24px;"><?= htmlspecialchars($patient['full_name']) ?></span>
                 <div style="display:flex; gap:30px;">
                     <div><span class="info-label">Patient No</span><span class="info-value"><?= htmlspecialchars($patient['patient_number']) ?></span></div>
-                    <div><span class="info-label">Current Balance</span><span class="info-value" style="color:#ffeb3b;font-size:20px;font-weight:800;">KES <?= number_format($amountToPayNow, 2) ?></span></div>
+                    <div><span class="info-label">Current Balance</span><span class="info-value" style="color:#ffeb3b;font-size:20px;font-weight:800;">KES <?= number_format($balance_due, 2) ?></span></div>
                 </div>
             </div>
             <div style="text-align:right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 20px;">
@@ -1024,8 +1024,8 @@ if ($patient_id <= 0) {
         </div>
         <div class="patient-command-card <?= $balance_due > 0 ? 'alert-card' : 'ok-card' ?>">
             <div class="command-label">Amount to Pay</div>
-            <div class="command-value">KES <?= number_format($amountToPayNow,2) ?></div>
-            <div class="command-meta">Total charges KES <?= number_format($total_charges,2) ?> · Paid KES <?= number_format($total_paid,2) ?></div>
+            <div class="command-value">KES <?= number_format($balance_due,2) ?></div>
+            <div class="command-meta">Total charges KES <?= number_format($total_charges,2) ?> · Total paid KES <?= number_format($total_paid,2) ?></div>
         </div>
         <div class="patient-command-card <?= $recentAppointment ? 'info-card' : 'ok-card' ?>">
             <div class="command-label">Appointment</div>
@@ -1495,7 +1495,7 @@ function clearForm() {
                 <span style="font-size:24px; font-weight:bold; color:var(--secondary-blue);">KES <?= number_format($total_charges, 2) ?></span>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#e8f5e9;">
-                <span class="info-label">Total Collected</span><br>
+                <span class="info-label">Total Paid</span><br>
                 <span style="font-size:24px; font-weight:bold; color:#2e7d32;">KES <?= number_format($total_paid, 2) ?></span>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#eef7ff;">
@@ -1504,9 +1504,9 @@ function clearForm() {
                 <div style="font-size:12px; color:#666; margin-top:6px;">Payer: <?= htmlspecialchars($currentPayerLabel); ?></div>
             </div>
             <div style="padding: 20px; border-radius: 8px; text-align: center; background:#ffebee;">
-                <span class="info-label">Amount to Pay</span><br>
-                <span style="font-size:24px; font-weight:bold; color:#c62828;">KES <?= number_format($amountToPayNow, 2) ?></span>
-                <div style="font-size:12px; color:#666; margin-top:6px;">Co-pay est: KES <?= number_format($currentCopayEstimate, 2); ?></div>
+                <span class="info-label">Outstanding Balance</span><br>
+                <span style="font-size:24px; font-weight:bold; color:#c62828;">KES <?= number_format($balance_due, 2) ?></span>
+                <div style="font-size:12px; color:#666; margin-top:6px;">Total charges less total paid</div>
             </div>
         </div>
 
@@ -1517,8 +1517,8 @@ function clearForm() {
                     <p style="margin:6px 0 0;color:#667085;font-size:13px;">Cumulative charges for services, laboratory tests and medicines on this patient account.</p>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:11px;text-transform:uppercase;font-weight:800;color:#718096;">Amount to Pay</div>
-                    <div style="font-size:28px;font-weight:800;color:#c62828;">KES <?= number_format($amountToPayNow,2) ?></div>
+                    <div style="font-size:11px;text-transform:uppercase;font-weight:800;color:#718096;">Outstanding Balance</div>
+                    <div style="font-size:28px;font-weight:800;color:#c62828;">KES <?= number_format($balance_due,2) ?></div>
                 </div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px;">
