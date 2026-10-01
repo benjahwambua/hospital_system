@@ -23,9 +23,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                         $visitId=get_or_create_current_visit($conn,$patientId,'Outpatient','Maternity');
                         $resolved=get_service_price_for_patient($conn,$patientId,$serviceId);
                         $amount=(float)$resolved['price'];
-                        $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
-                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$resolved['service_name'],1,$amount,'maternity',$serviceId);
-                        post_invoice_journal($conn,$invoiceId,$patientId,$amount,'Maternity catalogue service',$itemId);
+                        if (!empty($resolved['billable'])) {
+                            $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
+                            $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$resolved['service_name'],1,$amount,'maternity',$serviceId);
+                            post_invoice_journal($conn,$invoiceId,$patientId,$amount,'Maternity catalogue service',$itemId);
+                        }
                         if(function_exists('audit'))audit('maternity_charge',"maternity_id={$id},service_id={$serviceId},amount={$amount}");
                         $conn->commit();header("Location:view.php?id={$id}&charge=1");exit;
                     }catch(Throwable $e){$conn->rollback();$error=$e->getMessage();}
