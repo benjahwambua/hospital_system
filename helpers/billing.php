@@ -446,15 +446,21 @@ function create_invoice($conn, $patient_id = null, $encounter_id = null, $walkin
 }
 
 function get_or_create_invoice($conn, $patient_id, $encounter_id = null, $visit_id = null) {
-    // Prefer an outstanding invoice belonging to this specific visit.
-    // Legacy invoices without visit_id remain available through the patient-wide fallback.
+    // Reuse only a non-cancelled invoice that still has an outstanding balance.
+    // Payment columns differ across older HMS schemas, so build the paid expression
+    // from columns that actually exist in the live database.
+    $paidAmountExpr = invoice_column_exists($conn, 'paid_amount') ? 'COALESCE(paid_amount,0)' : '0';
+    $amountPaidExpr = invoice_column_exists($conn, 'amount_paid') ? 'COALESCE(amount_paid,0)' : '0';
+    $paidExpr = "GREATEST($paidAmountExpr,$amountPaidExpr)";
+
     if ($visit_id !== null && (int)$visit_id > 0 && invoice_column_exists($conn, 'visit_id')) {
         $q = $conn->prepare("
             SELECT id
             FROM invoices
             WHERE patient_id = ?
               AND visit_id = ?
-              AND COALESCE(total, 0) > GREATEST($paidAmountExpr, $amountPaidExpr)
+              AND LOWER(COALESCE(status,'')) NOT IN ('cancelled','canceled','void')
+              AND COALESCE(total,0) > $paidExpr
             ORDER BY id DESC
             LIMIT 1
         ");
@@ -473,7 +479,8 @@ function get_or_create_invoice($conn, $patient_id, $encounter_id = null, $visit_
         SELECT id
         FROM invoices
         WHERE patient_id = ?
-          AND COALESCE(total, 0) > GREATEST(COALESCE(paid_amount, 0), COALESCE(amount_paid, 0))
+          AND LOWER(COALESCE(status,'')) NOT IN ('cancelled','canceled','void')
+          AND COALESCE(total,0) > $paidExpr
         ORDER BY id DESC
         LIMIT 1
     ");
