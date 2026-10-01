@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                     post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
                 }
                 $conn->commit();
-                $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.'.';
+                $message=ucfirst($type).' order placed'.(!empty($resolved['billable']) && $invoiceId ? ' and added to Invoice #'.$invoiceId : ' (non-billable service).').';';
             } elseif ($type==='pharmacy') {
                 $medicineId=(int)($_POST['medicine_id'] ?? 0);
                 $quantity=max(1,(int)($_POST['quantity'] ?? 1));
