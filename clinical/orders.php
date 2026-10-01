@@ -203,8 +203,46 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                         $pq->close();
                     }
                 }
+                // Prescription is a financial charge at the time it is ordered.
+                // Dispensing fulfills the order and must never create a second charge.
+                $invoiceId = get_or_create_visit_invoice($conn, $patientId, $visitId);
+                $invoiceItemId = add_invoice_item(
+                    $conn,
+                    $invoiceId,
+                    'Pharmacy: ' . $medicine['drug_name'],
+                    $quantity,
+                    $unit,
+                    'pharmacy',
+                    $medicineId
+                );
+                post_invoice_journal(
+                    $conn,
+                    $invoiceId,
+                    $patientId,
+                    $quantity * $unit,
+                    'Pharmacy prescription',
+                    $invoiceItemId
+                );
+
+                // Link the prescription to its invoice when the column exists.
+                if (invoice_column_exists($conn, 'id')) {
+                    $rxInvoiceColumn = $conn->query("SHOW COLUMNS FROM prescriptions LIKE 'invoice_id'");
+                    if ($rxInvoiceColumn && $rxInvoiceColumn->num_rows > 0) {
+                        $linkRx = $conn->prepare("UPDATE prescriptions SET invoice_id=? WHERE id=?");
+                        if ($linkRx) {
+                            $linkRx->bind_param('ii', $invoiceId, $prescriptionId);
+                            if (!$linkRx->execute()) {
+                                $err = $linkRx->error;
+                                $linkRx->close();
+                                throw new Exception('Unable to link prescription to its invoice: ' . $err);
+                            }
+                            $linkRx->close();
+                        }
+                    }
+                }
+
                 $conn->commit();
-                $message='Prescription sent to Pharmacy for dispensing. Stock and the pharmacy charge are posted when Pharmacy dispenses. ';
+                $message='Prescription sent to Pharmacy and added to the patient bill. The charge remains on the account until paid or reversed.';
             } else throw new Exception('Select a department.');
         } catch (Throwable $e) {
             $conn->rollback();
