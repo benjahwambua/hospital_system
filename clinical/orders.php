@@ -111,6 +111,7 @@ if ($v) { $v->bind_param('ii',$visitId,$patientId); $v->execute(); $visit=$v->ge
 if (!$visit) die('Visit not found.');
 
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
+    $invoiceId = null;
     if (($visit['status'] ?? '') === 'Completed') {
         $message = 'This visit is already completed. Start a new visit before placing additional orders.';
     } elseif (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
@@ -134,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                     post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
                 }
                 $conn->commit();
-                $message=ucfirst($type).' order placed'.(!empty($resolved['billable']) && $invoiceId ? ' and added to Invoice #'.$invoiceId : ' (non-billable service).').';';
+                $message=ucfirst($type).' order placed'.(!empty($resolved['billable']) && $invoiceId ? ' and added to Invoice #'.$invoiceId : ' (non-billable service).');
             } elseif ($type==='pharmacy') {
                 $medicineId=(int)($_POST['medicine_id'] ?? 0);
                 $quantity=max(1,(int)($_POST['quantity'] ?? 1));
