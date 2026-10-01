@@ -596,11 +596,19 @@ if ($patient_id <= 0) {
             $serviceBillingMap[$desc] = $bi;
         }
     }
-    $prescriptions = ($activeVisitId > 0 && $hasVisitPrescriptions)
-        ? $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " AND pr.visit_id = " . (int)$activeVisitId . " ORDER BY pr.created_at DESC, pr.id DESC")
-        : $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id WHERE pr.patient_id = " . (int)$patient_id . " ORDER BY pr.created_at DESC, pr.id DESC");
+    // Prescriptions are part of the patient's financial account, not only the
+    // currently open encounter. Keep the dashboard history cumulative so the
+    // doctor can see every medicine charge alongside services and laboratory work.
+    $prescriptions = $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price
+        FROM prescriptions pr
+        LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id
+        WHERE pr.patient_id = " . (int)$patient_id . "
+        ORDER BY pr.created_at DESC, pr.id DESC");
     if (!$prescriptions) {
-        $prescriptions = $conn->query("SELECT pr.*, ps.drug_name, ps.selling_price AS stock_selling_price FROM prescriptions pr LEFT JOIN pharmacy_stock ps ON ps.id = pr.medicine_id ORDER BY pr.created_at DESC, pr.id DESC");
+        $prescriptions = $conn->query("SELECT pr.*, NULL AS drug_name, NULL AS stock_selling_price
+            FROM prescriptions pr
+            WHERE pr.patient_id = " . (int)$patient_id . "
+            ORDER BY pr.created_at DESC, pr.id DESC");
     }
     $stock = $conn->query("SELECT id, drug_name, quantity, selling_price FROM pharmacy_stock WHERE quantity > 0 ORDER BY drug_name");
 
@@ -650,6 +658,9 @@ if (!empty($patient['is_walkin'])) {
     // Charges are read from invoice_items because this is the authoritative
     // record of services, investigations and medicines billed to the patient.
     $billingScopeLabel = 'Patient Account';
+    // Billing is account-wide and must not depend on visit_id existing in the
+    // local database. Every active invoice line is a patient charge, including
+    // pharmacy/prescriptions whether the order is still pending or already dispensed.
     $billingItems = $conn->query("
         SELECT
             ii.id,
@@ -659,13 +670,11 @@ if (!empty($patient['is_walkin'])) {
             ii.{$billingItemPriceColumn} AS unit_price,
             ii.total,
             {$billingItemTypeSelect},
+            {$billingItemSourceSelect},
             i.created_at AS invoice_date,
-            i.status AS invoice_status,
-            i.visit_id,
-            v.visit_number
+            i.status AS invoice_status
         FROM invoice_items ii
         INNER JOIN invoices i ON i.id = ii.invoice_id
-        LEFT JOIN visits v ON v.id = i.visit_id
         WHERE i.patient_id = " . (int)$patient_id . "
           AND LOWER(COALESCE(i.status, '')) NOT IN ('cancelled', 'canceled', 'void')
         ORDER BY i.created_at DESC, ii.id DESC
@@ -1548,7 +1557,6 @@ function clearForm() {
                             <th>Date</th>
                             <th>Service / Item</th>
                             <th>Department</th>
-                            <th>Visit</th>
                             <th>Qty</th>
                             <th>Unit Price</th>
                             <th>Amount</th>
@@ -1562,10 +1570,17 @@ function clearForm() {
                                 <?php
                                     $itemType = strtolower(trim((string)($billItem['item_type'] ?? '')));
                                     if ($itemType === '') {
+                                        $itemType = strtolower(trim((string)($billItem['source'] ?? '')));
+                                    }
+                                    if ($itemType === '') {
                                         $descriptionLower = strtolower((string)($billItem['description'] ?? ''));
                                         if (strpos($descriptionLower, 'lab:') === 0) {
                                             $itemType = 'lab';
-                                        } elseif (strpos($descriptionLower, 'medication:') === 0 || strpos($descriptionLower, 'medicine:') === 0) {
+                                        } elseif (
+                                            strpos($descriptionLower, 'pharmacy:') === 0 ||
+                                            strpos($descriptionLower, 'medication:') === 0 ||
+                                            strpos($descriptionLower, 'medicine:') === 0
+                                        ) {
                                             $itemType = 'pharmacy';
                                         } elseif (strpos($descriptionLower, 'radiology:') === 0 || strpos($descriptionLower, 'x-ray:') === 0) {
                                             $itemType = 'radiology';
@@ -1587,7 +1602,6 @@ function clearForm() {
                                     <td><?= !empty($billItem['invoice_date']) ? date('d M Y H:i', strtotime($billItem['invoice_date'])) : 'N/A' ?></td>
                                     <td><strong><?= htmlspecialchars($billItem['description'] ?? 'Billed Item') ?></strong></td>
                                     <td><?= htmlspecialchars($department) ?></td>
-                                    <td><?= htmlspecialchars($billItem['visit_number'] ?? ($activeVisit['visit_number'] ?? '—')) ?></td>
                                     <td><?= number_format((float)($billItem['quantity'] ?? 1), 2) ?></td>
                                     <td>KES <?= number_format((float)($billItem['unit_price'] ?? 0), 2) ?></td>
                                     <td><strong>KES <?= number_format((float)($billItem['total'] ?? 0), 2) ?></strong></td>
@@ -1597,7 +1611,7 @@ function clearForm() {
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="9" style="text-align:center; color:#666; padding:25px;">
+                                <td colspan="8" style="text-align:center; color:#666; padding:25px;">
                                     No billed services or charges are recorded in this patient account.
                                 </td>
                             </tr>
