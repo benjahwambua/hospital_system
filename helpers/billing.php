@@ -161,6 +161,9 @@ function get_service_price($conn, int $serviceId, ?int $payerId = null, ?int $pl
         'service_name' => (string)($row['service_name'] ?? ''),
         'category' => (string)($row['category'] ?? ''),
         'unit' => (string)($row['unit'] ?? 'Each'),
+        'billable' => true,
+        'requires_order' => (int)($row['requires_order'] ?? 0) === 1,
+        'requires_result' => (int)($row['requires_result'] ?? 0) === 1,
         'payer_id' => $row['payer_id'] ?? $payerId,
         'plan_id' => $row['plan_id'] ?? $planId,
     ];
