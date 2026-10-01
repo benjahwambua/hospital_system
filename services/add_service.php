@@ -2,9 +2,10 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 require_login();
-require_role(['admin']);
+require_module_access($conn, 'administration', 'create');
 
 $message = '';
 $error = '';
@@ -29,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $service_code = 'TMP-' . strtoupper(bin2hex(random_bytes(6)));
 
-    $valid_categories = ['consultation', 'procedure', 'treatment', 'lab', 'radiology', 'maternity', 'other'];
+    $valid_categories = ['consultation', 'procedure', 'treatment', 'lab', 'radiology', 'maternity', 'inpatient', 'other'];
 
     if ($name === '' || !in_array($category, $valid_categories, true) || $department === '' || $unit === '' || $price < 0 || $cost_price < 0) {
         $error = 'Service name, category, department and valid prices are required.';
@@ -123,6 +124,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 <option value="lab">Laboratory</option>
                 <option value="radiology">Radiology</option>
                 <option value="maternity">Maternity</option>
+                <option value="inpatient">Inpatient / Ward</option>
                 <option value="other">Other</option>
             </select>
 
