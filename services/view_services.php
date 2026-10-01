@@ -9,7 +9,7 @@ require_module_access($conn, 'administration', 'view');
 
 $message = '';
 $error = '';
-$isAdmin = current_user_is_super() || current_user_role() === 'admin';
+$isAdmin = current_user_is_super() || can_module_action($conn, 'administration', 'edit');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$isAdmin) {
