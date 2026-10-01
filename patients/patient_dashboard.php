@@ -726,7 +726,7 @@ $isMaternityPatient = !empty($patient) && empty($patient['is_walkin']) && in_arr
 // canonical visits table so older visits cannot be mistaken for today's encounter.
 $encounterHistory = [];
 if ($patient_id > 0 && hms_visits_available($conn)) {
-    $historyStmt = $conn->prepare("SELECT visit_number, visit_date, visit_time, visit_type, clinic_category, status FROM visits WHERE patient_id=? ORDER BY visit_date DESC, visit_time DESC, id DESC LIMIT 15");
+    $historyStmt = $conn->prepare("SELECT id, visit_date, visit_time, visit_type, clinic_category, status FROM visits WHERE patient_id=? ORDER BY visit_date DESC, visit_time DESC, id DESC LIMIT 15");
     if ($historyStmt) {
         $historyStmt->bind_param('i', $patient_id);
         $historyStmt->execute();
@@ -993,16 +993,15 @@ if ($patient_id <= 0) {
         <?php if ($encounterHistory): ?>
             <div style="overflow-x:auto;margin-top:12px;">
                 <table class="table-custom" style="margin-top:0;">
-                    <thead><tr><th>Date</th><th>Visit No.</th><th>Type</th><th>Department</th><th>Status</th><th>Context</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Type</th><th>Department</th><th>Status</th><th>Context</th></tr></thead>
                     <tbody>
                     <?php foreach ($encounterHistory as $history): ?>
                         <tr>
                             <td><?= htmlspecialchars(date('d M Y', strtotime((string)$history['visit_date']))) ?><br><small><?= htmlspecialchars((string)($history['visit_time'] ?? '')) ?></small></td>
-                            <td><strong><?= htmlspecialchars((string)$history['visit_number']) ?></strong></td>
                             <td><?= htmlspecialchars((string)$history['visit_type']) ?></td>
                             <td><?= htmlspecialchars((string)($history['clinic_category'] ?: 'General')) ?></td>
                             <td><?= htmlspecialchars((string)$history['status']) ?></td>
-                            <td><?php if ($activeVisit && (string)$history['visit_number'] === (string)$activeVisit['visit_number']): ?><span class="status-chip completed">Current</span><?php else: ?>Historical encounter<?php endif; ?></td>
+                            <td><?php if ($activeVisit && (int)$history['id'] === (int)$activeVisit['id']): ?><span class="status-chip completed">Current</span><?php else: ?>Historical encounter<?php endif; ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -1535,7 +1534,6 @@ function clearForm() {
             <?php if (can_module_action($conn,'finance','view')): ?><a class="btn btn-outline-primary" href="/hospital_system/billing/view_bills.php">Open Billing</a><?php endif; ?>
         </div>
     </div>
-/div>
 </div>
 
 <script>
