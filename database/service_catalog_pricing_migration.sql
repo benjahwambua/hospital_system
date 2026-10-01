@@ -46,6 +46,12 @@ UPDATE services_master
 SET service_code = CONCAT('SVC-', LPAD(id, 5, '0'))
 WHERE service_code IS NULL OR service_code = '';
 
+-- HMS billing model: every catalogue service is billable.
+-- There is no non-billable clinical service in the patient financial workflow.
+UPDATE services_master
+SET billable = 1
+WHERE billable IS NULL OR billable = 0;
+
 UPDATE services_master
 SET category = 'procedure'
 WHERE LOWER(category) IN ('procedures', 'procedure');
