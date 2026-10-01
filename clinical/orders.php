@@ -126,6 +126,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 if (!$s) throw new Exception('Unable to load service.');
                 $s->bind_param('is',$serviceId,$type); $s->execute(); $service=$s->get_result()->fetch_assoc(); $s->close();
                 if (!$service) throw new Exception('Select a valid service.');
+                // Prevent duplicate clinical orders and duplicate billing lines within the same visit.
+                $dup=$conn->prepare("SELECT id FROM patient_services WHERE patient_id=? AND service_id=? AND visit_id=? AND status <> 'Cancelled' LIMIT 1");
+                if (!$dup) throw new Exception('Unable to check for an existing order.');
+                $dup->bind_param('iii',$patientId,$serviceId,$visitId);
+                $dup->execute();
+                $alreadyOrdered=(bool)$dup->get_result()->fetch_assoc();
+                $dup->close();
+                if ($alreadyOrdered) throw new Exception('This service has already been ordered for the current visit.');
+
                 $resolved=get_service_price_for_patient($conn,$patientId,$serviceId);
                 $price=(float)$resolved['price'];
                 add_patient_service($conn, $patientId, $serviceId, $visitId, null, null, 1, 0, 'Pending', null);
@@ -144,13 +153,29 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 $s->bind_param('i',$medicineId); $s->execute(); $medicine=$s->get_result()->fetch_assoc(); $s->close();
                 if (!$medicine) throw new Exception('Select a valid medicine.');
                 if ((int)$medicine['quantity'] < $quantity) throw new Exception('Insufficient stock.');
+                if (!ensure_prescription_visit_column($conn)) {
+                    throw new Exception('Prescription visit linkage is required. Run the clinical care migration before placing pharmacy orders.');
+                }
+
+                // Prevent duplicate prescriptions for the same medicine in one visit.
+                // Pharmacy queue status is used so cancelled orders can be re-prescribed.
+                $dupRx=$conn->prepare("SELECT pr.id
+                    FROM prescriptions pr
+                    LEFT JOIN pharmacy_queue pq ON pq.prescription_id=pr.id
+                    WHERE pr.patient_id=? AND pr.medicine_id=? AND pr.visit_id=?
+                      AND (pq.id IS NULL OR pq.status <> 'cancelled')
+                    LIMIT 1");
+                if (!$dupRx) throw new Exception('Unable to check for an existing prescription.');
+                $dupRx->bind_param('iii',$patientId,$medicineId,$visitId);
+                $dupRx->execute();
+                $existingRx=$dupRx->get_result()->fetch_assoc();
+                $dupRx->close();
+                if ($existingRx) throw new Exception('This medicine has already been prescribed for the current visit.');
+
                 $unit=(float)$medicine['selling_price'];
                 if (ensure_prescription_visit_column($conn)) {
                     $rx=$conn->prepare("INSERT INTO prescriptions (patient_id,medicine_id,quantity,unit_price,visit_id,frequency,created_at) VALUES (?,?,?,?,?,?,NOW())");
                     $rx->bind_param('iiidis',$patientId,$medicineId,$quantity,$unit,$visitId,$notes);
-                } else {
-                    $rx=$conn->prepare("INSERT INTO prescriptions (patient_id,medicine_id,quantity,unit_price,frequency,created_at) VALUES (?,?,?,?,?,NOW())");
-                    $rx->bind_param('iiids',$patientId,$medicineId,$quantity,$unit,$notes);
                 }
                 if (!$rx->execute()) throw new Exception($rx->error);
                 $prescriptionId=(int)$rx->insert_id; $rx->close();
@@ -211,12 +236,12 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 <?php if($rads): while($x=$rads->fetch_assoc()): ?><option value="<?=$x['id']?>">Radiology: <?=htmlspecialchars($x['service_name'])?> — KES <?=number_format((float)get_service_price_for_patient($conn,$patientId,(int)$x['id'])['price'],2)?></option><?php endwhile; endif; ?></select></div>
 <div class="col-md-5 mb-3" id="medicineBox" style="display:none"><label>Medicine</label><select name="medicine_id" class="form-control"><option value="">Select...</option><?php if($meds): while($m=$meds->fetch_assoc()): ?><option value="<?=$m['id']?>"><?=htmlspecialchars($m['drug_name'])?> — KES <?=number_format($m['selling_price'],2)?> · Stock <?=$m['quantity']?></option><?php endwhile; endif; ?></select></div>
 <div class="col-md-2 mb-3"><label>Qty</label><input type="number" name="quantity" value="1" min="1" class="form-control"></div>
-<div class="col-md-10 mb-3"><label>Instructions / Notes</label><input type="text" name="order_notes" class="form-control"></div>
+<div class="col-md-10 mb-3"><label>Dosage / Instructions / Notes</label><input type="text" name="order_notes" class="form-control" placeholder="e.g. 1 tablet 3 times daily for 5 days"></div>
 <div class="col-md-2 mb-3"><button name="place_order" class="btn btn-success btn-block">Place Order</button></div>
 </form>
 </div></div>
 <div class="card shadow-sm"><div class="card-header">Lab & Radiology Orders</div><div class="card-body"><table class="table table-sm"><tr><th>Department</th><th>Service</th><th>Status</th><th>Amount</th><th>Time</th></tr><?php while($o=$orderRows->fetch_assoc()): ?><tr><td><?=htmlspecialchars(ucfirst($o['category']))?></td><td><?=htmlspecialchars($o['service_name'])?></td><td><?=htmlspecialchars($o['status']??'Pending')?></td><td>KES <?=number_format($o['price'],2)?></td><td><?=htmlspecialchars($o['created_at'])?></td></tr><?php endwhile; ?></table></div></div>
-<?php if($rxRows): ?><div class="card shadow-sm mt-4"><div class="card-header">Pharmacy Orders</div><div class="card-body"><table class="table table-sm"><tr><th>Medicine</th><th>Qty</th><th>Unit Price</th><th>Time</th></tr><?php while($r=$rxRows->fetch_assoc()): ?><tr><td><?=htmlspecialchars($r['drug_name'])?></td><td><?=$r['quantity']?></td><td>KES <?=number_format($r['unit_price'],2)?></td><td><?=htmlspecialchars($r['created_at'])?></td></tr><?php endwhile; ?></table></div></div><?php endif; ?>
+<?php if($rxRows): ?><div class="card shadow-sm mt-4"><div class="card-header">Pharmacy Orders</div><div class="card-body"><table class="table table-sm"><tr><th>Medicine</th><th>Qty</th><th>Unit Price</th><th>Status</th><th>Time</th></tr><?php while($r=$rxRows->fetch_assoc()): ?><tr><td><?=htmlspecialchars($r['drug_name'])?></td><td><?=$r['quantity']?></td><td>KES <?=number_format($r['unit_price'],2)?></td><td><span class="badge badge-warning">Pending Pharmacy</span></td><td><?=htmlspecialchars($r['created_at'])?></td></tr><?php endwhile; ?></table></div></div><?php endif; ?>
 <a class="btn btn-outline-primary mt-3" href="../patients/patient_dashboard.php?id=<?=$patientId?>&tab=clinical">Back to Clinical Care</a>
 </div></div>
 <script>
