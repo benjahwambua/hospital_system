@@ -321,7 +321,8 @@ if ($patient_id <= 0) {
                     $duplicate = $duplicateStmt->get_result()->fetch_assoc();
                     $duplicateStmt->close();
                     if ($duplicate) {
-                        throw new Exception('This service has already been added to the current encounter.');
+                        header("Location: patient_dashboard.php?id=$patient_id&tab=services&duplicate_service=1");
+                        exit;
                     }
                 }
             }
@@ -380,7 +381,8 @@ if ($patient_id <= 0) {
                     $duplicateLab = $duplicateLabStmt->get_result()->fetch_assoc();
                     $duplicateLabStmt->close();
                     if ($duplicateLab) {
-                        throw new Exception('This laboratory test has already been requested for the current encounter.');
+                        header("Location: patient_dashboard.php?id=$patient_id&tab=services&duplicate_lab=1");
+                        exit;
                     }
                 }
             }
