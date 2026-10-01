@@ -649,7 +649,7 @@ if (!empty($patient['is_walkin'])) {
 // Billing line items for the read-only patient billing history.
     // Charges are read from invoice_items because this is the authoritative
     // record of services, investigations and medicines billed to the patient.
-    $billingItems = null;
+    $billingScopeLabel = 'Patient Account';
     $billingItems = $conn->query("
         SELECT
             ii.id,
@@ -666,7 +666,7 @@ if (!empty($patient['is_walkin'])) {
         FROM invoice_items ii
         INNER JOIN invoices i ON i.id = ii.invoice_id
         LEFT JOIN visits v ON v.id = i.visit_id
-        WHERE i.patient_id = " . (int)$patient_id . $billingVisitCondition . "
+        WHERE i.patient_id = " . (int)$patient_id . "
           AND LOWER(COALESCE(i.status, '')) NOT IN ('cancelled', 'canceled', 'void')
         ORDER BY i.created_at DESC, ii.id DESC
     ");
@@ -702,7 +702,8 @@ if (!empty($patient['is_walkin'])) {
             FROM invoice_items
             GROUP BY invoice_id
         ) items ON items.invoice_id = i.id
-        WHERE i.patient_id = " . (int)$patient_id . ($activeVisitId > 0 && $hasVisitInvoices ? " AND i.visit_id = " . (int)$activeVisitId : "") . "
+        WHERE i.patient_id = " . (int)$patient_id . "
+          AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')
         ORDER BY i.id ASC
     ");
 
@@ -1507,7 +1508,7 @@ function clearForm() {
                     </button>
                 </div>
                     <p style="margin:6px 0 0; color:#666; font-size:13px;">
-                        <?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'Read-only services, investigations and medicines billed during this current encounter.' : 'Read-only historical account of services, investigations and medicines billed to this patient.' ?>
+                        Read-only account history of services, investigations and medicines billed to this patient.
                         Payments are collected centrally by the Cashier.
                     </p>
                 </div>
@@ -1571,7 +1572,7 @@ function clearForm() {
                         <?php else: ?>
                             <tr>
                                 <td colspan="9" style="text-align:center; color:#666; padding:25px;">
-                                    <?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'No billed services or charges are recorded for this encounter.' : 'No billed services or charges are recorded in this patient account.' ?>
+                                    No billed services or charges are recorded in this patient account.
                                 </td>
                             </tr>
                         <?php endif; ?>
@@ -1609,7 +1610,7 @@ function clearForm() {
                 </div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-                <div><h1 style="margin:0; color:#007bff; font-size:25px;"><?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'Service Statement' : 'Patient Account Statement' ?></h1><div style="font-size:12px; color:#666; margin-top:5px;"><?= ($activeVisitId > 0 && $hasVisitInvoices) ? 'Services and charges for the current encounter' : 'Historical services, investigations and medicines billed to this patient' ?></div></div>
+                <div><h1 style="margin:0; color:#007bff; font-size:25px;">Patient Account Statement</h1><div style="font-size:12px; color:#666; margin-top:5px;">Services, investigations and medicines billed to this patient</div></div>
                 <div style="text-align:right; font-size:13px;"><strong>Printed:</strong> <?= date('d-m-Y H:i') ?><br><strong>Patient No.:</strong> <?= htmlspecialchars($patient['patient_number'] ?? '—') ?><br><strong>Scope:</strong> <?= htmlspecialchars($billingScopeLabel) ?><?php if ($activeVisit): ?><br><strong>Visit No.:</strong> <?= htmlspecialchars($activeVisit['visit_number'] ?? '—') ?><?php endif; ?></div>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px; background:#f8f9fa; border-radius:8px; margin-bottom:22px;">
