@@ -1309,17 +1309,61 @@ function clearForm() {
             </form>
         </div>
 
-        <table class="table-custom">
-            <tr><th>Service Name</th><th>Category</th><th>Cost</th><th>Action</th></tr>
-            <?php $patient_services->data_seek(0); while($s=$patient_services->fetch_assoc()): ?>
-            <tr>
-                <td><?= htmlspecialchars($s['service_name']) ?></td>
-                <td><span class="badge-info"><?= htmlspecialchars($s['svc_category']) ?></span></td>
-                <td>KES <?= number_format($s['price'], 2) ?></td>
-                <td><form method="post" style="display:inline;" onsubmit="return confirm('Remove this service?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="service"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form></td>
-            </tr>
-            <?php endwhile; ?>
-        </table>
+        <div style="overflow-x:auto;">
+            <table class="table-custom">
+                <thead>
+                    <tr><th>Service / Test</th><th>Category</th><th>Status</th><th>Encounter</th><th>Cost</th><th>Billing</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                <?php $patient_services->data_seek(0); while($s=$patient_services->fetch_assoc()): ?>
+                    <?php
+                        $serviceStatus = trim((string)($s['status'] ?? 'Pending'));
+                        if ($serviceStatus === '') $serviceStatus = 'Pending';
+                        $statusClass = strtolower($serviceStatus) === 'completed' ? 'completed' : (strtolower($serviceStatus) === 'cancelled' ? 'cancelled' : 'pending');
+                        $serviceCategory = strtolower(trim((string)($s['svc_category'] ?? $s['category'] ?? 'service')));
+                        $isLabService = $serviceCategory === 'lab';
+                        $isBillableService = false;
+                        $resolvedForDisplay = get_service_price_for_patient($conn, $patient_id, (int)($s['service_id'] ?? 0));
+                        if (!empty($resolvedForDisplay['billable'])) $isBillableService = true;
+                    ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars($s['service_name'] ?? 'Service') ?></strong>
+                            <?php if ($isLabService && strtolower($serviceStatus) !== 'completed' && strtolower($serviceStatus) !== 'cancelled'): ?>
+                                <div style="font-size:11px;color:#8a6d1d;margin-top:4px;"><i class="fas fa-flask"></i> Awaiting laboratory result</div>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="badge-info"><?= htmlspecialchars($s['svc_category'] ?? 'Service') ?></span></td>
+                        <td><span class="status-chip <?= htmlspecialchars($statusClass) ?>"><?= htmlspecialchars($serviceStatus) ?></span></td>
+                        <td style="font-size:12px;color:#667085;">
+                            <?php if (!empty($s['visit_id'])): ?>Encounter #<?= (int)$s['visit_id'] ?><?php else: ?>Historical / unlinked<?php endif; ?>
+                        </td>
+                        <td><strong>KES <?= number_format((float)($s['price'] ?? 0), 2) ?></strong></td>
+                        <td>
+                            <?php if ($isBillableService): ?>
+                                <span class="status-chip completed">Billable</span>
+                            <?php else: ?>
+                                <span class="status-chip">Non-billable</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (strtolower($serviceStatus) !== 'cancelled'): ?>
+                                <form method="post" style="display:inline;" onsubmit="return confirm('Remove this service? This will also remove its matching unpaid billing line.')">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                    <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                                    <input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>">
+                                    <input type="hidden" name="type" value="service">
+                                    <button type="submit" name="delete_item" style="border:0;background:none;color:#c0392b;cursor:pointer;font-weight:600;"><i class="fas fa-times-circle"></i> Remove</button>
+                                </form>
+                            <?php else: ?>
+                                <span style="font-size:12px;color:#98a2b3;">No action</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div id="prescriptions" class="card" style="display:none;">
@@ -1353,21 +1397,41 @@ function clearForm() {
         </form>
 
         <h3>Medication History</h3>
-        <table class="table-custom">
-            <tr><th>Drug Name</th><th>Quantity</th><th>Unit Price</th><th>Total</th><th>Date</th><th>Action</th></tr>
-            <?php $prescriptions->data_seek(0); while($p=$prescriptions->fetch_assoc()): ?>
-            <tr>
-                <td><strong><?= htmlspecialchars($p['drug_name']) ?></strong></td>
-                <td><?= htmlspecialchars($p['quantity']) ?></td>
-                <td>KES <?= number_format((float)($p['unit_price'] ?? 0), 2) ?></td>
-                <td>KES <?= number_format($p['quantity'] * (float)($p['unit_price'] ?? 0), 2) ?></td>
-                <td><?= date('d/m/y', strtotime($p['created_at'])) ?></td>
-                <td>
-                    <form method="post" style="display:inline;" onsubmit="return confirm('Remove this medication?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>"><input type="hidden" name="type" value="prescription"><button type="submit" name="delete_item" style="border:0;background:none;color:red;cursor:pointer;">&times; Remove</button></form>
-                </td>
-            </tr>
-            <?php endwhile; ?>
-        </table>
+        <div style="overflow-x:auto;">
+            <table class="table-custom">
+                <thead>
+                    <tr><th>Drug Name</th><th>Quantity</th><th>Dosage / Instructions</th><th>Unit Price</th><th>Total</th><th>Date</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                <?php $prescriptions->data_seek(0); while($p=$prescriptions->fetch_assoc()): ?>
+                <tr>
+                    <td><strong><?= htmlspecialchars($p['drug_name'] ?? 'Medicine') ?></strong></td>
+                    <td><?= htmlspecialchars((string)($p['quantity'] ?? 0)) ?></td>
+                    <td>
+                        <?php $dosageInstruction = trim((string)($p['frequency'] ?? '')); ?>
+                        <?php if ($dosageInstruction !== ''): ?>
+                            <div style="font-weight:700;color:#26364a;"><?= htmlspecialchars($dosageInstruction) ?></div>
+                        <?php else: ?>
+                            <span style="color:#98a2b3;font-size:12px;">No dosage instruction recorded</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>KES <?= number_format((float)($p['unit_price'] ?? 0), 2) ?></td>
+                    <td><strong>KES <?= number_format((float)($p['quantity'] ?? 0) * (float)($p['unit_price'] ?? 0), 2) ?></strong></td>
+                    <td><?= !empty($p['created_at']) ? htmlspecialchars(date('d/m/y H:i', strtotime($p['created_at']))) : '—' ?></td>
+                    <td>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Remove this medication?')">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                            <input type="hidden" name="patient_id" value="<?= (int)$patient_id ?>">
+                            <input type="hidden" name="type" value="prescription">
+                            <button type="submit" name="delete_item" style="border:0;background:none;color:#c0392b;cursor:pointer;font-weight:600;"><i class="fas fa-times-circle"></i> Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 
