@@ -10,7 +10,11 @@ $userRole = $_SESSION['role'] ?? 'Staff';
 
 // Highlights the exact link
 function isActive($path) {
-    return strpos($_SERVER['REQUEST_URI'], $path) !== false ? 'active' : '';
+    $uri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+    $uri = rtrim($uri, '/');
+    $target = '/' . trim($path, '/');
+    $base = '/hospital_system' . $target;
+    return ($uri === $base || str_ends_with($uri, $target)) ? 'active' : '';
 }
 
 // Keeps the parent dropdown open if a child link is active
@@ -206,7 +210,7 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <div class="menu-title">Exit</div>
-        <a href="/hospital_system/logout.php" class="logout-link">
+        <a href="/hospital_system/auth/logout.php" class="logout-link">
             <i class="fas fa-power-off icon-main"></i> Logout
         </a>
 
