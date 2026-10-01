@@ -568,10 +568,28 @@ if ($patient_id <= 0) {
         ? $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " AND ps.visit_id = " . (int)$activeVisitId . " ORDER BY ps.created_at DESC, ps.id DESC")
         : $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " ORDER BY ps.created_at DESC, ps.id DESC");
 
+    // Billing columns are resolved before any service/billing display query uses them.
+    // Keep this dashboard defensive against older HMS database schemas.
+    $billingItemQtyColumn = invoice_item_column_exists($conn, 'qty') ? 'qty' : 'quantity';
+    $billingItemPriceColumn = invoice_item_column_exists($conn, 'unit_price') ? 'unit_price' : 'price';
+    $billingItemTypeSelect = invoice_item_column_exists($conn, 'item_type')
+        ? "ii.item_type"
+        : "NULL AS item_type";
+    $billingItemSourceExists = invoice_item_column_exists($conn, 'source');
+    $billingItemSourceSelect = $billingItemSourceExists ? "ii.source" : "NULL AS source";
+    $billingVisitCondition = ($activeVisitId > 0 && $hasVisitInvoices)
+        ? " AND i.visit_id = " . (int)$activeVisitId
+        : "";
+
     // Attach the authoritative invoice charge to each service. The recorded patient_services.price is the encounter snapshot;
     // invoice_items is used to identify the actual active billing line. Status (Pending/Completed) never hides a charge.
     $serviceBillingMap = [];
-    $serviceBillingRes = $conn->query("SELECT ii.id AS invoice_item_id, ii.invoice_id, ii.description, ii.total, ii." . $billingItemPriceColumn . " AS unit_price, i.status AS invoice_status FROM invoice_items ii INNER JOIN invoices i ON i.id=ii.invoice_id WHERE i.patient_id=" . (int)$patient_id . $billingVisitCondition . " AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void') AND (LOWER(COALESCE(ii.item_type,'')) IN ('service','lab') OR LOWER(COALESCE(ii.source,''))='service') ORDER BY ii.id DESC");
+    $serviceBillingTypeCondition = "(LOWER(COALESCE(ii.item_type,'')) IN ('service','lab')";
+    if ($billingItemSourceExists) {
+        $serviceBillingTypeCondition .= " OR LOWER(COALESCE(ii.source,''))='service'";
+    }
+    $serviceBillingTypeCondition .= ")";
+    $serviceBillingRes = $conn->query("SELECT ii.id AS invoice_item_id, ii.invoice_id, ii.description, ii.total, ii." . $billingItemPriceColumn . " AS unit_price, " . $billingItemSourceSelect . ", i.status AS invoice_status FROM invoice_items ii INNER JOIN invoices i ON i.id=ii.invoice_id WHERE i.patient_id=" . (int)$patient_id . $billingVisitCondition . " AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void') AND " . $serviceBillingTypeCondition . " ORDER BY ii.id DESC");
     if ($serviceBillingRes) {
         while ($bi = $serviceBillingRes->fetch_assoc()) {
             $desc = (string)($bi['description'] ?? '');
@@ -632,16 +650,6 @@ if (!empty($patient['is_walkin'])) {
     // Charges are read from invoice_items because this is the authoritative
     // record of services, investigations and medicines billed to the patient.
     $billingItems = null;
-    $billingItemQtyColumn = invoice_item_column_exists($conn, 'qty') ? 'qty' : 'quantity';
-    $billingItemPriceColumn = invoice_item_column_exists($conn, 'unit_price') ? 'unit_price' : 'price';
-    $billingItemTypeSelect = invoice_item_column_exists($conn, 'item_type')
-        ? "ii.item_type"
-        : "NULL AS item_type";
-
-    $billingVisitCondition = ($activeVisitId > 0 && $hasVisitInvoices)
-        ? " AND i.visit_id = " . (int)$activeVisitId
-        : "";
-
     $billingItems = $conn->query("
         SELECT
             ii.id,
