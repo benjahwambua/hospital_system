@@ -454,7 +454,7 @@ function get_or_create_invoice($conn, $patient_id, $encounter_id = null, $visit_
             FROM invoices
             WHERE patient_id = ?
               AND visit_id = ?
-              AND COALESCE(total, 0) > GREATEST(COALESCE(paid_amount, 0), COALESCE(amount_paid, 0))
+              AND COALESCE(total, 0) > GREATEST($paidAmountExpr, $amountPaidExpr)
             ORDER BY id DESC
             LIMIT 1
         ");
