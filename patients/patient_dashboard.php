@@ -311,12 +311,35 @@ if ($patient_id <= 0) {
             if($price < 0) throw new Exception('Invalid service price.');
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', $service['category'] ?: 'General', (int)($patient['doctor_id'] ?? 0));
-            add_patient_service($conn, $patient_id, $service_id, $visitId, null, null, 1, 0, 'Completed', null);
 
-            if (!empty($resolved['billable'])) {
-                $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
-                $itemId=add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
-                post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Service order',$itemId);
+            // Prevent accidental double-billing of the same service within the same open encounter.
+            if ($visitId > 0 && $hasVisitServices) {
+                $duplicateStmt = $conn->prepare("SELECT id FROM patient_services WHERE patient_id=? AND service_id=? AND visit_id=? AND status <> 'Cancelled' LIMIT 1");
+                if ($duplicateStmt) {
+                    $duplicateStmt->bind_param('iii', $patient_id, $service_id, $visitId);
+                    $duplicateStmt->execute();
+                    $duplicate = $duplicateStmt->get_result()->fetch_assoc();
+                    $duplicateStmt->close();
+                    if ($duplicate) {
+                        throw new Exception('This service has already been added to the current encounter.');
+                    }
+                }
+            }
+
+            $conn->begin_transaction();
+            try {
+                add_patient_service($conn, $patient_id, $service_id, $visitId, null, null, 1, 0, 'Completed', null);
+
+                if (!empty($resolved['billable'])) {
+                    $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
+                    $itemId=add_invoice_item($conn,$invoice_id,'Service: '.$service['service_name'],1,$price,'service',$service_id);
+                    post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Service order',$itemId);
+                }
+
+                $conn->commit();
+            } catch (Throwable $serviceError) {
+                $conn->rollback();
+                throw $serviceError;
             }
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&added=1");
@@ -347,12 +370,35 @@ if ($patient_id <= 0) {
             $labService['service_name'] = $resolved['service_name'];
 
             $visitId = $activeVisitId > 0 ? $activeVisitId : get_or_create_current_visit($conn, $patient_id, 'Outpatient', 'Laboratory', (int)($patient['doctor_id'] ?? 0));
-            add_patient_service($conn, $patient_id, $service_id, $visitId, null, null, 1, 0, 'Pending', $instructions);
 
-            if (!empty($resolved['billable'])) {
-                $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
-                $itemId=add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
-                post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Laboratory order',$itemId);
+            // Prevent accidentally requesting and charging the same laboratory test twice in one encounter.
+            if ($visitId > 0 && $hasVisitServices) {
+                $duplicateLabStmt = $conn->prepare("SELECT id FROM patient_services WHERE patient_id=? AND service_id=? AND visit_id=? AND status <> 'Cancelled' LIMIT 1");
+                if ($duplicateLabStmt) {
+                    $duplicateLabStmt->bind_param('iii', $patient_id, $service_id, $visitId);
+                    $duplicateLabStmt->execute();
+                    $duplicateLab = $duplicateLabStmt->get_result()->fetch_assoc();
+                    $duplicateLabStmt->close();
+                    if ($duplicateLab) {
+                        throw new Exception('This laboratory test has already been requested for the current encounter.');
+                    }
+                }
+            }
+
+            $conn->begin_transaction();
+            try {
+                add_patient_service($conn, $patient_id, $service_id, $visitId, null, null, 1, 0, 'Pending', $instructions);
+
+                if (!empty($resolved['billable'])) {
+                    $invoice_id=get_or_create_invoice($conn,$patient_id,null,$visitId);
+                    $itemId=add_invoice_item($conn,$invoice_id,'Lab: '.$labService['service_name'],1,$price,'lab',$service_id);
+                    post_invoice_journal($conn,$invoice_id,$patient_id,$price,'Laboratory order',$itemId);
+                }
+
+                $conn->commit();
+            } catch (Throwable $labError) {
+                $conn->rollback();
+                throw $labError;
             }
 
             header("Location: patient_dashboard.php?id=$patient_id&tab=services&lab_success=1");
