@@ -139,8 +139,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         add_patient_service($conn,$patientId,$serviceId,$visitId,null,null,1,0,'Completed',null);
                         $resolved=get_service_price_for_patient($conn,$patientId,$serviceId);
                         $servicePrice=(float)$resolved['price'];
-                        $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$resolved['service_name'],1,$servicePrice,'maternity',$serviceId);
-                        post_invoice_journal($conn,$invoiceId,$patientId,$servicePrice,'Maternity service',$itemId);
+                        if (!empty($resolved['billable'])) {
+                            $itemId=add_invoice_item($conn,$invoiceId,'Maternity Service: '.$resolved['service_name'],1,$servicePrice,'maternity',$serviceId);
+                            post_invoice_journal($conn,$invoiceId,$patientId,$servicePrice,'Maternity service',$itemId);
+                        }
                     }
                 }
 
