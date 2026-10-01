@@ -90,12 +90,12 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['dispense_id'])){
 
 $hasVisit=$conn->query("SHOW COLUMNS FROM pharmacy_queue LIKE 'visit_id'");
 if($hasVisit&&$hasVisit->num_rows){
- $sql="SELECT q.id,q.prescription_id,q.quantity,q.status,q.created_at,q.completed_at,q.visit_id,p.full_name,p.patient_number,s.drug_name,s.selling_price unit_price,v.visit_number
-       FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id LEFT JOIN visits v ON v.id=q.visit_id
+ $sql="SELECT q.id,q.prescription_id,q.quantity,q.status,q.created_at,q.completed_at,q.visit_id,p.full_name,p.patient_number,s.drug_name,s.selling_price unit_price,pr.frequency dosage_instructions,v.visit_number
+       FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id LEFT JOIN prescriptions pr ON pr.id=q.prescription_id LEFT JOIN visits v ON v.id=q.visit_id
        WHERE q.status='pending' ORDER BY q.created_at ASC";
 }else{
- $sql="SELECT q.id,q.prescription_id,q.quantity,q.status,q.created_at,q.completed_at,NULL visit_id,p.full_name,p.patient_number,s.drug_name,s.selling_price unit_price,NULL visit_number
-       FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id
+ $sql="SELECT q.id,q.prescription_id,q.quantity,q.status,q.created_at,q.completed_at,NULL visit_id,p.full_name,p.patient_number,s.drug_name,s.selling_price unit_price,pr.frequency dosage_instructions,NULL visit_number
+       FROM pharmacy_queue q JOIN patients p ON p.id=q.patient_id JOIN pharmacy_stock s ON s.id=q.medicine_id LEFT JOIN prescriptions pr ON pr.id=q.prescription_id
        WHERE q.status='pending' ORDER BY q.created_at ASC";
 }
 $rows=$conn->query($sql);
@@ -105,11 +105,11 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
 <div class="card shadow-sm"><div class="card-header"><h4 class="mb-0">Pharmacy Dispensing Queue</h4></div><div class="card-body">
 <?php if($message):?><div class="alert alert-info"><?=htmlspecialchars($message)?></div><?php endif;?>
 
-<table class="table table-bordered"><thead><tr><th>Client / Patient Name</th><th>Visit</th><th>Medicine</th><th>Qty</th><th>Requested</th><th>Action</th></tr></thead><tbody>
+<table class="table table-bordered"><thead><tr><th>Client / Patient Name</th><th>Visit</th><th>Medicine</th><th>Qty</th><th>Dosage / Instructions</th><th>Requested</th><th>Action</th></tr></thead><tbody>
 <?php if($rows&&$rows->num_rows):while($r=$rows->fetch_assoc()):?><tr>
 <td><strong><?=htmlspecialchars($r['full_name'])?></strong><br><small><?=htmlspecialchars($r['patient_number'])?></small></td>
-<td><?=htmlspecialchars($r['visit_number']??'Legacy')?></td><td><?=htmlspecialchars($r['drug_name'])?></td><td><?=$r['quantity']?></td><td><?=htmlspecialchars($r['created_at'])?></td>
+<td><?=htmlspecialchars($r['visit_number']??'Legacy')?></td><td><strong><?=htmlspecialchars($r['drug_name'])?></strong></td><td><?=$r['quantity']?></td><td><?=!empty(trim((string)($r['dosage_instructions']??'')))?htmlspecialchars($r['dosage_instructions']):'<span class="text-muted">No instructions</span>'?></td><td><?=htmlspecialchars($r['created_at'])?></td>
 <td><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="dispense_id" value="<?=$r['id']?>"><button class="btn btn-success" type="submit">Dispense</button></form></td>
-</tr><?php endwhile;else:?><tr><td colspan="6" class="text-center text-muted">No pending pharmacy orders.</td></tr><?php endif;?>
+</tr><?php endwhile;else:?><tr><td colspan="7" class="text-center text-muted">No pending pharmacy orders.</td></tr><?php endif;?>
 </tbody></table></div></div></div></div>
 <?php include __DIR__.'/../includes/footer.php'; ?>
