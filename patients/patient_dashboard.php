@@ -1083,6 +1083,10 @@ if ($patient_id <= 0) {
     </ul>
 
    <div id="clinical" class="card">
+    <?php if (isset($_GET['duplicate_service'])): ?><div class="alert alert-danger"><strong>Service already added.</strong> This service is already part of the current encounter and was not billed again.</div><?php endif; ?>
+    <?php if (isset($_GET['duplicate_lab'])): ?><div class="alert alert-danger"><strong>Laboratory test already requested.</strong> This test is already part of the current encounter and was not charged again.</div><?php endif; ?>
+    <?php if (isset($_GET['added'])): ?><div class="alert alert-success"><strong>Service added successfully.</strong> The service has been recorded and billed where applicable.</div><?php endif; ?>
+    <?php if (isset($_GET['lab_success'])): ?><div class="alert alert-success"><strong>Laboratory request submitted.</strong> The test has been recorded and billed where applicable.</div><?php endif; ?>
     <?php if (isset($_GET['vitals_saved'])): ?><div class="alert alert-success">Vitals saved successfully.</div><?php endif; ?>
     <?php if (isset($_GET['error']) && $_GET['error'] === 'csrf'): ?><div class="alert alert-danger">Security token mismatch. Please retry the action.</div><?php endif; ?>
 
