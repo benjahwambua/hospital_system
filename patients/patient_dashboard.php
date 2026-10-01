@@ -1239,8 +1239,8 @@ function clearForm() {
                 </div>
                 <div>
                     <label class="info-label">Pricing</label>
-                    <div style="padding:10px;background:#f3f6fa;border:1px solid #dbe3ec;border-radius:5px;font-size:12px;color:#667085;">
-                        Price is taken automatically from the active Service Catalogue and applicable patient coverage.
+                    <div id="svc_p" style="padding:10px;background:#f3f6fa;border:1px solid #dbe3ec;border-radius:5px;font-size:15px;color:#344054;font-weight:700;">
+                        Select a service
                     </div>
                 </div>
                 <button type="submit" name="add_service" style="background:var(--primary-blue); color:white; border:none; border-radius:5px; margin-top:22px;">Bill Item</button>
@@ -1567,7 +1567,7 @@ function updatePrice(selectElement, targetInputId) {
     target.textContent = price !== null && price !== '' ? 'KES ' + Number(price).toFixed(2) : 'Select service';
 }
 
-// Automatically load the walk-in's previously selected service and its price.
+// Automatically load the walk-in's previously selected service and its resolved price.
 // This makes the dashboard ready for the next action without selecting the service again.
 document.addEventListener('DOMContentLoaded', function () {
     const requestedServiceId = <?= (int)$walkinRequestedServiceId ?>;
@@ -1577,7 +1577,7 @@ document.addEventListener('DOMContentLoaded', function () {
             updatePrice(serviceSelect, 'svc_p');
         }
 
-        const labSelect = document.querySelector('#services select[name="service_id"]');
+        const labSelect = document.querySelector('#services .lab-order-box select[name="service_id"]');
         if (labSelect && labSelect.value === String(requestedServiceId)) {
             updatePrice(labSelect, 'lab_service_price');
         }
