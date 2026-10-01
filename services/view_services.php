@@ -214,6 +214,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <p>Manage billable hospital services, standard pricing, departments and effective-dated price history.</p>
         </div>
         <div class="service-actions">
+            <a class="service-btn" href="print_service_list.php?search=<?= urlencode($search) ?>&category=<?= urlencode($category) ?>&department=<?= urlencode($department) ?>&status=<?= urlencode($status) ?>" target="_blank"><i class="fas fa-print"></i> Print Service List</a>
             <?php if ($isAdmin): ?>
                 <a class="service-btn primary" href="add_service.php"><i class="fas fa-plus"></i> New Service</a>
             <?php endif; ?>
