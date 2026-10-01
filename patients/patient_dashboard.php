@@ -713,20 +713,21 @@ if (!empty($patient['is_walkin'])) {
         }
     }
 
-    // Payments are invoice-specific, matching billing/view_invoice.php.
+    // Payments are account-wide, matching the account-wide billing list above.
+    // Restricting payments to the current visit makes the patient balance incorrect
+    // whenever an earlier invoice has already been paid.
     $total_paid = 0.0;
     $paymentTotals = $conn->query("SELECT COALESCE(SUM(p.amount),0) AS paid_total
         FROM payments p INNER JOIN invoices i ON i.id=p.invoice_id
-        WHERE i.patient_id=".(int)$patient_id
-        .($activeVisitId>0 && $hasVisitInvoices ? " AND i.visit_id=".(int)$activeVisitId : "")
-        ." AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')");
+        WHERE i.patient_id=".(int)$patient_id."
+          AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')");
     if($paymentTotals) $total_paid=(float)($paymentTotals->fetch_assoc()['paid_total']??0);
 
     $refundTotals = $conn->query("SELECT COALESCE(SUM(r.amount),0) AS refunded_total
         FROM payment_refunds r INNER JOIN payments p ON p.id=r.payment_id INNER JOIN invoices i ON i.id=p.invoice_id
-        WHERE i.patient_id=".(int)$patient_id." AND r.status='Approved'"
-        .($activeVisitId>0 && $hasVisitInvoices ? " AND i.visit_id=".(int)$activeVisitId : "")
-        ." AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')");
+        WHERE i.patient_id=".(int)$patient_id."
+          AND r.status='Approved'
+          AND LOWER(COALESCE(i.status,'')) NOT IN ('cancelled','canceled','void')");
     $total_refunded = $refundTotals ? (float)($refundTotals->fetch_assoc()['refunded_total']??0) : 0.0;
     $total_paid=max($total_paid-$total_refunded,0.0);
 
