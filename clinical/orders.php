@@ -156,6 +156,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 if (!ensure_prescription_visit_column($conn)) {
                     throw new Exception('Prescription visit linkage is required. Run the clinical care migration before placing pharmacy orders.');
                 }
+                $queueTable=$conn->query("SHOW TABLES LIKE 'pharmacy_queue'");
+                if (!$queueTable || $queueTable->num_rows === 0) {
+                    throw new Exception('Pharmacy queue is not available. Run the clinical care migration before placing pharmacy orders.');
+                }
 
                 // Prevent duplicate prescriptions for the same medicine in one visit.
                 // Pharmacy queue status is used so cancelled orders can be re-prescribed.
