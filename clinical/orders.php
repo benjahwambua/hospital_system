@@ -127,11 +127,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
                 if (!$service) throw new Exception('Select a valid service.');
                 $resolved=get_service_price_for_patient($conn,$patientId,$serviceId);
                 $price=(float)$resolved['price'];
-                $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
-
                 add_patient_service($conn, $patientId, $serviceId, $visitId, null, null, 1, 0, 'Pending', null);
-                $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$resolved['service_name'],1,$price,$type,$serviceId);
-                post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
+                if (!empty($resolved['billable'])) {
+                    $invoiceId=get_or_create_visit_invoice($conn,$patientId,$visitId);
+                    $invoiceItemId=add_invoice_item($conn,$invoiceId,ucfirst($type).': '.$resolved['service_name'],1,$price,$type,$serviceId);
+                    post_invoice_journal($conn,$invoiceId,$patientId,$price,ucfirst($type).' order',$invoiceItemId);
+                }
                 $conn->commit();
                 $message=ucfirst($type).' order placed. Invoice #'.$invoiceId.'.';
             } elseif ($type==='pharmacy') {
