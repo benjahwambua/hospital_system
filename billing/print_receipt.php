@@ -41,6 +41,23 @@ $amount=(float)$payment['amount'];
 $method=(string)($payment['method']??'');
 $reference=trim((string)($payment['reference']??''));
 $paymentDate=!empty($payment['created_at'])?date('d M Y H:i',strtotime($payment['created_at'])):date('d M Y H:i');
+
+// Load pharmacy items linked to this invoice so the patient-facing receipt can carry
+// the prescription dosage/instructions. Medication dispensing must remain traceable
+// from the financial transaction back to the clinical prescription.
+$medicationRows=[];
+$medStmt=$conn->prepare("SELECT ii.description,ii.quantity,ii.price,ii.med_id,pr.frequency dosage_instructions
+    FROM invoice_items ii
+    LEFT JOIN prescriptions pr ON pr.invoice_id=ii.invoice_id AND pr.medicine_id=ii.med_id
+    WHERE ii.invoice_id=? AND (ii.item_type='pharmacy' OR ii.source='pharmacy')
+    ORDER BY ii.id ASC");
+if($medStmt){
+    $medStmt->bind_param('i',$invoiceId);
+    $medStmt->execute();
+    $medRes=$medStmt->get_result();
+    while($medRow=$medRes->fetch_assoc()){$medicationRows[]=$medRow;}
+    $medStmt->close();
+}
 $receiptNumber='RCT-'.str_pad((string)$paymentId,6,'0',STR_PAD_LEFT);
 $invoiceNumber='INV-'.str_pad((string)$invoiceId,6,'0',STR_PAD_LEFT);
 $logoExists=is_file(__DIR__.'/../assets/img/logo.png');
@@ -66,6 +83,14 @@ $logoSrc='/hospital_system/assets/img/logo.png';
 </section>
 <div class="amount"><small>Amount Received</small><strong>KES <?=number_format($amount,2)?></strong></div>
 <section class="section"><h3>Transaction Details</h3><table class="table"><tr><td>Payment Receipt</td><td class="right"><strong><?=htmlspecialchars($receiptNumber)?></strong></td></tr><tr><td>Invoice</td><td class="right"><?=htmlspecialchars($invoiceNumber)?></td></tr><tr><td>Method</td><td class="right"><?=htmlspecialchars($method?:'Not recorded')?></td></tr><tr><td>Reference</td><td class="right"><?=htmlspecialchars($reference?:'—')?></td></tr></table></section>
+<?php if($medicationRows):?>
+<section class="section"><h3>Medication Instructions</h3>
+<table class="table"><tr><td><strong>Medicine</strong></td><td><strong>Quantity</strong></td><td><strong>Dosage / Instructions</strong></td></tr>
+<?php foreach($medicationRows as $med):?>
+<tr><td><?=htmlspecialchars($med['description']??'Medicine')?></td><td><?=number_format((float)($med['quantity']??0),0)?></td><td><?=!empty(trim((string)($med['dosage_instructions']??'')))?htmlspecialchars($med['dosage_instructions']):'No dosage instruction recorded'?></td></tr>
+<?php endforeach;?>
+</table></section>
+<?php endif;?>
 <div class="note"><strong>Note:</strong> This receipt confirms the payment recorded against the invoice shown above. It is not a replacement for the invoice. Please quote the receipt or transaction reference for payment enquiries.</div>
 <section class="sign"><div><div class="stamp">OFFICIAL<br>HOSPITAL<br>STAMP</div><div class="line">Hospital Stamp / Authorized Officer</div></div><div><div style="height:94px"></div><div class="line">Patient / Guardian</div></div></section>
 <footer class="footer"><span>Receipt <?=htmlspecialchars($receiptNumber)?> • Emaqure Medical Centre</span><span>Generated <?=date('d M Y H:i')?></span></footer>
