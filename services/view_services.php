@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "UPDATE service_prices
                      SET effective_to = DATE_SUB(?, INTERVAL 1 DAY), active = 0
                      WHERE service_id = ? AND payer_id IS NULL AND plan_id IS NULL
-                       AND active = 1 AND effective_from < ?"
+                       AND active = 1 AND effective_from <= ?"
                 );
                 $stmt->bind_param("sis", $effective_from, $service_id, $effective_from);
                 $stmt->execute();
