@@ -503,6 +503,19 @@ if ($patient_id <= 0) {
         $all_services = $conn->query("SELECT id, category, service_name, active FROM services_master ORDER BY category, service_name");
     }
 
+    // Resolve the actual patient-facing price once for each service so the
+    // selector and displayed amount use the same catalogue/coverage pricing
+    // that is used when the service is billed.
+    $serviceOptions = [];
+    if ($all_services) {
+        while ($serviceRow = $all_services->fetch_assoc()) {
+            $resolvedService = get_service_price_for_patient($conn, $patient_id, (int)$serviceRow['id']);
+            $serviceRow['resolved_price'] = (float)($resolvedService['price'] ?? 0);
+            $serviceRow['resolved_billable'] = !empty($resolvedService['billable']);
+            $serviceOptions[] = $serviceRow;
+        }
+    }
+
     $patient_services = ($activeVisitId > 0 && $hasVisitServices)
         ? $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " AND ps.visit_id = " . (int)$activeVisitId . " ORDER BY ps.created_at DESC, ps.id DESC")
         : $conn->query("SELECT ps.*, sm.service_name, sm.category AS svc_category FROM patient_services ps LEFT JOIN services_master sm ON sm.id = ps.service_id WHERE ps.patient_id = " . (int)$patient_id . " ORDER BY ps.created_at DESC, ps.id DESC");
@@ -1219,9 +1232,9 @@ function clearForm() {
                     <label class="info-label">Service Description</label>
                     <select name="service_id" onchange="updatePrice(this, 'svc_p')" required style="width:100%; padding:10px;">
                         <option value="">Search Service...</option>
-                        <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): ?>
-                        <option value="<?= $s['id'] ?>" data-price="<?= $s['price'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?> (<?= strtoupper(htmlspecialchars($s['category'])) ?>)</option>
-                        <?php endwhile; ?>
+                        <?php foreach ($serviceOptions as $s): ?>
+                        <option value="<?= (int)$s['id'] ?>" data-price="<?= htmlspecialchars((string)$s['resolved_price'], ENT_QUOTES, 'UTF-8') ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?> (<?= strtoupper(htmlspecialchars($s['category'])) ?>)</option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
@@ -1238,13 +1251,13 @@ function clearForm() {
             <h4>Request Laboratory Test</h4>
             <form method="post" style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px;">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                <select name="service_id" required style="padding:10px;">
+                <select name="service_id" onchange="updatePrice(this, 'lab_service_price')" required style="padding:10px;">
                     <option value="">Select Lab Test...</option>
-                    <?php $all_services->data_seek(0); while($s=$all_services->fetch_assoc()): if($s['category'] == 'lab'): ?>
-                    <option value="<?= $s['id'] ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
-                    <?php endif; endwhile; ?>
+                    <?php foreach ($serviceOptions as $s): if ($s['category'] === 'lab'): ?>
+                    <option value="<?= (int)$s['id'] ?>" data-price="<?= htmlspecialchars((string)$s['resolved_price'], ENT_QUOTES, 'UTF-8') ?>" <?= ($walkinRequestedServiceId > 0 && (int)$s['id'] === $walkinRequestedServiceId) ? 'selected' : '' ?>><?= htmlspecialchars($s['service_name']) ?></option>
+                    <?php endif; endforeach; ?>
                 </select>
-                <span style="padding:10px;background:#f3f6fa;border:1px solid #dbe3ec;border-radius:5px;font-size:12px;color:#667085;">Catalogue price applied automatically</span>
+                <div id="lab_service_price" style="padding:10px;background:#f3f6fa;border:1px solid #dbe3ec;border-radius:5px;font-size:13px;color:#344054;font-weight:600;">Select a lab test</div>
                 <input type="text" name="lab_instructions" placeholder="Notes..." style="padding:10px;">
                 <button type="submit" name="add_lab_request" style="background:#2980b9; color:white; border:none; padding:10px; border-radius:5px;">Request Lab</button>
             </form>
@@ -1547,11 +1560,11 @@ function showTab(tabId) {
 }
 
 function updatePrice(selectElement, targetInputId) {
-    const price = selectElement.options[selectElement.selectedIndex].getAttribute('data-price');
-    const target=document.getElementById(targetInputId);
-    if(!target) return;
-    if('value' in target) target.value = price || '';
-    else target.textContent = price ? 'KES ' + Number(price).toFixed(2) : 'Select medicine';
+    const option = selectElement.options[selectElement.selectedIndex];
+    const price = option ? option.getAttribute('data-price') : '';
+    const target = document.getElementById(targetInputId);
+    if (!target) return;
+    target.textContent = price !== null && price !== '' ? 'KES ' + Number(price).toFixed(2) : 'Select service';
 }
 
 // Automatically load the walk-in's previously selected service and its price.
@@ -1559,7 +1572,7 @@ function updatePrice(selectElement, targetInputId) {
 document.addEventListener('DOMContentLoaded', function () {
     const requestedServiceId = <?= (int)$walkinRequestedServiceId ?>;
     if (requestedServiceId > 0) {
-        const serviceSelect = document.querySelector('select[name="service_id"]');
+        const serviceSelect = document.querySelector('#services select[name="service_id"]');
         if (serviceSelect && serviceSelect.value === String(requestedServiceId)) {
             updatePrice(serviceSelect, 'svc_p');
         }
