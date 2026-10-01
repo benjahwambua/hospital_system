@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $price = (float)($_POST['price'] ?? 0);
     $requires_order = isset($_POST['requires_order']) ? 1 : 0;
     $requires_result = isset($_POST['requires_result']) ? 1 : 0;
-    $billable = isset($_POST['billable']) ? 1 : 0;
+    $billable = 1;
 
     $service_code = 'TMP-' . strtoupper(bin2hex(random_bytes(6)));
 
@@ -145,7 +145,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
             <label><input type="checkbox" name="requires_order"> Requires clinical order</label>
             <label><input type="checkbox" name="requires_result"> Requires result</label>
-            <label><input type="checkbox" name="billable" checked> Billable</label>
+<div style="margin-top:14px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;color:#166534;font-size:13px;font-weight:600;">All clinical services are billable. Charges remain on the patient account until removed or paid.</div>
 
             <button type="submit">Create Service</button>
         </form>
