@@ -320,7 +320,24 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 <style>
-    .ledger-page { background: #f6f8fb; min-height: 100vh; padding: 24px; }
+.ledger-page{background:#f5f7fb;padding:28px 24px 48px}
+.ledger-shell{max-width:1500px}
+.ledger-hero{background:linear-gradient(135deg,#0f4c81 0%,#1769aa 55%,#2384c6 100%);border:0;color:#fff;border-radius:18px;padding:25px 28px;box-shadow:0 12px 30px rgba(15,76,129,.16)}
+.ledger-hero .ledger-eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;opacity:.78;margin-bottom:5px}
+.ledger-hero .ledger-title h1{color:#fff;font-weight:800;font-size:1.65rem}
+.ledger-hero .ledger-title p{color:#fff;opacity:.86}
+.ledger-hero .ledger-switch{background:rgba(255,255,255,.14)}
+.ledger-hero .ledger-switch button{color:#fff}
+.ledger-hero .ledger-switch .active{color:#1769aa}
+.ledger-filters{margin-top:22px}
+.ledger-card{border-radius:15px;box-shadow:0 6px 22px rgba(20,40,70,.06)}
+.ledger-card-header{padding:18px 20px}
+.ledger-table th{background:#f8fafc;padding:13px 16px}
+.ledger-table td{padding:13px 16px}
+.ledger-btn{transition:transform .15s ease,box-shadow .15s ease}
+.ledger-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+@media(max-width:767px){.ledger-page{padding:18px 12px 35px}.ledger-hero{padding:21px;border-radius:14px}.ledger-hero .ledger-title h1{font-size:1.35rem}.ledger-table-wrap{border-radius:0}}
+</style>    .ledger-page { background: #f6f8fb; min-height: 100vh; padding: 24px; }
     .ledger-shell { max-width: 1500px; margin: 0 auto; }
     .ledger-topbar, .ledger-card { background: #fff; border: 1px solid #e7ebf3; border-radius: 16px; box-shadow: 0 6px 24px rgba(31, 41, 55, 0.06); }
     .ledger-topbar { padding: 20px; margin-bottom: 20px; }
@@ -373,11 +390,12 @@ include __DIR__ . '/../includes/sidebar.php';
 
 <div class="ledger-page">
     <div class="ledger-shell">
-        <div class="ledger-topbar no-print">
+        <div class="ledger-topbar no-print ledger-hero">
             <div class="ledger-title">
                 <div>
-                    <h1>General Ledger</h1>
-                    <p>Production-ready accounting view with opening balances, controlled filters, exports, and trial balance checks inspired by ERP workflows.</p>
+                    <div class="ledger-eyebrow">Finance &amp; Controls</div>
+                    <h1><i class="fas fa-book-open mr-2"></i>General Ledger</h1>
+                    <p>Review posted financial entries, balances, account movements and trial balance integrity.</p>
                 </div>
                 <div class="ledger-switch">
                     <button type="button" class="<?= $viewMode === 'ledger' ? 'active' : '' ?>" onclick="setViewMode('ledger')">Ledger</button>
