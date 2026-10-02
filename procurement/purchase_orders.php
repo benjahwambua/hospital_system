@@ -161,7 +161,7 @@ if ($viewId > 0):
     border-color:#075b9d!important;
     box-shadow:0 0 0 3px rgba(7,91,157,.10)!important;
 }
-.proc-card form.form-row .btn{
+ .proc-card form.form-row .btn{
     height:43px!important;
     padding:0 14px!important;
     border-radius:9px!important;
@@ -318,7 +318,7 @@ if ($viewId > 0):
     border-radius:16px!important;
     box-shadow:0 8px 24px rgba(31,45,61,.06)!important;
 }
-.po-content{padding:28px!important}
+.po-content{padding:28px!important}.po-top{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:24px!important;padding:20px 0!important;margin-bottom:18px!important;border-bottom:1px solid #edf0f4!important}.po-top h3{font-size:20px!important;font-weight:800!important}.po-top>div:last-child{font-size:11px!important;line-height:1.9!important;color:#667085!important}.po-signatures{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:28px!important;margin-top:42px!important;padding-top:22px!important;border-top:1px solid #edf0f4!important}.stamp-space{height:92px!important;border:1px dashed #cbd5e1!important;border-radius:10px!important;display:flex!important;align-items:center!important;justify-content:center!important;color:#98a2b3!important;font-size:10px!important;text-transform:uppercase!important;letter-spacing:.7px!important}.sig-box{padding-top:35px!important;text-align:center!important;color:#475467!important;font-size:10px!important}.sig-line{border-top:1px dotted #667085!important;margin-bottom:8px!important}.po-card .watermark{position:absolute!important;left:50%!important;top:52%!important;transform:translate(-50%,-50%)!important;width:320px!important;opacity:.035!important;pointer-events:none!important;z-index:0!important}.po-content{position:relative!important;z-index:1!important}.po-branding{display:flex!important;align-items:center!important;gap:18px!important}.po-branding>div:first-child img{max-width:78px!important;max-height:78px!important}.po-hospital h2{margin:0 0 5px!important;font-size:22px!important}.po-hospital div{font-size:10px!important;color:#667085!important;line-height:1.6!important}
 .po-branding{padding-bottom:18px!important;border-bottom:1px solid #edf0f4!important}
 .po-hospital h2{color:#25324a!important;font-weight:800!important}
 .status-pill{
@@ -347,6 +347,8 @@ if ($viewId > 0):
 .po-total{margin-top:16px!important;padding-top:16px!important;border-top:1px solid #edf0f4!important;color:#075b9d!important;font-size:20px!important;font-weight:800!important}
 
 @media(max-width:900px){
+    .po-top{flex-direction:column!important}.po-signatures{grid-template-columns:1fr!important}.stamp-space{height:70px!important}
+
     .proc-page{padding:20px 14px 32px!important}
     .proc-hero{flex-direction:column!important;align-items:flex-start!important;padding:24px!important}
     .proc-actions{width:100%!important;justify-content:flex-start!important}
