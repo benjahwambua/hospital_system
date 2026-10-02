@@ -62,21 +62,23 @@ body{font-size:13.5px;line-height:1.45}
 .patient-grid{display:grid;grid-template-columns:2.1fr .7fr 1fr 1fr;gap:10px;margin-bottom:15px}
 .field{border-bottom:1px solid #111827;min-height:27px;padding:3px 2px}
 .field label{font-weight:700;font-size:12px;margin-right:5px}
-.section{margin-top:12px}
+.section{margin-top:13px}
+.lab-section{margin-top:16px}
+.results-section{margin-top:18px}
 .section-title{font-weight:800;font-size:13px;text-transform:uppercase;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:5px}
 .exam-row{display:grid;grid-template-columns:72px 1fr;min-height:29px;border-bottom:1px solid #d7dee8}
 .exam-row label{font-weight:700;padding:5px 4px 5px 2px}
 .line{min-height:29px;padding:5px 4px;border-left:1px solid #d7dee8}
 .large-line{min-height:65px}
 .tests{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
-.test{display:grid;grid-template-columns:58px 1fr;min-height:29px;border-bottom:1px solid #d7dee8}
-.test label{font-weight:700;padding:5px 2px}
-.test .line{padding-left:5px}
-.recommendation{min-height:72px;border:1px solid #cbd5e1;padding:7px}
-.signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:23px;align-items:end}
+.test{display:grid;grid-template-columns:88px 1fr;min-height:34px;border-bottom:1px solid #d7dee8}
+.test label{font-weight:700;padding:7px 2px}
+.test .line{padding-left:5px;min-height:34px}
+.recommendation{min-height:102px;border:1px solid #cbd5e1;padding:7px}
+.signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:20px;align-items:end}
 .sigline{border-bottom:1px solid #111827;height:25px}
 .siglabel{font-size:11px;color:var(--muted);margin-top:4px}
-.footer-note{margin-top:14px;text-align:center;font-size:10px;color:var(--muted)}
+.footer-note{margin-top:12px;text-align:center;font-size:10px;color:var(--muted)}
 .actions{text-align:right;margin-top:10px}
 .btn{border:0;background:var(--primary);color:#fff;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer}
 @media print{
@@ -122,27 +124,19 @@ body{font-size:13.5px;line-height:1.45}
 <div class="field"><label>WEIGHT</label></div>
 </div>
 
-<section class="section">
-<div class="section-title">System Examination</div>
-<div class="exam-row"><label>CNS</label><div class="line"></div></div>
-<div class="exam-row"><label>RS</label><div class="line"></div></div>
-<div class="exam-row"><label>GIT</label><div class="line"></div></div>
-<div class="exam-row"><label>OTHER</label><div class="line large-line"></div></div>
-</section>
-
-<section class="section">
+<section class="section lab-section">
 <div class="section-title">Laboratory Test</div>
 <div class="tests">
-<div class="test"><label>P24</label><div class="line"></div></div>
-<div class="test"><label>SAT</label><div class="line"></div></div>
-<div class="test"><label>O/C</label><div class="line"></div></div>
-<div class="test"><label>HEP</label><div class="line"></div></div>
+<div class="test"><label>MALARIA</label><div class="line"></div></div>
+<div class="test"><label>H. PYLORI</label><div class="line"></div></div>
+<div class="test"><label>PBF</label><div class="line"></div></div>
+<div class="test"><label>FULL HAEM.</label><div class="line"></div></div>
 </div>
 </section>
 
-<section class="section">
-<div class="section-title">Recommendation</div>
-<div class="recommendation"></div>
+<section class="section results-section">
+<div class="section-title">Lab Results</div>
+<div class="recommendation results-box"></div>
 </section>
 
 <div class="signature">
