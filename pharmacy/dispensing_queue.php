@@ -146,7 +146,7 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
             <td><div class="dq-patient"><?=htmlspecialchars($r['full_name'])?><small><?=htmlspecialchars($r['patient_number'])?></small></div></td>
             <td><div class="dq-medicine"><?=htmlspecialchars($r['drug_name'])?></div></td>
             <td><span class="dq-qty"><?=$r['quantity']?></span></td>
-            <td><div class="dq-dosage"><?=!empty(trim((string)($r['dosage_instructions']??''))?htmlspecialchars($r['dosage_instructions']):'<span class="dq-muted">No instructions</span>'?></div></td>
+            <td><div class="dq-dosage"><?=!empty(trim((string)($r['dosage_instructions']??'')))?htmlspecialchars($r['dosage_instructions']):'<span class="dq-muted">No instructions</span>'?></div></td>
             <td><span class="dq-time"><i class="far fa-clock mr-1"></i><?=htmlspecialchars($r['created_at'])?></span></td>
             <td><form method="post" class="m-0"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="dispense_id" value="<?=$r['id']?>"><button class="dq-action" type="submit"><i class="fas fa-check mr-1"></i>Dispense</button></form></td>
           </tr>
