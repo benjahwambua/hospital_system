@@ -270,24 +270,51 @@ if ($patient_id <= 0) {
         }
 
         if ($invoice_total > 0) {
+            // Pharmacy prescriptions are billable at the time they are ordered.
+            // Keep the charge on the patient's account even while the prescription
+            // is still pending in Pharmacy; dispensing must not create a second charge.
             $invoice_id = get_or_create_invoice($conn, $patient_id, null, $visitId);
-            add_invoice_item(
+            $invoiceItemId = add_invoice_item(
                 $conn,
                 $invoice_id,
-                'Medication: ' . ($stock['drug_name'] ?? 'Prescription'),
+                'Pharmacy: ' . ($stock['drug_name'] ?? 'Prescription'),
                 $qty,
                 $unit_price,
                 'pharmacy',
                 $medicine_id
             );
 
-            $updatePrescription = $conn->prepare("UPDATE prescriptions SET invoice_id = ? WHERE id = ?");
-            if ($updatePrescription) {
-                $updatePrescription->bind_param('ii', $invoice_id, $prescription_id);
-                $updatePrescription->execute();
-                $updatePrescription->close();
+            post_invoice_journal(
+                $conn,
+                $invoice_id,
+                $patient_id,
+                $invoice_total,
+                'Pharmacy prescription',
+                $invoiceItemId
+            );
+
+            if (invoice_column_exists($conn, 'id')) {
+                $rxInvoiceColumn = $conn->query("SHOW COLUMNS FROM prescriptions LIKE 'invoice_id'");
+                if ($rxInvoiceColumn && $rxInvoiceColumn->num_rows > 0) {
+                    $updatePrescription = $conn->prepare("UPDATE prescriptions SET invoice_id = ? WHERE id = ?");
+                    if (!$updatePrescription) {
+                        throw new Exception('Unable to link prescription to its invoice: ' . $conn->error);
+                    }
+                    $updatePrescription->bind_param('ii', $invoice_id, $prescription_id);
+                    if (!$updatePrescription->execute()) {
+                        $error = $updatePrescription->error;
+                        $updatePrescription->close();
+                        throw new Exception('Unable to link prescription to its invoice: ' . $error);
+                    }
+                    $updatePrescription->close();
+                }
             }
         }
+
+        // The handler opened a transaction before creating the prescription.
+        // Commit it here so the prescription, pharmacy queue entry and invoice
+        // charge are persisted before the dashboard redirects.
+        $conn->commit();
 
         header("Location: patient_dashboard.php?id=$patient_id&tab=prescriptions&success=1");
         exit;
