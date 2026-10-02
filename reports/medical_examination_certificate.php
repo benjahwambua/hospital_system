@@ -65,6 +65,8 @@ body{font-size:13.5px;line-height:1.45}
 .section{margin-top:13px}
 .lab-section{margin-top:16px}
 .results-section{margin-top:18px}
+.results-box{min-height:132px;padding:10px 8px;position:relative}
+.results-box:after{content:"................................................................................................................................................................................";display:block;margin-top:88px;white-space:nowrap;overflow:hidden;color:#111827;letter-spacing:.02em}
 .section-title{font-weight:800;font-size:13px;text-transform:uppercase;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:5px}
 .exam-row{display:grid;grid-template-columns:72px 1fr;min-height:29px;border-bottom:1px solid #d7dee8}
 .exam-row label{font-weight:700;padding:5px 4px 5px 2px}
@@ -75,10 +77,10 @@ body{font-size:13.5px;line-height:1.45}
 .test label{font-weight:700;padding:6px 2px}
 .test .line{padding-left:5px;min-height:31px}
 .recommendation{min-height:102px;border:1px solid #cbd5e1;padding:7px}
-.signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:20px;align-items:end}
+.signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:34px};align-items:end}
 .sigline{border-bottom:1px solid #111827;height:25px}
 .siglabel{font-size:11px;color:var(--muted);margin-top:4px}
-.footer-note{margin-top:12px;text-align:center;font-size:10px;color:var(--muted)}
+.footer-note{margin-top:10px;text-align:center;font-size:10px;color:var(--muted)}
 .actions{text-align:right;margin-top:10px}
 .btn{border:0;background:var(--primary);color:#fff;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer}
 @media print{
