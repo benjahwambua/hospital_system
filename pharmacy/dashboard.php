@@ -5,86 +5,92 @@ function ph_count(mysqli $c,string $s):int{$q=$c->query($s);return $q?(int)($q->
 $queue=ph_count($conn,"SELECT COUNT(*) total FROM pharmacy_queue WHERE status='pending'");
 $stock=ph_count($conn,"SELECT COUNT(*) total FROM pharmacy_stock");
 $low=ph_count($conn,"SELECT COUNT(*) total FROM pharmacy_stock WHERE quantity<15");
+$out=ph_count($conn,"SELECT COUNT(*) total FROM pharmacy_stock WHERE quantity<=0");
 $canCreate=can_module_action($conn,'pharmacy','create'); $canEdit=can_module_action($conn,'pharmacy','edit'); $canApprove=can_module_action($conn,'pharmacy','approve');
 include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php'; ?>
 <style>
-/* HMS unified operational workspace */
-.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
-.main-content>.container-fluid{max-width:1500px}
-.main-content h1,.main-content h2,.main-content h3{color:#25324a}
-.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
-.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
-.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-.main-content .table td{border-color:#edf0f5;vertical-align:middle;font-size:13px}
-.main-content .table tbody tr:hover{background:#f8fbff}
-.main-content .form-control{border-color:#d7dee8;border-radius:9px}
-.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
-.main-content .btn{border-radius:8px;font-weight:700}
-.main-content .btn-primary{background:#075b9d;border-color:#075b9d}
-.main-content .page-header,.main-content .d-flex.justify-content-between.align-items-center{margin-bottom:20px!important}
-.hms-workspace{padding:26px 24px 42px}
-.hms-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}
-.hms-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;font-weight:800;color:#667085;margin-bottom:5px}
-.hms-hero h1{font-size:26px;font-weight:800;margin:0 0 5px}
-.hms-hero p{margin:0;color:#667085;font-size:14px}
-.hms-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.hms-stat{height:100%;padding:18px 20px}
-.hms-stat .label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:800;color:#667085}
-.hms-stat .value{font-size:22px;font-weight:800;color:#25324a;margin-top:4px}
-.hms-stat .hint{font-size:12px;color:#98a2b3;margin-top:2px}
-.hms-icon{width:38px;height:38px;border-radius:10px;background:#eef5fb;color:#075b9d;display:flex;align-items:center;justify-content:center}
-.hms-filter{padding:18px 20px}
-.hms-filter label{font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;color:#667085}
-.hms-person{font-weight:800;color:#25324a}.hms-meta{font-size:11px;color:#98a2b3}
-.hms-amount{font-weight:800;color:#25324a;white-space:nowrap}
-.hms-danger{color:#b42318!important;font-weight:800}.hms-success{color:#067647!important;font-weight:800}
-.hms-empty{padding:60px 20px;text-align:center;color:#98a2b3}.hms-empty i{font-size:38px;color:#c5ccd6;margin-bottom:12px}
-@media(max-width:900px){.hms-hero{flex-direction:column}.hms-actions{justify-content:flex-start}.hms-workspace{padding:20px 12px 35px}}
+.pharmacy-page{padding:26px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 60px)}
+.pharmacy-shell{max-width:1500px;margin:0 auto}
+.pharmacy-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:20px;padding:30px;display:flex;justify-content:space-between;align-items:center;gap:22px;margin-bottom:22px;box-shadow:0 12px 30px rgba(7,91,157,.16)}
+.pharmacy-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#bfe8ff;margin-bottom:5px}
+.pharmacy-hero h1{font-size:29px;font-weight:800;margin:5px 0 8px;color:#fff}
+.pharmacy-hero p{margin:0;color:rgba(255,255,255,.82);font-size:14px}
+.pharmacy-actions{display:grid;grid-template-columns:repeat(2,minmax(145px,1fr));gap:10px;min-width:350px}
+.pharmacy-action{display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid rgba(255,255,255,.22);border-radius:11px;text-decoration:none;color:#fff;background:rgba(255,255,255,.09);transition:.15s}
+.pharmacy-action:hover{transform:translateY(-1px);background:rgba(255,255,255,.15);color:#fff;text-decoration:none}
+.pharmacy-action.primary{background:#fff;color:#063b73;border-color:#fff}
+.pharmacy-action.primary:hover{background:#f5f9fd;color:#063b73}
+.pharmacy-action i{width:28px;text-align:center;font-size:16px}.pharmacy-action span{font-weight:800;font-size:12px;flex:1}.pharmacy-action small{display:block;font-size:9px;color:rgba(255,255,255,.68)}
+.pharmacy-action.primary small{color:#667085}
+.pharmacy-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.pharmacy-stat{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:19px 20px;box-shadow:0 4px 15px rgba(31,45,61,.05);display:flex;justify-content:space-between;align-items:flex-start;text-decoration:none;transition:.18s}
+.pharmacy-stat:hover{transform:translateY(-1px);box-shadow:0 7px 20px rgba(31,45,61,.08);text-decoration:none}
+.pharmacy-stat small{display:block;color:#667085;text-transform:uppercase;font-size:10px;font-weight:800;letter-spacing:.7px}
+.pharmacy-stat strong{font-size:28px;color:#25324a;display:block;margin-top:7px}
+.pharmacy-stat span{font-size:11px;color:#98a2b3;display:block;margin-top:2px}
+.pharmacy-stat .icon{width:40px;height:40px;border-radius:10px;background:#eef4ff;color:#075b9d;display:flex;align-items:center;justify-content:center}
+.pharmacy-grid{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+.pharmacy-panel{background:#fff;border:1px solid #e7ebf2;border-radius:15px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}
+.pharmacy-head{padding:17px 20px;border-bottom:1px solid #edf0f5;display:flex;justify-content:space-between;align-items:center}
+.pharmacy-head strong{color:#25324a;font-size:15px}.pharmacy-head small{color:#8792a5}
+.pharmacy-body{padding:20px}
+.pharmacy-nav{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pharmacy-nav a{display:flex;align-items:center;gap:12px;padding:14px 15px;border:1px solid #e6ebf2;border-radius:11px;background:#fbfcfe;color:#344054;text-decoration:none;font-size:13px;font-weight:700;transition:.18s}
+.pharmacy-nav a:hover{background:#f5faff;border-color:#b9d5ea;transform:translateY(-1px);box-shadow:0 4px 12px rgba(31,45,61,.06);text-decoration:none}
+.pharmacy-nav i{width:34px;height:34px;border-radius:9px;background:#f0f6fb;color:#075b9d;display:flex;align-items:center;justify-content:center}
+.pharmacy-nav span{display:block}.pharmacy-nav small{display:block;margin-top:3px;color:#98a2b3;font-size:10px;font-weight:500}
+.pharmacy-queue-card{height:100%;display:flex;flex-direction:column;justify-content:center;padding:24px}
+.pharmacy-queue-icon{width:50px;height:50px;border-radius:13px;background:#eef4ff;color:#075b9d;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:13px}
+.pharmacy-queue-card .count{font-size:38px;font-weight:800;color:#25324a;line-height:1}
+.pharmacy-queue-card p{color:#7b8798;font-size:13px;margin:8px 0 18px}
+.pharmacy-alert{margin-top:18px;padding:13px 15px;border-radius:10px;background:#fff7e6;border:1px solid #f5d79b;color:#8a5a00;font-size:12px}
+@media(max-width:1050px){.pharmacy-hero{align-items:flex-start;flex-direction:column}.pharmacy-actions{min-width:0;width:100%}.pharmacy-metrics{grid-template-columns:repeat(2,1fr)}.pharmacy-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.pharmacy-page{padding:18px 12px 35px}.pharmacy-hero{padding:23px 20px}.pharmacy-hero h1{font-size:23px}.pharmacy-actions{grid-template-columns:1fr}.pharmacy-metrics{grid-template-columns:1fr}.pharmacy-nav{grid-template-columns:1fr}}
 </style>
 <div class="main-content">
-<div class="container-fluid hms-workspace">
-    <div class="hms-hero">
+<div class="pharmacy-page"><div class="pharmacy-shell">
+    <div class="pharmacy-hero">
         <div>
-            <div class="hms-kicker">Pharmacy · Operations</div>
-            <h1><i class="fas fa-prescription-bottle-medical mr-2"></i> Pharmacy</h1>
+            <div class="pharmacy-kicker">Pharmacy · Operations</div>
+            <h1><i class="fas fa-prescription-bottle-medical mr-2"></i>Pharmacy</h1>
             <p>Manage dispensing, stock and medicine sales from one operational workspace.</p>
         </div>
-        <div class="hms-actions">
-            <a href="dispensing_queue.php" class="btn btn-primary"><i class="fas fa-clipboard-check mr-1"></i> Dispensing Queue</a>
+        <div class="pharmacy-actions">
+            <a href="dispensing_queue.php" class="pharmacy-action primary"><i class="fas fa-clipboard-check"></i><span>Dispensing Queue<small>Process pending prescriptions</small></span></a>
+            <?php if($canCreate): ?><a href="sell_medicine.php" class="pharmacy-action"><i class="fas fa-prescription"></i><span>Sell Medicine<small>Process pharmacy sales</small></span></a><?php endif; ?>
+            <?php if($canEdit): ?><a href="add_stock.php" class="pharmacy-action"><i class="fas fa-box-open"></i><span>Add Stock<small>Receive or record stock</small></span></a><?php endif; ?>
+            <a href="view_stock.php" class="pharmacy-action"><i class="fas fa-capsules"></i><span>View Stock<small>Monitor quantity and expiry</small></span></a>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-lg-4 col-md-6 mb-3"><div class="card h-100"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Pending Dispensing</div><div class="value"><?=$queue?></div><div class="hint">Prescriptions awaiting action</div></div><div class="hms-icon"><i class="fas fa-clipboard-check"></i></div></div></div></div>
-        <div class="col-lg-4 col-md-6 mb-3"><div class="card h-100"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Stock Items</div><div class="value"><?=$stock?></div><div class="hint">Medicine records</div></div><div class="hms-icon"><i class="fas fa-boxes-stacked"></i></div></div></div></div>
-        <div class="col-lg-4 col-md-6 mb-3"><div class="card h-100"><div class="hms-stat d-flex justify-content-between"><div><div class="label">Low Stock</div><div class="value"><?=$low?></div><div class="hint">Below replenishment threshold</div></div><div class="hms-icon"><i class="fas fa-arrow-trend-down"></i></div></div></div></div>
+    <div class="pharmacy-metrics">
+        <a class="pharmacy-stat" href="dispensing_queue.php"><div><small>Pending Dispensing</small><strong><?=$queue?></strong><span>Prescriptions awaiting action</span></div><div class="icon"><i class="fas fa-clipboard-check"></i></div></a>
+        <a class="pharmacy-stat" href="view_stock.php"><div><small>Stock Items</small><strong><?=$stock?></strong><span>Medicine records</span></div><div class="icon"><i class="fas fa-boxes-stacked"></i></div></a>
+        <a class="pharmacy-stat" href="view_stock.php"><div><small>Low Stock</small><strong><?=$low?></strong><span>Below replenishment threshold</span></div><div class="icon"><i class="fas fa-arrow-trend-down"></i></div></a>
+        <a class="pharmacy-stat" href="view_stock.php"><div><small>Out of Stock</small><strong><?=$out?></strong><span>Requires replenishment</span></div><div class="icon"><i class="fas fa-circle-exclamation"></i></div></a>
     </div>
 
-    <div class="row">
-        <div class="col-lg-8 mb-4">
-            <div class="card h-100">
-                <div class="card-header py-3"><strong>Pharmacy Operations</strong><div class="small text-muted">Daily dispensing and inventory workflows.</div></div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3"><a href="dispensing_queue.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-clipboard-check text-primary mr-2"></i><strong>Dispensing Queue</strong><small class="d-block text-muted ml-4">Process prescribed medicines</small></a></div>
-                        <?php if($canCreate): ?><div class="col-md-6 mb-3"><a href="sell_medicine.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-prescription text-primary mr-2"></i><strong>Sell Medicine</strong><small class="d-block text-muted ml-4">Process pharmacy sales</small></a></div><?php endif; ?>
-                        <?php if($canEdit): ?><div class="col-md-6 mb-3"><a href="add_stock.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-box-open text-primary mr-2"></i><strong>Add Stock</strong><small class="d-block text-muted ml-4">Receive or record stock</small></a></div><?php endif; ?>
-                        <div class="col-md-6 mb-3"><a href="view_stock.php" class="btn btn-light border btn-block text-left p-3"><i class="fas fa-capsules text-primary mr-2"></i><strong>View Stock</strong><small class="d-block text-muted ml-4">Monitor quantities and expiry</small></a></div>
-                    </div>
+    <div class="pharmacy-grid">
+        <div class="pharmacy-panel">
+            <div class="pharmacy-head"><div><strong>Pharmacy Operations</strong><br><small>Daily dispensing and inventory workflows.</small></div></div>
+            <div class="pharmacy-body">
+                <div class="pharmacy-nav">
+                    <a href="dispensing_queue.php"><i class="fas fa-clipboard-check"></i><span>Dispensing Queue<small>Process prescribed medicines</small></span></a>
+                    <?php if($canCreate): ?><a href="sell_medicine.php"><i class="fas fa-prescription"></i><span>Sell Medicine<small>Process pharmacy sales</small></span></a><?php endif; ?>
+                    <?php if($canEdit): ?><a href="add_stock.php"><i class="fas fa-box-open"></i><span>Add Stock<small>Receive or record stock</small></span></a><?php endif; ?>
+                    <a href="view_stock.php"><i class="fas fa-capsules"></i><span>View Stock<small>Monitor quantities and expiry</small></span></a>
                 </div>
+                <?php if($low>0): ?><div class="pharmacy-alert"><i class="fas fa-triangle-exclamation mr-1"></i><strong><?=$low?> stock item(s)</strong> are below the replenishment threshold. Review stock before the next dispensing cycle.</div><?php endif; ?>
             </div>
         </div>
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header py-3"><strong>Dispensing Queue</strong></div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <div class="h1 font-weight-bold text-primary mb-1"><?=$queue?></div>
-                    <div class="text-muted mb-3">prescriptions pending dispensing</div>
-                    <?php if($canApprove): ?><a href="dispensing_queue.php" class="btn btn-primary btn-block">Open Queue</a><?php else: ?><a href="dispensing_queue.php" class="btn btn-outline-primary btn-block">View Queue</a><?php endif; ?>
-                </div>
+        <div class="pharmacy-panel">
+            <div class="pharmacy-queue-card">
+                <div class="pharmacy-queue-icon"><i class="fas fa-clipboard-check"></i></div>
+                <div class="count"><?=$queue?></div>
+                <p>prescriptions pending dispensing</p>
+                <?php if($canApprove): ?><a href="dispensing_queue.php" class="btn btn-primary btn-block">Open Dispensing Queue</a><?php else: ?><a href="dispensing_queue.php" class="btn btn-outline-primary btn-block">View Dispensing Queue</a><?php endif; ?>
             </div>
         </div>
     </div>
-</div>
-</div>
+</div></div></div>
 <?php include __DIR__.'/../includes/footer.php'; ?>
