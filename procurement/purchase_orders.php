@@ -46,85 +46,22 @@ if ($viewId > 0):
     // PO accounting is recognized at GRN/receiving, when inventory is actually received.
 ?>
 <style>
-.proc-page{background:radial-gradient(circle at 5% 0%,rgba(33,150,210,.09),transparent 27%),#f4f7fb;min-height:calc(100vh - 70px);padding:30px 24px 54px}
-.proc-shell{max-width:1480px;margin:0 auto}
-.proc-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#082f55 0%,#0d5f91 52%,#2196d2 100%);color:#fff;border-radius:22px;padding:30px 32px;margin-bottom:20px;box-shadow:0 18px 42px rgba(8,47,85,.2)}
-.proc-hero:after{content:"";position:absolute;width:300px;height:300px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-85px;top:-145px;box-shadow:0 0 0 35px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.015)}
-.proc-hero>div{position:relative;z-index:1}
-.proc-kicker{font-size:.68rem;text-transform:uppercase;letter-spacing:.18em;font-weight:800;opacity:.72;margin-bottom:7px}
-.proc-hero h1{font-size:1.85rem;font-weight:800;letter-spacing:-.025em;margin:0 0 7px;color:#fff}
-.proc-hero p{margin:0;color:rgba(255,255,255,.82);font-size:.92rem}
-.proc-actions{position:absolute!important;right:30px;top:50%;transform:translateY(-50%);display:flex;gap:9px;z-index:3}
-.proc-actions .btn{border-radius:10px;padding:10px 15px;font-weight:800;font-size:.74rem}
-.proc-actions .btn-primary,.proc-actions .btn-light{background:#fff;border-color:#fff;color:#0d5f91;box-shadow:0 5px 14px rgba(0,0,0,.12)}
-.proc-actions .btn-outline-light{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.3);color:#fff}
-.proc-card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065);overflow:hidden;margin-bottom:20px}
-.proc-filter-head{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:18px 21px;border-bottom:1px solid #e8edf3;background:linear-gradient(180deg,#fff,#fbfcfe)}
-.proc-filter-head strong{font-size:.98rem;color:#182334}
-.proc-filter-head span{font-size:.78rem;color:#7a8494}
-.proc-card .card-body{padding:18px 21px}
-.proc-card form.form-row{display:grid;grid-template-columns:minmax(260px,1.8fr) minmax(170px,1fr) auto;gap:11px;margin:0;align-items:center}
-.proc-card form.form-row>div{padding:0!important;margin:0!important}
-.proc-card .form-control{height:43px;border:1px solid #dfe5ed;border-radius:10px;background:#f9fbfd;color:#25324a;font-size:.8rem;box-shadow:none}
-.proc-card .form-control:focus{background:#fff;border-color:#1769aa;box-shadow:0 0 0 3px rgba(23,105,170,.10)}
-.proc-card form.form-row .btn{height:43px;border-radius:10px;padding:0 14px;font-size:.72rem;font-weight:800}
-.proc-card form.form-row .btn-primary{background:#1769aa;border-color:#1769aa}
-.proc-card form.form-row .btn-dark{background:#25324a;border-color:#25324a}
-.proc-card form.form-row .btn-light{background:#f5f7fa;border-color:#e1e6ed;color:#475467}
-.proc-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid #e8edf3}
-.proc-toolbar-title{display:flex;align-items:center;gap:9px;color:#182334;font-weight:800;font-size:.88rem}
-.proc-toolbar-title .dot{width:8px;height:8px;border-radius:50%;background:#1769aa;box-shadow:0 0 0 4px #eaf4fb}
-.proc-toolbar-actions{display:flex;gap:8px}
-.proc-toolbar .btn{border-radius:9px;padding:8px 11px;font-size:.68rem;font-weight:800}
-.proc-table-wrap{overflow:auto}
-.proc-table{width:100%;margin:0;border-collapse:separate;border-spacing:0}
-.proc-table thead th{padding:13px 16px;background:#f7f9fc;border:0;border-bottom:1px solid #e5eaf0;color:#687386;font-size:.67rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;white-space:nowrap}
-.proc-table tbody td{padding:14px 16px;border:0;border-bottom:1px solid #edf1f5;color:#374151;font-size:.82rem;vertical-align:middle;background:#fff}
-.proc-table tbody tr{transition:background .15s ease}
-.proc-table tbody tr:hover td{background:#f7fbff}
-.proc-table tbody tr:last-child td{border-bottom:0}
-.po-ref{display:inline-flex;align-items:center;padding:6px 10px;border-radius:9px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:.72rem;font-weight:800}
-.supplier-name{font-weight:750;color:#25324a}
-.date-text{color:#7a8494;font-variant-numeric:tabular-nums}
-.amount-text{font-weight:850;color:#152033;font-variant-numeric:tabular-nums;white-space:nowrap}
-.proc-status{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:.65rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
-.proc-table td:last-child{min-width:270px}
-.proc-table td .btn{margin:2px 3px 2px 0;padding:6px 9px;border-radius:8px;font-size:.65rem;font-weight:800;border-width:1px;transition:.16s}
-.proc-table td .btn-info{background:#eef4ff;border-color:#dbe6ff;color:#2f6fed}
-.proc-table td .btn-secondary{background:#f3f5f8;border-color:#e1e6ed;color:#475467}
-.proc-table td .btn-warning{background:#fff7e8;border-color:#f2ddb4;color:#a16207}
-.proc-table td .btn-danger{background:#fff1f1;border-color:#ffd7d7;color:#c92a2a}
-.proc-table td .btn-success{background:#edf9f1;border-color:#ccebd6;color:#19713a}
-.proc-table td .btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(20,40,70,.08)}
-.proc-table td form{display:inline-block;margin:0}
-.proc-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 20px;border-top:1px solid #e8edf3;background:#fbfcfe}
-.proc-footer small{color:#7a8494;font-size:.7rem}
-.proc-footer .btn{border-radius:9px;border-color:#dfe5ed;color:#475467;background:#fff;font-size:.68rem;font-weight:800}
-.proc-detail{max-width:1120px;margin:0 auto}
-.po-card{position:relative;overflow:hidden;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 10px 30px rgba(20,40,70,.07)}
-.po-content{position:relative;z-index:1;padding:30px}
-.po-branding{display:flex;align-items:center;gap:18px;padding-bottom:20px;border-bottom:1px solid #e8edf3}
-.po-branding>div:first-child img{max-width:78px;max-height:78px}
-.po-hospital h2{margin:0 0 5px;color:#182334;font-size:22px;font-weight:850}
-.po-hospital div{color:#667085;font-size:10px;line-height:1.6}
-.po-top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:22px 0 18px;margin-bottom:17px;border-bottom:1px solid #edf1f5}
-.po-top h3{margin:0!important;color:#1769aa!important;font-size:21px!important;font-weight:850!important}
-.po-top>div:last-child{font-size:11px;line-height:1.9;color:#667085}
-.status-pill{display:inline-flex;padding:6px 10px;border-radius:999px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:9px;font-weight:800;text-transform:uppercase}
-.po-table{width:100%;border-collapse:separate;border-spacing:0}
-.po-table th{padding:12px;background:#f7f9fc;color:#687386;border:0;border-bottom:1px solid #e5eaf0;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-.po-table td{padding:13px 12px;border-bottom:1px solid #edf1f5;color:#344054}
-.po-total{margin-top:17px;padding-top:16px;border-top:1px solid #edf1f5;color:#1769aa;font-size:20px;font-weight:850}
-.po-signatures{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;margin-top:42px;padding-top:22px;border-top:1px solid #edf1f5}
-.stamp-space{height:92px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#98a2b3;font-size:10px;text-transform:uppercase;letter-spacing:.7px}
-.sig-box{padding-top:35px;text-align:center;color:#475467;font-size:10px}.sig-line{border-top:1px dotted #667085;margin-bottom:8px}
-.po-card .watermark{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:320px;opacity:.035;pointer-events:none}
-@media(max-width:950px){.proc-hero{padding-right:30px}.proc-actions{position:static!important;transform:none!important;margin-top:18px}.proc-card form.form-row{grid-template-columns:1fr}.proc-table{min-width:980px}.po-top{flex-direction:column}.po-signatures{grid-template-columns:1fr}}
-@media(max-width:600px){.proc-page{padding:18px 11px 32px}.proc-hero{padding:23px 20px;border-radius:17px}.proc-hero h1{font-size:1.5rem}.proc-actions{display:grid;width:100%;grid-template-columns:1fr}.proc-actions .btn{width:100%}.proc-toolbar{align-items:flex-start;flex-direction:column}.proc-toolbar-actions{width:100%}.proc-toolbar-actions .btn{flex:1}.po-content{padding:19px}}
+.proc-page{background:radial-gradient(circle at 8% 0%,rgba(33,150,210,.08),transparent 30%),#f4f7fb;min-height:calc(100vh - 70px);padding:30px 24px 54px}.proc-shell{max-width:1480px;margin:auto}
+.proc-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#082f55,#0d5f91 52%,#2196d2);color:#fff;border-radius:22px;padding:30px 32px;margin-bottom:22px;box-shadow:0 18px 42px rgba(8,47,85,.2)}.proc-hero:after{content:"";position:absolute;width:300px;height:300px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-90px;top:-145px;box-shadow:0 0 0 35px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.015)}.proc-hero-main{position:relative;z-index:1;max-width:760px}.proc-kicker{font-size:.68rem;text-transform:uppercase;letter-spacing:.18em;font-weight:800;opacity:.7;margin-bottom:7px}.proc-hero h1{font-size:1.9rem;font-weight:850;letter-spacing:-.03em;margin:0 0 7px;color:#fff}.proc-hero p{margin:0;color:rgba(255,255,255,.8);font-size:.9rem}.proc-actions{position:absolute;right:30px;top:30px;display:flex;gap:9px;z-index:3}.proc-actions .btn{border-radius:10px;padding:10px 15px;font-size:.72rem;font-weight:800}.proc-actions .btn-primary,.proc-actions .btn-light{background:#fff;border-color:#fff;color:#0d5f91;box-shadow:0 5px 14px rgba(0,0,0,.12)}.proc-actions .btn-outline-light{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:#fff}
+.proc-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px}.proc-metric{background:#fff;border:1px solid #e2e8f0;border-radius:17px;padding:19px 20px;box-shadow:0 8px 25px rgba(20,40,70,.06);position:relative;overflow:hidden}.proc-metric:after{content:"";position:absolute;right:-24px;top:-28px;width:90px;height:90px;border-radius:50%;background:#edf6fc}.proc-metric small,.proc-metric strong,.proc-metric span{position:relative;z-index:1;display:block}.proc-metric small{text-transform:uppercase;color:#7a8494;font-size:.66rem;font-weight:800;letter-spacing:.07em;margin-bottom:7px}.proc-metric strong{font-size:1.45rem;color:#152033;font-weight:850;font-variant-numeric:tabular-nums}.proc-metric span{font-size:.75rem;color:#98a2b3;margin-top:4px}
+.proc-card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.06);overflow:hidden;margin-bottom:20px}.proc-section-head{padding:19px 21px;border-bottom:1px solid #e8edf3;background:linear-gradient(180deg,#fff,#fbfcfe);display:flex;justify-content:space-between;align-items:center;gap:12px}.proc-section-head strong{font-size:.96rem;color:#182334}.proc-section-head span{font-size:.75rem;color:#7a8494}
+.proc-card .card-body{padding:20px 21px}.proc-card form.form-row{display:grid;grid-template-columns:minmax(280px,1.7fr) minmax(180px,.8fr) auto;gap:11px;margin:0;align-items:center}.proc-card form.form-row>div{padding:0!important;margin:0!important}.proc-card .form-control{height:44px;border:1px solid #dfe5ed;border-radius:10px;background:#f9fbfd;color:#25324a;font-size:.8rem;box-shadow:none}.proc-card .form-control:focus{background:#fff;border-color:#1769aa;box-shadow:0 0 0 3px rgba(23,105,170,.1)}.proc-card form.form-row .btn{height:44px;border-radius:10px;padding:0 14px;font-size:.7rem;font-weight:800}.proc-card form.form-row .btn-primary{background:#1769aa;border-color:#1769aa}.proc-card form.form-row .btn-dark{background:#25324a;border-color:#25324a}.proc-card form.form-row .btn-light{background:#f5f7fa;border-color:#e1e6ed;color:#475467}
+.proc-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid #e8edf3}.proc-toolbar-title{display:flex;align-items:center;gap:10px;color:#182334;font-weight:800;font-size:.88rem}.proc-toolbar-title .dot{width:8px;height:8px;border-radius:50%;background:#1769aa;box-shadow:0 0 0 4px #eaf4fb}.proc-toolbar-actions{display:flex;gap:8px}.proc-toolbar .btn{border-radius:9px;padding:8px 11px;font-size:.67rem;font-weight:800}
+.proc-table-wrap{overflow:auto}.proc-table{width:100%;margin:0;border-collapse:separate;border-spacing:0}.proc-table th{padding:13px 16px;background:#f7f9fc;color:#687386;border:0;border-bottom:1px solid #e5eaf0;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;white-space:nowrap}.proc-table td{padding:15px 16px;border:0;border-bottom:1px solid #edf1f5;color:#374151;font-size:.81rem;vertical-align:middle;background:#fff}.proc-table tbody tr{transition:.15s}.proc-table tbody tr:hover td{background:#f7fbff}.proc-table tbody tr:last-child td{border-bottom:0}.po-ref{display:inline-flex;padding:7px 10px;border-radius:9px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:.7rem;font-weight:850}.supplier-name{font-weight:800;color:#25324a}.date-text{color:#7a8494;font-variant-numeric:tabular-nums}.amount-text{font-weight:850;color:#152033;font-variant-numeric:tabular-nums;white-space:nowrap}.proc-status{display:inline-flex;padding:6px 10px;border-radius:999px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:.63rem;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.proc-table td:last-child{min-width:285px}.proc-table td .btn{margin:2px 3px 2px 0;padding:6px 9px;border-radius:8px;font-size:.63rem;font-weight:800;border-width:1px;transition:.16s}.proc-table td .btn-info{background:#eef4ff;border-color:#dbe6ff;color:#2f6fed}.proc-table td .btn-secondary{background:#f3f5f8;border-color:#e1e6ed;color:#475467}.proc-table td .btn-warning{background:#fff7e8;border-color:#f2ddb4;color:#a16207}.proc-table td .btn-danger{background:#fff1f1;border-color:#ffd7d7;color:#c92a2a}.proc-table td .btn-success{background:#edf9f1;border-color:#ccebd6;color:#19713a}.proc-table td .btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(20,40,70,.08)}.proc-table td form{display:inline-block;margin:0}
+.proc-empty{padding:55px 25px!important;text-align:center!important;color:#7a8494!important}.proc-empty-icon{width:54px;height:54px;margin:0 auto 13px;border-radius:16px;background:#edf6fc;color:#1769aa;display:flex;align-items:center;justify-content:center;font-size:21px}.proc-empty strong{display:block;color:#25324a;font-size:.95rem;margin-bottom:5px}.proc-empty span{font-size:.78rem}
+.proc-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 20px;border-top:1px solid #e8edf3;background:#fbfcfe}.proc-footer small{color:#7a8494;font-size:.7rem}.proc-footer .btn{border-radius:9px;border-color:#dfe5ed;color:#475467;background:#fff;font-size:.67rem;font-weight:800}
+.proc-detail{max-width:1120px;margin:0 auto}.po-card{position:relative;overflow:hidden;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 10px 30px rgba(20,40,70,.07)}.po-content{position:relative;z-index:1;padding:30px}.po-branding{display:flex;align-items:center;gap:18px;padding-bottom:20px;border-bottom:1px solid #e8edf3}.po-branding>div:first-child img{max-width:78px;max-height:78px}.po-hospital h2{margin:0 0 5px;color:#182334;font-size:22px;font-weight:850}.po-hospital div{color:#667085;font-size:10px;line-height:1.6}.po-top{display:flex;justify-content:space-between;gap:24px;padding:22px 0 18px;margin-bottom:17px;border-bottom:1px solid #edf1f5}.po-top h3{margin:0!important;color:#1769aa!important;font-size:21px!important;font-weight:850!important}.po-top>div:last-child{font-size:11px;line-height:1.9;color:#667085}.status-pill{display:inline-flex;padding:6px 10px;border-radius:999px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:9px;font-weight:800;text-transform:uppercase}.po-table{width:100%;border-collapse:separate;border-spacing:0}.po-table th{padding:12px;background:#f7f9fc;color:#687386;border-bottom:1px solid #e5eaf0;font-size:9px;font-weight:800;text-transform:uppercase}.po-table td{padding:13px 12px;border-bottom:1px solid #edf1f5;color:#344054}.po-total{margin-top:17px;padding-top:16px;border-top:1px solid #edf1f5;color:#1769aa;font-size:20px;font-weight:850}.po-signatures{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;margin-top:42px;padding-top:22px;border-top:1px solid #edf1f5}.stamp-space{height:92px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#98a2b3;font-size:10px;text-transform:uppercase}.sig-box{padding-top:35px;text-align:center;color:#475467;font-size:10px}.sig-line{border-top:1px dotted #667085;margin-bottom:8px}.po-card .watermark{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:320px;opacity:.035;pointer-events:none}
+@media(max-width:1000px){.proc-actions{position:static;margin-top:20px}.proc-metrics{grid-template-columns:repeat(2,1fr)}.proc-card form.form-row{grid-template-columns:1fr}.po-top{flex-direction:column}.po-signatures{grid-template-columns:1fr}}
+@media(max-width:600px){.proc-page{padding:18px 11px 32px}.proc-hero{padding:23px 20px;border-radius:17px}.proc-hero h1{font-size:1.5rem}.proc-actions{display:grid;grid-template-columns:1fr;width:100%}.proc-actions .btn{width:100%}.proc-metrics{grid-template-columns:1fr}.proc-toolbar{align-items:flex-start;flex-direction:column}.proc-toolbar-actions{width:100%}.proc-toolbar-actions .btn{flex:1}.proc-table{min-width:980px}.po-content{padding:19px}}
 @media print{.no-print{display:none!important}.proc-page{padding:0;background:#fff}.proc-hero,.proc-card,.po-card{box-shadow:none!important;border:1px solid #ddd}}
 </style>
 
-<div class="proc-page"><div class="proc-shell"><div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Orders</h1><p>Create, approve and track procurement orders.</p></div><div class="proc-actions"><a href="purchase_orders.php" class="btn btn-light">Purchase Orders</a><?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-outline-light">New Order</a><?php endif; ?></div></div><div class="proc-detail"><div class="po-container">
+<div class="proc-page"><div class="proc-shell"><div class="proc-hero"><div class="proc-hero-main"><div class="proc-kicker">Supply Chain · Procurement</div><h1>Purchase Orders</h1><p>Create, approve, receive and track the hospital procurement lifecycle.</p></div><div class="proc-actions"><a href="purchase_orders.php" class="btn btn-light">Purchase Orders</a><?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-outline-light">New Order</a><?php endif; ?></div></div><div class="proc-detail"><div class="po-container">
     <div class="no-print d-flex justify-content-between align-items-center mb-3">
         <a href="purchase_orders.php" class="btn btn-secondary btn-sm">← Back to History</a>
         <button onclick="window.print()" class="btn btn-primary btn-sm">Print Order</button>
@@ -241,6 +178,22 @@ if ($types !== '') {
 $countStmt->execute();
 $totalRows = (int)($countStmt->get_result()->fetch_assoc()['total'] ?? 0);
 $countStmt->close();
+
+$statusCounts = ['Pending'=>0,'Approved'=>0,'Partial'=>0,'Received'=>0,'Cancelled'=>0];
+$summaryStmt = $conn->query("SELECT status, COUNT(*) AS total FROM purchase_orders GROUP BY status");
+if ($summaryStmt) {
+    while ($summary = $summaryStmt->fetch_assoc()) {
+        $key = (string)($summary['status'] ?? '');
+        if (isset($statusCounts[$key])) $statusCounts[$key] = (int)$summary['total'];
+    }
+    $summaryStmt->close();
+}
+$totalPoValue = 0.0;
+$valueStmt = $conn->query("SELECT COALESCE(SUM(total_amount),0) AS total_value FROM purchase_orders");
+if ($valueStmt) {
+    $totalPoValue = (float)($valueStmt->fetch_assoc()['total_value'] ?? 0);
+    $valueStmt->close();
+}
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
 
 $listSql = "SELECT po.*, s.name AS s_name
@@ -259,12 +212,19 @@ $listStmt->execute();
 $listRes = $listStmt->get_result();
 ?>
 <div class="proc-page"><div class="proc-shell">
-    <div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Order History</h1><p>Review, approve and receive procurement orders.</p></div><div class="proc-actions">
+    <div class="proc-hero"><div class="proc-hero-main"><div class="proc-kicker">Supply Chain · Procurement</div><h1>Purchase Order Register</h1><p>Control supplier orders from request through approval and receipt.</p></div><div class="proc-actions">
         <?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Order</a><?php endif; ?>
     </div></div>
 
+    <div class="proc-metrics">
+        <div class="proc-metric"><small>Total Orders</small><strong><?= number_format($totalRows) ?></strong><span>Purchase order register</span></div>
+        <div class="proc-metric"><small>Pending Approval</small><strong><?= number_format($statusCounts['Pending']) ?></strong><span>Awaiting procurement approval</span></div>
+        <div class="proc-metric"><small>In Progress</small><strong><?= number_format($statusCounts['Approved'] + $statusCounts['Partial']) ?></strong><span>Approved / partially received</span></div>
+        <div class="proc-metric"><small>Total PO Value</small><strong>KES <?= number_format($totalPoValue,2) ?></strong><span>Across all purchase orders</span></div>
+    </div>
+
     <div class="proc-card">
-        <div class="proc-filter-head"><strong>Purchase Order Register</strong><span>Search and filter procurement activity</span></div>
+        <div class="proc-section-head"><strong>Find a Purchase Order</strong><span>Search supplier, reference or procurement status</span></div><strong>Purchase Order Register</strong><span>Search and filter procurement activity</span></div>
         <div class="card-body">
             <form class="form-row">
                 <div class="col-md-4 mb-2"><input type="text" class="form-control" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search supplier or PO number"></div>
@@ -287,7 +247,7 @@ $listRes = $listStmt->get_result();
 
     <div class="proc-card">
         <div class="card-body table-responsive p-0">
-            <div class="proc-toolbar"><div class="proc-toolbar-title"><span class="dot"></span>Purchase Order Register</div><div class="proc-toolbar-actions"><button onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')" class="btn btn-sm btn-outline-dark mr-2">Download CSV</button>
+            <div class="proc-toolbar"><div class="proc-toolbar-title"><span class="dot"></span>Purchase Order Register <span style="font-weight:500;color:#98a2b3;margin-left:3px">(<?= number_format($totalRows) ?>)</span></div><div class="proc-toolbar-actions"><button onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')" class="btn btn-sm btn-outline-dark mr-2">Download CSV</button>
                 <button onclick="window.print()" class="btn btn-sm btn-outline-primary">Print Report</button>
             </div>
             <div class="proc-table-wrap"><table class="table proc-table table-hover">
@@ -320,7 +280,7 @@ $listRes = $listStmt->get_result();
                             </td>
                         </tr>
                     <?php endwhile; else: ?>
-                        <tr><td colspan="8" class="text-center">No records found.</td></tr>
+                        <tr><td colspan="8" class="proc-empty"><div class="proc-empty-icon"><i class="fa fa-file-text-o"></i></div><strong>No purchase orders found</strong><span>Try adjusting your filters or create a new purchase order.</span></td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
