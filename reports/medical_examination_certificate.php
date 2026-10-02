@@ -70,10 +70,10 @@ body{font-size:13.5px;line-height:1.45}
 .exam-row label{font-weight:700;padding:5px 4px 5px 2px}
 .line{min-height:29px;padding:5px 4px;border-left:1px solid #d7dee8}
 .large-line{min-height:65px}
-.tests{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
-.test{display:grid;grid-template-columns:88px 1fr;min-height:34px;border-bottom:1px solid #d7dee8}
-.test label{font-weight:700;padding:7px 2px}
-.test .line{padding-left:5px;min-height:34px}
+.tests{display:block}
+.test{display:grid;grid-template-columns:105px 1fr;min-height:31px;border-bottom:1px solid #d7dee8}
+.test label{font-weight:700;padding:6px 2px}
+.test .line{padding-left:5px;min-height:31px}
 .recommendation{min-height:102px;border:1px solid #cbd5e1;padding:7px}
 .signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:20px;align-items:end}
 .sigline{border-bottom:1px solid #111827;height:25px}
@@ -127,6 +127,10 @@ body{font-size:13.5px;line-height:1.45}
 <section class="section lab-section">
 <div class="section-title">Laboratory Test</div>
 <div class="tests">
+<div class="test"><label>P24</label><div class="line"></div></div>
+<div class="test"><label>SAT</label><div class="line"></div></div>
+<div class="test"><label>O/C</label><div class="line"></div></div>
+<div class="test"><label>HEP</label><div class="line"></div></div>
 <div class="test"><label>MALARIA</label><div class="line"></div></div>
 <div class="test"><label>H. PYLORI</label><div class="line"></div></div>
 <div class="test"><label>PBF</label><div class="line"></div></div>
