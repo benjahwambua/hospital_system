@@ -233,18 +233,24 @@ $listRes = $listStmt->get_result();
         <div class="proc-card proc-metric"><small>Purchase Value</small><strong>KES <?= number_format($totalPoValue,2) ?></strong><div class="muted">Total order value</div></div>
     </div>
 <div class="proc-card">
-        <div class="card-body table-responsive p-0">
-            <div class="proc-toolbar"><div class="proc-toolbar-title"><span class="dot"></span>Purchase Order Register <span style="font-weight:500;color:#98a2b3;margin-left:3px">(<?= number_format($totalRows) ?>)</span></div><div class="proc-toolbar-actions"><button onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')" class="btn btn-sm btn-outline-dark mr-2">Download CSV</button>
-                <button onclick="window.print()" class="btn btn-sm btn-outline-primary">Print Report</button>
+        <div class="proc-card-header">
+            <div>
+                <strong>Purchase Order Register</strong><br>
+                <small>Supplier orders awaiting approval, receipt or closure.</small>
             </div>
-            <div class="proc-table-wrap"><table class="table proc-table table-hover">
-                <thead class="thead-light">
+            <div class="proc-toolbar">
+                <button type="button" class="proc-small-btn" onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')"><i class="fa fa-download"></i> Download CSV</button>
+                <button type="button" class="proc-small-btn" onclick="window.print()"><i class="fa fa-print"></i> Print</button>
+            </div>
+        </div>
+        <div class="proc-table-wrap">
+            <table class="proc-table">
+                <thead>
                     <tr>
                         <th>PO #</th>
                         <th>Date</th>
                         <th>Supplier</th>
                         <th>Status</th>
-                        
                         <th>Total Amount</th>
                         <th>Action</th>
                     </tr>
@@ -259,31 +265,30 @@ $listRes = $listStmt->get_result();
                             <td><span class="amount-text">KES <?= number_format((float)$row['total_amount'], 2) ?></span></td>
                             <td>
                                 <a href="view_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
-                                <?php if (can_create($conn, 'procurement') && in_array(($row['status']??''), ['Approved','Partial'], true)): ?><a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a><?php endif; ?> <?php if (can_edit($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><a href="edit_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-warning btn-sm mt-1"><i class="fa fa-edit"></i> Edit</a><?php endif; ?> <?php if (can_delete($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><form method="post" action="delete_po.php" class="d-inline" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="id" value="<?= (int)$row['id']?>"><button class="btn btn-danger btn-sm mt-1">Delete</button></form><?php endif; ?> <?php if (can_approve($conn, 'procurement')): ?><form method="post" class="d-inline">
-<input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
-<input type="hidden" name="po_id" value="<?= (int)$row['id']?>">
-<button name="approve_po" class="btn btn-success btn-sm mt-1" <?=($row['status']??'')!=='Pending'?'disabled':''?>>Approve</button>
-</form><?php endif; ?>
+                                <?php if (can_create($conn, 'procurement') && in_array(($row['status']??''), ['Approved','Partial'], true)): ?><a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a><?php endif; ?>
+                                <?php if (can_edit($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><a href="edit_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-warning btn-sm mt-1"><i class="fa fa-edit"></i> Edit</a><?php endif; ?>
+                                <?php if (can_delete($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><form method="post" action="delete_po.php" class="d-inline" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="id" value="<?= (int)$row['id']?>"><button class="btn btn-danger btn-sm mt-1">Delete</button></form><?php endif; ?>
+                                <?php if (can_approve($conn, 'procurement')): ?><form method="post" class="d-inline"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="po_id" value="<?= (int)$row['id']?>"><button name="approve_po" class="btn btn-success btn-sm mt-1" <?=($row['status']??'')!=='Pending'?'disabled':''?>>Approve</button></form><?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; else: ?>
-                        <tr><td colspan="8" class="proc-empty"><div class="proc-empty-icon"><i class="fa fa-file-text-o"></i></div><strong>No purchase orders found</strong><span>Try adjusting your filters or create a new purchase order.</span></td></tr>
+                        <tr><td colspan="6" class="proc-empty"><div class="proc-empty-icon"><i class="fa fa-file-text-o"></i></div><strong>No purchase orders found</strong><span>Try adjusting your filters or create a new purchase order.</span></td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
-
-            </div><div class="proc-footer">
-                <small><?= $generateReport ? 'Report mode: showing up to 10,000 records' : ('Page ' . $page . ' of ' . $totalPages) ?></small>
-                <div>
-                    <?php $base = ['search' => $search, 'status' => $statusFilter]; ?>
-                    <?php if (!$generateReport): ?>
-                        <?php if ($page > 1): ?><a class="btn btn-sm btn-light" href="?<?= htmlspecialchars(http_build_query(array_merge($base, ['page' => $page - 1]))) ?>">Previous</a><?php endif; ?>
-                        <?php if ($page < $totalPages): ?><a class="btn btn-sm btn-light" href="?<?= htmlspecialchars(http_build_query(array_merge($base, ['page' => $page + 1]))) ?>">Next</a><?php endif; ?>
-                    <?php endif; ?>
-                </div>
-            </div></div>
+        </div>
+        <div class="proc-footer">
+            <small><?= $generateReport ? 'Report mode: showing up to 10,000 records' : ('Page ' . $page . ' of ' . $totalPages) ?></small>
+            <div>
+                <?php $base = ['search' => $search, 'status' => $statusFilter]; ?>
+                <?php if (!$generateReport): ?>
+                    <?php if ($page > 1): ?><a class="btn btn-sm btn-light" href="?<?= htmlspecialchars(http_build_query(array_merge($base, ['page' => $page - 1]))) ?>">Previous</a><?php endif; ?>
+                    <?php if ($page < $totalPages): ?><a class="btn btn-sm btn-light" href="?<?= htmlspecialchars(http_build_query(array_merge($base, ['page' => $page + 1]))) ?>">Next</a><?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
+</div>
 </div>
 <script>
 function exportTableToCSV(filename) {
