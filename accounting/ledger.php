@@ -376,6 +376,58 @@ include __DIR__ . '/../includes/sidebar.php';
 @media(max-width:767px){.ledger-page{padding:18px 12px 35px}.ledger-topbar{padding:23px 20px!important;border-radius:17px!important}.ledger-title h1{font-size:1.4rem!important}.ledger-filters{grid-template-columns:1fr}.ledger-metrics{grid-template-columns:1fr}.ledger-actions{align-items:stretch}.ledger-actions .ledger-btn{flex:1}.ledger-table{min-width:900px}}
 @media print{.no-print{display:none!important}.ledger-page{padding:0;background:#fff}.ledger-topbar,.ledger-card{box-shadow:none!important;border:1px solid #ddd!important}.ledger-topbar{color:#111}}
 
+<!-- Legacy duplicate CSS retained only as a hidden comment to preserve the exact prior design. -->
+<!--
+    .ledger-page { background: #f6f8fb; min-height: 100vh; padding: 24px; }
+    .ledger-shell { max-width: 1500px; margin: 0 auto; }
+    .ledger-topbar, .ledger-card { background: #fff; border: 1px solid #e7ebf3; border-radius: 16px; box-shadow: 0 6px 24px rgba(31, 41, 55, 0.06); }
+    .ledger-topbar { padding: 20px; margin-bottom: 20px; }
+    .ledger-title { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+    .ledger-title h1 { font-size: 1.5rem; margin: 0; color: #1f2937; }
+    .ledger-title p { margin: 6px 0 0; color: #6b7280; }
+    .ledger-filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-top: 18px; }
+    .ledger-field label { display:block; font-size:0.78rem; font-weight:700; text-transform:uppercase; color:#6b7280; margin-bottom:6px; }
+    .ledger-field input, .ledger-field select { width:100%; border:1px solid #d8dee9; border-radius:10px; padding:10px 12px; background:#fff; }
+    .ledger-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    .ledger-btn { border:none; border-radius:10px; padding:10px 14px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+    .ledger-btn-primary { background:#2563eb; color:#fff; }
+    .ledger-btn-secondary { background:#eef2ff; color:#3730a3; }
+    .ledger-btn-light { background:#f3f4f6; color:#111827; }
+    .ledger-switch { display:inline-flex; background:#eef2ff; border-radius:12px; padding:4px; }
+    .ledger-switch button { border:none; background:transparent; padding:8px 12px; border-radius:10px; font-weight:700; color:#4338ca; }
+    .ledger-switch .active { background:#fff; box-shadow:0 2px 8px rgba(67,56,202,0.14); }
+    .ledger-metrics { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px; }
+    .metric { padding:18px; }
+    .metric small { display:block; text-transform:uppercase; color:#6b7280; font-weight:700; margin-bottom:6px; }
+    .metric strong { font-size:1.35rem; color:#111827; }
+    .metric .muted { color:#6b7280; font-size:0.88rem; }
+    .ledger-status { padding:14px 16px; border-radius:14px; margin-bottom:20px; font-weight:600; }
+    .status-ok { background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
+    .status-warn { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+    .ledger-card { overflow:hidden; }
+    .ledger-card-header { padding:18px 20px; border-bottom:1px solid #edf2f7; display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+    .ledger-table-wrap { overflow:auto; }
+    .ledger-table { width:100%; border-collapse:collapse; }
+    .ledger-table th, .ledger-table td { padding:12px 16px; border-bottom:1px solid #edf2f7; white-space:nowrap; }
+    .ledger-table th { background:#f9fafb; font-size:0.78rem; text-transform:uppercase; color:#6b7280; letter-spacing:.04em; }
+    .ledger-table td.ref { max-width: 380px; white-space: normal; }
+    .amount-debit { color:#047857; font-weight:700; }
+    .amount-credit { color:#b91c1c; font-weight:700; }
+    .amount-balance { color:#1d4ed8; font-weight:700; }
+    .trace-link { color:#1d4ed8; text-decoration:none; font-weight:700; }
+    .trace-chip { display:inline-flex; padding:4px 9px; border-radius:999px; background:#eef2ff; color:#312e81; font-size:11px; font-weight:700; text-decoration:none; }
+    .badge-account { display:inline-flex; padding:4px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:.78rem; }
+    .opening-row td { background:#f8fafc; font-weight:700; }
+    .ledger-pagination { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 20px; }
+    .pagination-links { display:flex; gap:8px; flex-wrap:wrap; }
+    .pagination-links a, .pagination-links span { padding:8px 12px; border-radius:10px; background:#f3f4f6; color:#111827; text-decoration:none; }
+    .pagination-links .active { background:#2563eb; color:#fff; }
+    @media print {
+        .no-print { display:none !important; }
+        .ledger-page { padding:0; background:#fff; }
+        .ledger-topbar, .ledger-card { box-shadow:none; border:1px solid #ddd; }
+    }
+</style>
 
 <div class="ledger-page">
     <div class="ledger-shell">
