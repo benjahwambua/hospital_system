@@ -159,7 +159,7 @@ body{font-size:13.5px;line-height:1.45}
 <div><div class="sigline"></div><div class="siglabel">SIGNATURE</div></div>
 </div>
 
-<div class="footer-note">This certificate is issued by Emaqure Medical Centre following medical examination.</div>
+
 </div>
 </div>
 </div>
