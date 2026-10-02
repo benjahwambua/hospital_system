@@ -17,6 +17,28 @@ try{
  $s->bind_param('ii',$id,$patientId);$s->execute();$item=$s->get_result()->fetch_assoc();$s->close();if(!$item)throw new Exception('Item not found.');
  $invoiceId=(int)($item['invoice_id']??0);
  if($invoiceId<=0&&isset($item['visit_id'])){$v=$conn->prepare("SELECT id FROM invoices WHERE patient_id=? AND visit_id=? ORDER BY id DESC LIMIT 1");if($v){$vid=(int)$item['visit_id'];$v->bind_param('ii',$patientId,$vid);$v->execute();$invoiceId=(int)($v->get_result()->fetch_assoc()['id']??0);$v->close();}}
+ // A prescription owns a pharmacy dispensing request. Remove the pending queue
+ // record before deleting the prescription so the queue cannot retain a
+ // reference to a medicine that the clinician has removed.
+ if($type==='prescription'){
+  $queueTable=$conn->query("SHOW TABLES LIKE 'pharmacy_queue'");
+  if($queueTable && $queueTable->num_rows){
+   $q=$conn->prepare("SELECT id,status FROM pharmacy_queue WHERE prescription_id=? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+   if(!$q) throw new Exception('Unable to check the pharmacy dispensing queue.');
+   $q->bind_param('i',$id);$q->execute();$queueRow=$q->get_result()->fetch_assoc();$q->close();
+   if($queueRow){
+    $queueStatus=strtolower((string)($queueRow['status']??''));
+    if($queueStatus==='completed'){
+     throw new Exception('This medicine has already been dispensed and cannot be removed from the patient dashboard.');
+    }
+    $dq=$conn->prepare("DELETE FROM pharmacy_queue WHERE prescription_id=? AND status IN ('pending','cancelled')");
+    if(!$dq) throw new Exception('Unable to remove the pharmacy queue item.');
+    $dq->bind_param('i',$id);
+    if(!$dq->execute()) throw new Exception('Unable to remove the pharmacy queue item: '.$dq->error);
+    $dq->close();
+   }
+  }
+ }
  if($invoiceId>0){
   $p=$conn->prepare("SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.invoice_id=p.invoice_id AND r.status='Approved'),0) paid FROM payments p WHERE p.invoice_id=?");if(!$p)throw new Exception('Unable to verify invoice payments.');
   $p->bind_param('i',$invoiceId);$p->execute();$paid=(float)($p->get_result()->fetch_assoc()['paid']??0);$p->close();
@@ -65,7 +87,6 @@ try{
   }
  }
  $d=$conn->prepare("DELETE FROM {$table} WHERE id=? AND patient_id=?");if(!$d)throw new Exception('Unable to remove item.');$d->bind_param('ii',$id,$patientId);if(!$d->execute()||$d->affected_rows!==1)throw new Exception('Item could not be removed.');$d->close();
- if($type==='prescription'){$q=$conn->prepare("UPDATE pharmacy_queue SET status='cancelled',completed_at=NOW() WHERE prescription_id=? AND status='pending'");if($q){$q->bind_param('i',$id);$q->execute();$q->close();}}
  if(function_exists('audit'))audit('clinical_item_removed',"type={$type},item_id={$id},patient_id={$patientId},invoice_id={$invoiceId}");
  $conn->commit();header("Location: patient_dashboard.php?id={$patientId}&tab=billing&success=Item+Removed");exit;
 }catch(Throwable $e){$conn->rollback();http_response_code(409);exit(htmlspecialchars($e->getMessage()));}
