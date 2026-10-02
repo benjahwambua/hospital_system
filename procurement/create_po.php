@@ -156,9 +156,11 @@ include __DIR__ . '/../includes/sidebar.php';
 .hms-form-page textarea.form-control{min-height:auto}.hms-form-page .btn{border-radius:8px;font-weight:700}
 .hms-form-page hr{border-color:#edf0f5}.hms-form-page .table{margin-bottom:0}.hms-form-page .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
 @media(max-width:767px){.hms-form-page{padding:18px 12px 35px}.hms-form-hero{align-items:flex-start;flex-direction:column}}
+
+.proc-shell{background:#f5f7fb;min-height:calc(100vh - 60px);padding:28px 24px 44px}.proc-shell-inner{max-width:1500px;margin:auto}.proc-hero{background:linear-gradient(135deg,#063b73,#075b9d 55%,#2b78b8);color:#fff;border-radius:18px;padding:26px 30px;margin-bottom:20px;box-shadow:0 12px 30px rgba(6,59,115,.18)}.proc-hero h1{font-size:26px;font-weight:800;margin:4px 0}.proc-hero p{margin:0;color:rgba(255,255,255,.82);font-size:13px}.hms-form-card{border-radius:14px!important;box-shadow:0 5px 18px rgba(31,45,61,.045)!important}.hms-form-page .table thead th{background:#fafbfc!important;color:#7b8798!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.5px}.hms-form-page .btn{border-radius:8px!important;font-weight:800}
 </style>
 
-<div class="hms-form-page"><div class="hms-form-shell">
+<div class="proc-shell"><div class="proc-shell-inner"><div class="proc-hero"><div><div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d9ebfb">Procurement</div><h1>Create Purchase Order</h1><p>Prepare supplier orders and submit them through the procurement workflow.</p></div></div><div class="hms-form-page"><div class="hms-form-shell">
     <div class="hms-form-hero"><div><div class="hms-form-kicker">Procurement · Purchasing</div><h1>Create New Purchase Order</h1><p>Build a purchase order from approved pharmacy and laboratory inventory items.</p></div><a href="purchase_orders.php" class="btn btn-light border">Cancel</a></div>
 
     <?php if ($error !== ''): ?>
@@ -327,4 +329,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-</div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
+</div></div></div><?php include __DIR__ . '/../includes/footer.php'; ?>
