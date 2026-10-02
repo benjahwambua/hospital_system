@@ -46,331 +46,82 @@ if ($viewId > 0):
     // PO accounting is recognized at GRN/receiving, when inventory is actually received.
 ?>
 <style>
-/* PROCUREMENT PURCHASE ORDERS — dashboard-matched visual overhaul */
-.proc-page{
-    padding:28px 24px 44px!important;
-    background:#f5f7fb!important;
-    min-height:calc(100vh - 75px)!important;
-}
-.proc-shell{width:100%!important;max-width:none!important;margin:0!important}
-
-/* Header */
-.proc-hero{
-    position:relative!important;
-    overflow:hidden!important;
-    min-height:126px!important;
-    padding:28px 32px!important;
-    margin-bottom:22px!important;
-    display:flex!important;
-    align-items:center!important;
-    justify-content:space-between!important;
-    gap:24px!important;
-    color:#fff!important;
-    border-radius:18px!important;
-    background:linear-gradient(135deg,#063b73 0%,#075b9d 52%,#2b78b8 100%)!important;
-    box-shadow:0 14px 32px rgba(6,59,115,.18)!important;
-}
-.proc-hero:before,.proc-hero:after{
-    content:""!important;
-    position:absolute!important;
-    border-radius:50%!important;
-    pointer-events:none!important;
-    background:rgba(255,255,255,.07)!important;
-}
-.proc-hero:before{width:250px!important;height:250px!important;right:-75px!important;top:-135px!important}
-.proc-hero:after{width:130px!important;height:130px!important;right:130px!important;bottom:-100px!important}
-.proc-hero>div{position:relative!important;z-index:2!important}
-.proc-kicker{
-    margin:0 0 5px!important;
-    color:#d9ebfb!important;
-    font-size:10px!important;
-    font-weight:800!important;
-    letter-spacing:1.8px!important;
-    text-transform:uppercase!important;
-}
-.proc-hero h1{
-    margin:0 0 7px!important;
-    color:#fff!important;
-    font-size:30px!important;
-    line-height:1.15!important;
-    font-weight:800!important;
-    letter-spacing:-.4px!important;
-}
-.proc-hero p{margin:0!important;color:rgba(255,255,255,.82)!important;font-size:13px!important}
-.proc-actions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:9px!important;flex-wrap:wrap!important;position:relative!important;z-index:3!important}
-.proc-actions>div:first-child{display:none!important}
-.proc-actions .btn{
-    min-height:40px!important;
-    padding:9px 15px!important;
-    border-radius:9px!important;
-    font-size:11px!important;
-    font-weight:800!important;
-    border-width:1px!important;
-}
-.proc-actions .btn-primary{
-    background:#fff!important;
-    border-color:#fff!important;
-    color:#063b73!important;
-    box-shadow:0 5px 14px rgba(0,0,0,.12)!important;
-}
-.proc-actions .btn-light{
-    background:#fff!important;
-    border-color:#fff!important;
-    color:#063b73!important;
-}
-.proc-actions .btn-outline-light{
-    background:rgba(255,255,255,.10)!important;
-    border-color:rgba(255,255,255,.48)!important;
-    color:#fff!important;
-}
-.proc-actions .btn:hover{transform:translateY(-1px)!important}
-
-/* Filter panel */
-.proc-card{
-    margin-bottom:20px!important;
-    overflow:hidden!important;
-    background:#fff!important;
-    border:1px solid #e5e9f0!important;
-    border-radius:14px!important;
-    box-shadow:0 5px 18px rgba(31,45,61,.045)!important;
-}
-.proc-card .card-body{padding:18px 20px!important}
-.proc-card form.form-row{
-    display:flex!important;
-    align-items:center!important;
-    gap:10px!important;
-    margin:0!important;
-}
+.proc-page{background:radial-gradient(circle at 5% 0%,rgba(33,150,210,.09),transparent 27%),#f4f7fb;min-height:calc(100vh - 70px);padding:30px 24px 54px}
+.proc-shell{max-width:1480px;margin:0 auto}
+.proc-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#082f55 0%,#0d5f91 52%,#2196d2 100%);color:#fff;border-radius:22px;padding:30px 32px;margin-bottom:20px;box-shadow:0 18px 42px rgba(8,47,85,.2)}
+.proc-hero:after{content:"";position:absolute;width:300px;height:300px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-85px;top:-145px;box-shadow:0 0 0 35px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.015)}
+.proc-hero>div{position:relative;z-index:1}
+.proc-kicker{font-size:.68rem;text-transform:uppercase;letter-spacing:.18em;font-weight:800;opacity:.72;margin-bottom:7px}
+.proc-hero h1{font-size:1.85rem;font-weight:800;letter-spacing:-.025em;margin:0 0 7px;color:#fff}
+.proc-hero p{margin:0;color:rgba(255,255,255,.82);font-size:.92rem}
+.proc-actions{position:absolute!important;right:30px;top:50%;transform:translateY(-50%);display:flex;gap:9px;z-index:3}
+.proc-actions .btn{border-radius:10px;padding:10px 15px;font-weight:800;font-size:.74rem}
+.proc-actions .btn-primary,.proc-actions .btn-light{background:#fff;border-color:#fff;color:#0d5f91;box-shadow:0 5px 14px rgba(0,0,0,.12)}
+.proc-actions .btn-outline-light{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.3);color:#fff}
+.proc-card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065);overflow:hidden;margin-bottom:20px}
+.proc-filter-head{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:18px 21px;border-bottom:1px solid #e8edf3;background:linear-gradient(180deg,#fff,#fbfcfe)}
+.proc-filter-head strong{font-size:.98rem;color:#182334}
+.proc-filter-head span{font-size:.78rem;color:#7a8494}
+.proc-card .card-body{padding:18px 21px}
+.proc-card form.form-row{display:grid;grid-template-columns:minmax(260px,1.8fr) minmax(170px,1fr) auto;gap:11px;margin:0;align-items:center}
 .proc-card form.form-row>div{padding:0!important;margin:0!important}
-.proc-card form.form-row>div:first-child{flex:1.6!important}
-.proc-card form.form-row>div:nth-child(2){flex:1!important}
-.proc-card form.form-row>div:nth-child(3){flex:0 0 auto!important}
-.proc-card .form-control{
-    height:43px!important;
-    padding:0 13px!important;
-    border:1px solid #dfe4eb!important;
-    border-radius:9px!important;
-    background:#fbfcfe!important;
-    color:#344054!important;
-    font-size:12px!important;
-    box-shadow:none!important;
-}
-.proc-card .form-control::placeholder{color:#98a2b3!important}
-.proc-card .form-control:focus{
-    background:#fff!important;
-    border-color:#075b9d!important;
-    box-shadow:0 0 0 3px rgba(7,91,157,.10)!important;
-}
- .proc-card form.form-row .btn{
-    height:43px!important;
-    padding:0 14px!important;
-    border-radius:9px!important;
-    font-size:11px!important;
-    font-weight:800!important;
-}
-.proc-card form.form-row .btn-primary{background:#075b9d!important;border-color:#075b9d!important}
-.proc-card form.form-row .btn-dark{background:#25324a!important;border-color:#25324a!important}
-.proc-card form.form-row .btn-light{background:#f8f9fb!important;border-color:#e1e5eb!important;color:#475467!important}
-
-/* Report toolbar */
-.proc-card>.card-body.table-responsive{padding:0!important}
-.proc-card>.card-body.table-responsive>.mb-2{
-    display:flex!important;
-    align-items:center!important;
-    justify-content:flex-end!important;
-    gap:8px!important;
-    min-height:54px!important;
-    padding:9px 18px!important;
-    margin:0!important;
-    border-bottom:1px solid #edf0f4!important;
-    background:#fff!important;
-}
-.proc-card>.card-body.table-responsive>.mb-2 .btn{
-    margin:0!important;
-    padding:7px 11px!important;
-    border-radius:8px!important;
-    font-size:10px!important;
-    font-weight:800!important;
-}
-.proc-card>.card-body.table-responsive>.mb-2 .btn-outline-dark{
-    color:#344054!important;
-    border-color:#d9dee7!important;
-    background:#fff!important;
-}
-.proc-card>.card-body.table-responsive>.mb-2 .btn-outline-primary{
-    color:#075b9d!important;
-    border-color:#d7e6f4!important;
-    background:#f6faff!important;
-}
-
-/* Table */
-.proc-table{
-    width:100%!important;
-    margin:0!important;
-    border-collapse:separate!important;
-    border-spacing:0!important;
-}
-.proc-table thead th{
-    height:45px!important;
-    padding:0 16px!important;
-    vertical-align:middle!important;
-    background:#fafbfc!important;
-    color:#7b8798!important;
-    border:0!important;
-    border-bottom:1px solid #e5e9ef!important;
-    font-size:9.5px!important;
-    font-weight:800!important;
-    letter-spacing:.75px!important;
-    text-transform:uppercase!important;
-    white-space:nowrap!important;
-}
-.proc-table tbody td{
-    height:66px!important;
-    padding:9px 16px!important;
-    vertical-align:middle!important;
-    background:#fff!important;
-    color:#475467!important;
-    border:0!important;
-    border-bottom:1px solid #edf0f4!important;
-    font-size:12px!important;
-}
-.proc-table tbody tr{transition:background .15s ease!important}
-.proc-table tbody tr:hover td{background:#f5f9fd!important}
-.proc-table tbody tr:last-child td{border-bottom:0!important}
-.proc-table tbody td:first-child strong{
-    display:inline-flex!important;
-    align-items:center!important;
-    min-width:76px!important;
-    justify-content:center!important;
-    padding:6px 9px!important;
-    border-radius:8px!important;
-    border:1px solid #cfe1f3!important;
-    background:#f1f7fc!important;
-    color:#075b9d!important;
-    font-size:11px!important;
-    font-weight:800!important;
-}
-.proc-table tbody td:nth-child(2){color:#7b8798!important;font-size:11px!important;white-space:nowrap!important}
-.proc-table tbody td:nth-child(3){color:#344054!important;font-weight:700!important}
-.proc-table tbody td:nth-child(5){color:#25324a!important;font-weight:800!important;white-space:nowrap!important}
-.proc-status{
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    min-width:78px!important;
-    padding:6px 10px!important;
-    border:1px solid #cfe1f3!important;
-    border-radius:20px!important;
-    background:#f1f7fc!important;
-    color:#075b9d!important;
-    font-size:9px!important;
-    font-weight:800!important;
-    letter-spacing:.35px!important;
-    text-transform:uppercase!important;
-}
-.proc-table td:last-child{white-space:nowrap!important}
-.proc-table td .btn{
-    margin:2px 3px 2px 0!important;
-    padding:6px 9px!important;
-    border-radius:7px!important;
-    font-size:9.5px!important;
-    line-height:1.2!important;
-    font-weight:800!important;
-    border-width:1px!important;
-    box-shadow:none!important;
-    transition:.15s ease!important;
-}
-.proc-table td .btn-info{background:#eef4ff!important;border-color:#dbe6ff!important;color:#2f6fed!important}
-.proc-table td .btn-secondary{background:#f2f4f7!important;border-color:#e1e5eb!important;color:#475467!important}
-.proc-table td .btn-warning{background:#fff7e8!important;border-color:#f0d9a9!important;color:#075b9d!important}
-.proc-table td .btn-danger{background:#fff1f1!important;border-color:#ffd6d6!important;color:#c92a2a!important}
-.proc-table td .btn-success{background:#edf9f1!important;border-color:#cdebd6!important;color:#19713a!important}
-.proc-table td .btn:hover{transform:translateY(-1px)!important;box-shadow:0 3px 8px rgba(31,45,61,.08)!important}
-.proc-table td .btn:disabled{opacity:.38!important;cursor:not-allowed!important}
-.proc-table td form{display:inline-block!important;margin:0!important}
-
-/* Pagination footer */
-.proc-card>.card-body.table-responsive>.d-flex:last-child{
-    min-height:54px!important;
-    padding:9px 18px!important;
-    border-top:1px solid #edf0f4!important;
-    background:#fff!important;
-}
-.proc-card>.card-body.table-responsive>.d-flex:last-child small{
-    color:#98a2b3!important;
-    font-size:10px!important;
-}
-.proc-card>.card-body.table-responsive>.d-flex:last-child .btn{
-    min-width:68px!important;
-    border-radius:8px!important;
-    border-color:#e0e5ec!important;
-    color:#475467!important;
-    font-size:10px!important;
-    font-weight:800!important;
-}
-
-/* PO detail */
-.proc-detail{max-width:1120px!important;margin:0 auto!important}
-.po-card{
-    overflow:hidden!important;
-    background:#fff!important;
-    border:1px solid #e5e9f0!important;
-    border-radius:16px!important;
-    box-shadow:0 8px 24px rgba(31,45,61,.06)!important;
-}
-.po-content{padding:28px!important}.po-top{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:24px!important;padding:20px 0!important;margin-bottom:18px!important;border-bottom:1px solid #edf0f4!important}.po-top h3{font-size:20px!important;font-weight:800!important}.po-top>div:last-child{font-size:11px!important;line-height:1.9!important;color:#667085!important}.po-signatures{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:28px!important;margin-top:42px!important;padding-top:22px!important;border-top:1px solid #edf0f4!important}.stamp-space{height:92px!important;border:1px dashed #cbd5e1!important;border-radius:10px!important;display:flex!important;align-items:center!important;justify-content:center!important;color:#98a2b3!important;font-size:10px!important;text-transform:uppercase!important;letter-spacing:.7px!important}.sig-box{padding-top:35px!important;text-align:center!important;color:#475467!important;font-size:10px!important}.sig-line{border-top:1px dotted #667085!important;margin-bottom:8px!important}.po-card .watermark{position:absolute!important;left:50%!important;top:52%!important;transform:translate(-50%,-50%)!important;width:320px!important;opacity:.035!important;pointer-events:none!important;z-index:0!important}.po-content{position:relative!important;z-index:1!important}.po-branding{display:flex!important;align-items:center!important;gap:18px!important}.po-branding>div:first-child img{max-width:78px!important;max-height:78px!important}.po-hospital h2{margin:0 0 5px!important;font-size:22px!important}.po-hospital div{font-size:10px!important;color:#667085!important;line-height:1.6!important}
-.po-branding{padding-bottom:18px!important;border-bottom:1px solid #edf0f4!important}
-.po-hospital h2{color:#25324a!important;font-weight:800!important}
-.status-pill{
-    display:inline-flex!important;
-    padding:6px 10px!important;
-    border-radius:20px!important;
-    background:#f1f7fc!important;
-    border:1px solid #cfe1f3!important;
-    color:#075b9d!important;
-    font-size:9px!important;
-    font-weight:800!important;
-    text-transform:uppercase!important;
-}
-.po-table{width:100%!important;border-collapse:separate!important;border-spacing:0!important}
-.po-table th{
-    padding:12px!important;
-    background:#fafbfc!important;
-    color:#7b8798!important;
-    border-bottom:1px solid #e5e9ef!important;
-    font-size:9px!important;
-    font-weight:800!important;
-    letter-spacing:.5px!important;
-    text-transform:uppercase!important;
-}
-.po-table td{padding:13px 12px!important;border-bottom:1px solid #edf0f4!important;color:#344054!important}
-.po-total{margin-top:16px!important;padding-top:16px!important;border-top:1px solid #edf0f4!important;color:#075b9d!important;font-size:20px!important;font-weight:800!important}
-
-@media(max-width:900px){
-    .po-top{flex-direction:column!important}.po-signatures{grid-template-columns:1fr!important}.stamp-space{height:70px!important}
-
-    .proc-page{padding:20px 14px 32px!important}
-    .proc-hero{flex-direction:column!important;align-items:flex-start!important;padding:24px!important}
-    .proc-actions{width:100%!important;justify-content:flex-start!important}
-    .proc-card form.form-row{display:block!important}
-    .proc-card form.form-row>div{width:100%!important;margin-bottom:10px!important}
-    .proc-card form.form-row>div:last-child{margin-bottom:0!important}
-    .proc-card>.card-body.table-responsive{overflow-x:auto!important}
-    .proc-table{min-width:900px!important}
-}
-@media(max-width:600px){
-    .proc-page{padding:16px 10px 26px!important}
-    .proc-hero{border-radius:15px!important;padding:20px!important}
-    .proc-hero h1{font-size:24px!important}
-    .proc-actions{display:grid!important;grid-template-columns:1fr!important}
-    .proc-actions .btn{width:100%!important}
-    .po-content{padding:18px!important}
-}
-@media print{
-    .no-print{display:none!important}
-    .proc-page{padding:0!important;background:#fff!important}
-    .proc-hero,.proc-card,.po-card{box-shadow:none!important}
-}
+.proc-card .form-control{height:43px;border:1px solid #dfe5ed;border-radius:10px;background:#f9fbfd;color:#25324a;font-size:.8rem;box-shadow:none}
+.proc-card .form-control:focus{background:#fff;border-color:#1769aa;box-shadow:0 0 0 3px rgba(23,105,170,.10)}
+.proc-card form.form-row .btn{height:43px;border-radius:10px;padding:0 14px;font-size:.72rem;font-weight:800}
+.proc-card form.form-row .btn-primary{background:#1769aa;border-color:#1769aa}
+.proc-card form.form-row .btn-dark{background:#25324a;border-color:#25324a}
+.proc-card form.form-row .btn-light{background:#f5f7fa;border-color:#e1e6ed;color:#475467}
+.proc-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid #e8edf3}
+.proc-toolbar-title{display:flex;align-items:center;gap:9px;color:#182334;font-weight:800;font-size:.88rem}
+.proc-toolbar-title .dot{width:8px;height:8px;border-radius:50%;background:#1769aa;box-shadow:0 0 0 4px #eaf4fb}
+.proc-toolbar-actions{display:flex;gap:8px}
+.proc-toolbar .btn{border-radius:9px;padding:8px 11px;font-size:.68rem;font-weight:800}
+.proc-table-wrap{overflow:auto}
+.proc-table{width:100%;margin:0;border-collapse:separate;border-spacing:0}
+.proc-table thead th{padding:13px 16px;background:#f7f9fc;border:0;border-bottom:1px solid #e5eaf0;color:#687386;font-size:.67rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;white-space:nowrap}
+.proc-table tbody td{padding:14px 16px;border:0;border-bottom:1px solid #edf1f5;color:#374151;font-size:.82rem;vertical-align:middle;background:#fff}
+.proc-table tbody tr{transition:background .15s ease}
+.proc-table tbody tr:hover td{background:#f7fbff}
+.proc-table tbody tr:last-child td{border-bottom:0}
+.po-ref{display:inline-flex;align-items:center;padding:6px 10px;border-radius:9px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:.72rem;font-weight:800}
+.supplier-name{font-weight:750;color:#25324a}
+.date-text{color:#7a8494;font-variant-numeric:tabular-nums}
+.amount-text{font-weight:850;color:#152033;font-variant-numeric:tabular-nums;white-space:nowrap}
+.proc-status{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:.65rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.proc-table td:last-child{min-width:270px}
+.proc-table td .btn{margin:2px 3px 2px 0;padding:6px 9px;border-radius:8px;font-size:.65rem;font-weight:800;border-width:1px;transition:.16s}
+.proc-table td .btn-info{background:#eef4ff;border-color:#dbe6ff;color:#2f6fed}
+.proc-table td .btn-secondary{background:#f3f5f8;border-color:#e1e6ed;color:#475467}
+.proc-table td .btn-warning{background:#fff7e8;border-color:#f2ddb4;color:#a16207}
+.proc-table td .btn-danger{background:#fff1f1;border-color:#ffd7d7;color:#c92a2a}
+.proc-table td .btn-success{background:#edf9f1;border-color:#ccebd6;color:#19713a}
+.proc-table td .btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(20,40,70,.08)}
+.proc-table td form{display:inline-block;margin:0}
+.proc-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 20px;border-top:1px solid #e8edf3;background:#fbfcfe}
+.proc-footer small{color:#7a8494;font-size:.7rem}
+.proc-footer .btn{border-radius:9px;border-color:#dfe5ed;color:#475467;background:#fff;font-size:.68rem;font-weight:800}
+.proc-detail{max-width:1120px;margin:0 auto}
+.po-card{position:relative;overflow:hidden;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 10px 30px rgba(20,40,70,.07)}
+.po-content{position:relative;z-index:1;padding:30px}
+.po-branding{display:flex;align-items:center;gap:18px;padding-bottom:20px;border-bottom:1px solid #e8edf3}
+.po-branding>div:first-child img{max-width:78px;max-height:78px}
+.po-hospital h2{margin:0 0 5px;color:#182334;font-size:22px;font-weight:850}
+.po-hospital div{color:#667085;font-size:10px;line-height:1.6}
+.po-top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:22px 0 18px;margin-bottom:17px;border-bottom:1px solid #edf1f5}
+.po-top h3{margin:0!important;color:#1769aa!important;font-size:21px!important;font-weight:850!important}
+.po-top>div:last-child{font-size:11px;line-height:1.9;color:#667085}
+.status-pill{display:inline-flex;padding:6px 10px;border-radius:999px;background:#edf6fc;border:1px solid #d7eaf7;color:#126ba5;font-size:9px;font-weight:800;text-transform:uppercase}
+.po-table{width:100%;border-collapse:separate;border-spacing:0}
+.po-table th{padding:12px;background:#f7f9fc;color:#687386;border:0;border-bottom:1px solid #e5eaf0;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.po-table td{padding:13px 12px;border-bottom:1px solid #edf1f5;color:#344054}
+.po-total{margin-top:17px;padding-top:16px;border-top:1px solid #edf1f5;color:#1769aa;font-size:20px;font-weight:850}
+.po-signatures{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;margin-top:42px;padding-top:22px;border-top:1px solid #edf1f5}
+.stamp-space{height:92px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#98a2b3;font-size:10px;text-transform:uppercase;letter-spacing:.7px}
+.sig-box{padding-top:35px;text-align:center;color:#475467;font-size:10px}.sig-line{border-top:1px dotted #667085;margin-bottom:8px}
+.po-card .watermark{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:320px;opacity:.035;pointer-events:none}
+@media(max-width:950px){.proc-hero{padding-right:30px}.proc-actions{position:static!important;transform:none!important;margin-top:18px}.proc-card form.form-row{grid-template-columns:1fr}.proc-table{min-width:980px}.po-top{flex-direction:column}.po-signatures{grid-template-columns:1fr}}
+@media(max-width:600px){.proc-page{padding:18px 11px 32px}.proc-hero{padding:23px 20px;border-radius:17px}.proc-hero h1{font-size:1.5rem}.proc-actions{display:grid;width:100%;grid-template-columns:1fr}.proc-actions .btn{width:100%}.proc-toolbar{align-items:flex-start;flex-direction:column}.proc-toolbar-actions{width:100%}.proc-toolbar-actions .btn{flex:1}.po-content{padding:19px}}
+@media print{.no-print{display:none!important}.proc-page{padding:0;background:#fff}.proc-hero,.proc-card,.po-card{box-shadow:none!important;border:1px solid #ddd}}
 </style>
 
 <div class="proc-page"><div class="proc-shell"><div class="proc-hero"><div><div class="proc-kicker">Supply Chain</div><h1>Purchase Orders</h1><p>Create, approve and track procurement orders.</p></div><div class="proc-actions"><a href="purchase_orders.php" class="btn btn-light">Purchase Orders</a><?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-outline-light">New Order</a><?php endif; ?></div></div><div class="proc-detail"><div class="po-container">
@@ -513,6 +264,7 @@ $listRes = $listStmt->get_result();
     </div></div>
 
     <div class="proc-card">
+        <div class="proc-filter-head"><strong>Purchase Order Register</strong><span>Search and filter procurement activity</span></div>
         <div class="card-body">
             <form class="form-row">
                 <div class="col-md-4 mb-2"><input type="text" class="form-control" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search supplier or PO number"></div>
@@ -534,12 +286,11 @@ $listRes = $listStmt->get_result();
     </div>
 
     <div class="proc-card">
-        <div class="card-body table-responsive">
-            <div class="mb-2 d-flex justify-content-end">
-                <button onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')" class="btn btn-sm btn-outline-dark mr-2">Download CSV</button>
+        <div class="card-body table-responsive p-0">
+            <div class="proc-toolbar"><div class="proc-toolbar-title"><span class="dot"></span>Purchase Order Register</div><div class="proc-toolbar-actions"><button onclick="exportTableToCSV('po_report_<?= date('Y-m-d') ?>.csv')" class="btn btn-sm btn-outline-dark mr-2">Download CSV</button>
                 <button onclick="window.print()" class="btn btn-sm btn-outline-primary">Print Report</button>
             </div>
-            <table class="table proc-table table-hover">
+            <div class="proc-table-wrap"><table class="table proc-table table-hover">
                 <thead class="thead-light">
                     <tr>
                         <th>PO #</th>
@@ -554,11 +305,11 @@ $listRes = $listStmt->get_result();
                 <tbody>
                     <?php if ($listRes && $listRes->num_rows > 0): while ($row = $listRes->fetch_assoc()): ?>
                         <tr>
-                            <td><strong>PO-<?= str_pad((string)$row['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
-                            <td><?= !empty($row['order_date']) ? date('d M Y', strtotime($row['order_date'])) : 'N/A' ?></td>
-                            <td><?= htmlspecialchars((string)$row['s_name']) ?></td>
+                            <td><span class="po-ref">PO-<?= str_pad((string)$row['id'], 5, '0', STR_PAD_LEFT) ?></span></td>
+                            <td><span class="date-text"><?= !empty($row['order_date']) ? date('d M Y', strtotime($row['order_date'])) : 'N/A' ?></span></td>
+                            <td><span class="supplier-name"><?= htmlspecialchars((string)$row['s_name']) ?></span></td>
                             <td><span class="proc-status"><?= htmlspecialchars((string)($row['status'] ?? 'Pending')) ?></span></td>
-                            <td>KES <?= number_format((float)$row['total_amount'], 2) ?></td>
+                            <td><span class="amount-text">KES <?= number_format((float)$row['total_amount'], 2) ?></span></td>
                             <td>
                                 <a href="view_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-info btn-sm"><i class="fa fa-eye"></i> View</a>
                                 <?php if (can_create($conn, 'procurement') && in_array(($row['status']??''), ['Approved','Partial'], true)): ?><a href="receive_inventory.php?po_id=<?= (int)$row['id'] ?>" class="btn btn-secondary btn-sm mt-1">Receive</a><?php endif; ?> <?php if (can_edit($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><a href="edit_po.php?id=<?= (int)$row['id'] ?>" class="btn btn-warning btn-sm mt-1"><i class="fa fa-edit"></i> Edit</a><?php endif; ?> <?php if (can_delete($conn, 'procurement') && in_array(($row['status']??''), ['Pending','Cancelled'], true)): ?><form method="post" action="delete_po.php" class="d-inline" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="id" value="<?= (int)$row['id']?>"><button class="btn btn-danger btn-sm mt-1">Delete</button></form><?php endif; ?> <?php if (can_approve($conn, 'procurement')): ?><form method="post" class="d-inline">
@@ -574,7 +325,7 @@ $listRes = $listStmt->get_result();
                 </tbody>
             </table>
 
-            <div class="d-flex justify-content-between align-items-center">
+            </div><div class="proc-footer">
                 <small><?= $generateReport ? 'Report mode: showing up to 10,000 records' : ('Page ' . $page . ' of ' . $totalPages) ?></small>
                 <div>
                     <?php $base = ['search' => $search, 'status' => $statusFilter]; ?>
@@ -583,7 +334,7 @@ $listRes = $listStmt->get_result();
                         <?php if ($page < $totalPages): ?><a class="btn btn-sm btn-light" href="?<?= htmlspecialchars(http_build_query(array_merge($base, ['page' => $page + 1]))) ?>">Next</a><?php endif; ?>
                     <?php endif; ?>
                 </div>
-            </div>
+            </div></div>
         </div>
     </div>
 </div>
