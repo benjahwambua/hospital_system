@@ -66,7 +66,8 @@ body{font-size:13.5px;line-height:1.45}
 .lab-section{margin-top:16px}
 .results-section{margin-top:18px}
 .results-box{min-height:132px;padding:10px 8px;position:relative}
-.results-box:after{content:"................................................................................................................................................................................";display:block;margin-top:88px;white-space:nowrap;overflow:hidden;color:#111827;letter-spacing:.02em}
+.result-lines{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.result-lines span{display:block;border-bottom:1px dotted #111827;height:17px}
 .section-title{font-weight:800;font-size:13px;text-transform:uppercase;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:5px}
 .exam-row{display:grid;grid-template-columns:72px 1fr;min-height:29px;border-bottom:1px solid #d7dee8}
 .exam-row label{font-weight:700;padding:5px 4px 5px 2px}
@@ -142,7 +143,15 @@ body{font-size:13.5px;line-height:1.45}
 
 <section class="section results-section">
 <div class="section-title">Lab Results</div>
-<div class="recommendation results-box"></div>
+<div class="recommendation results-box">
+<div class="result-lines">
+<span></span>
+<span></span>
+<span></span>
+<span></span>
+<span></span>
+</div>
+</div>
 </section>
 
 <div class="signature">
