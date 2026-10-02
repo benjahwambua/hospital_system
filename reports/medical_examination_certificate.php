@@ -78,10 +78,9 @@ body{font-size:13.5px;line-height:1.45}
 .test label{font-weight:700;padding:6px 2px}
 .test .line{padding-left:5px;min-height:31px}
 .recommendation{min-height:102px;border:1px solid #cbd5e1;padding:7px}
-.signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:34px};align-items:end}
-.sigline{border-bottom:1px solid #111827;height:25px}
+.signature{display:grid;grid-template-columns:1.4fr 1fr;gap:25px;margin-top:58px;align-items:end}
+.sigline{height:25px;line-height:25px;letter-spacing:1px;white-space:nowrap;overflow:hidden}
 .siglabel{font-size:11px;color:var(--muted);margin-top:4px}
-.footer-note{margin-top:10px;text-align:center;font-size:10px;color:var(--muted)}
 .actions{text-align:right;margin-top:10px}
 .btn{border:0;background:var(--primary);color:#fff;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer}
 @media print{
@@ -155,8 +154,8 @@ body{font-size:13.5px;line-height:1.45}
 </section>
 
 <div class="signature">
-<div><div class="sigline"></div><div class="siglabel">DR. NAME / DESIGNATION</div></div>
-<div><div class="sigline"></div><div class="siglabel">SIGNATURE</div></div>
+<div><div class="sigline">............................................................</div><div class="siglabel">DR. NAME / DESIGNATION</div></div>
+<div><div class="sigline">............................................................</div><div class="siglabel">SIGNATURE</div></div>
 </div>
 
 
