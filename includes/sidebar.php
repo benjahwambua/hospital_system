@@ -130,7 +130,6 @@ function isParentActive($paths) {
                 <a href="/hospital_system/pharmacy/dashboard.php" class="<?= isActive('pharmacy/dashboard.php') ?>"><i class="fas fa-th-large"></i> Pharmacy Dashboard</a>
                 <a href="/hospital_system/pharmacy/dispensing_queue.php" class="<?= isActive('dispensing_queue.php') ?>"><i class="fas fa-clipboard-check"></i> Dispensing Queue</a>
                 <a href="/hospital_system/pharmacy/sell_medicine.php" class="<?= isActive('sell_medicine.php') ?>"><i class="fas fa-file-prescription"></i> Sell Medicine</a>
-                <a href="/hospital_system/pharmacy/add_stock.php" class="<?= isActive('add_stock.php') ?>"><i class="fas fa-box-open"></i> Add Stock</a>
                 <a href="/hospital_system/pharmacy/view_stock.php" class="<?= isActive('view_stock.php') ?>"><i class="fas fa-capsules"></i> View Stock</a>
             </div>
         </div>
