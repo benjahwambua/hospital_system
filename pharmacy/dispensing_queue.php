@@ -101,15 +101,70 @@ if($hasVisit&&$hasVisit->num_rows){
 $rows=$conn->query($sql);
 include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.php';
 ?>
-<div class="main-content"><div class="container-fluid pt-4">
-<div class="card shadow-sm"><div class="card-header"><h4 class="mb-0">Pharmacy Dispensing Queue</h4></div><div class="card-body">
-<?php if($message):?><div class="alert alert-info"><?=htmlspecialchars($message)?></div><?php endif;?>
-
-<table class="table table-bordered"><thead><tr><th>Client / Patient Name</th><th>Visit</th><th>Medicine</th><th>Qty</th><th>Dosage / Instructions</th><th>Requested</th><th>Action</th></tr></thead><tbody>
-<?php if($rows&&$rows->num_rows):while($r=$rows->fetch_assoc()):?><tr>
-<td><strong><?=htmlspecialchars($r['full_name'])?></strong><br><small><?=htmlspecialchars($r['patient_number'])?></small></td>
-<td><?=htmlspecialchars($r['visit_number']??'Legacy')?></td><td><strong><?=htmlspecialchars($r['drug_name'])?></strong></td><td><?=$r['quantity']?></td><td><?=!empty(trim((string)($r['dosage_instructions']??'')))?htmlspecialchars($r['dosage_instructions']):'<span class="text-muted">No instructions</span>'?></td><td><?=htmlspecialchars($r['created_at'])?></td>
-<td><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="dispense_id" value="<?=$r['id']?>"><button class="btn btn-success" type="submit">Dispense</button></form></td>
-</tr><?php endwhile;else:?><tr><td colspan="7" class="text-center text-muted">No pending pharmacy orders.</td></tr><?php endif;?>
-</tbody></table></div></div></div></div>
+<style>
+.dq-page{background:#f5f7fb;min-height:calc(100vh - 60px);padding:26px 24px 42px}
+.dq-shell{max-width:1500px;margin:auto}
+.dq-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:20px;padding:28px 30px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:20px;box-shadow:0 12px 30px rgba(7,91,157,.16)}
+.dq-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.7px;font-weight:800;color:#bfe8ff}
+.dq-hero h1{font-size:28px;font-weight:800;margin:5px 0 7px;color:#fff}
+.dq-hero p{margin:0;color:rgba(255,255,255,.82);font-size:13px}
+.dq-count{min-width:145px;padding:15px 20px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.1);text-align:center}
+.dq-count strong{display:block;font-size:32px;line-height:1.05}.dq-count span{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#d8efff;font-weight:800}
+.dq-toolbar{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;justify-content:space-between;box-shadow:0 4px 15px rgba(31,45,61,.05)}
+.dq-search{position:relative;flex:1;max-width:520px}.dq-search i{position:absolute;left:13px;top:11px;color:#98a2b3}.dq-search input{width:100%;border:1px solid #d7dee8;border-radius:9px;padding:9px 12px 9px 36px;font-size:13px;outline:0}.dq-search input:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
+.dq-note{font-size:11px;color:#667085;font-weight:600}
+.dq-table-card{background:#fff;border:1px solid #e7ebf2;border-radius:15px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}
+.dq-table-head{padding:16px 20px;border-bottom:1px solid #edf0f5;display:flex;align-items:center;justify-content:space-between}
+.dq-table-head strong{font-size:15px;color:#25324a}.dq-table-head span{font-size:11px;color:#98a2b3}
+.dq-table-wrap{overflow-x:auto}.dq-table{width:100%;border-collapse:collapse;margin:0}.dq-table th{background:#f8fafc;color:#667085;font-size:10px;text-transform:uppercase;letter-spacing:.55px;font-weight:800;padding:12px 16px;border-bottom:1px solid #e7ebf2;white-space:nowrap}.dq-table td{padding:15px 16px;border-bottom:1px solid #edf0f5;vertical-align:middle;color:#344054;font-size:12px}.dq-table tbody tr:hover{background:#f8fbff}.dq-table tbody tr:last-child td{border-bottom:0}
+.dq-patient{font-weight:800;color:#25324a;font-size:13px}.dq-patient small{display:block;color:#98a2b3;font-size:10px;font-weight:600;margin-top:3px}
+.dq-medicine{font-weight:800;color:#25324a}.dq-qty{display:inline-flex;min-width:34px;justify-content:center;padding:5px 9px;border-radius:8px;background:#eef4ff;color:#075b9d;font-weight:800}
+.dq-dosage{max-width:250px;line-height:1.45;color:#475467}.dq-muted{color:#98a2b3;font-style:italic}
+.dq-time{font-size:11px;color:#667085;white-space:nowrap}.dq-action{border:0;border-radius:8px;padding:8px 13px;background:#198754;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 3px 8px rgba(25,135,84,.12)}.dq-action:hover{filter:brightness(.96)}
+.dq-empty{padding:55px 20px;text-align:center}.dq-empty .icon{width:54px;height:54px;border-radius:14px;background:#eef7f1;color:#198754;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:21px}.dq-empty strong{display:block;color:#25324a;font-size:15px}.dq-empty p{margin:5px 0 0;color:#98a2b3;font-size:12px}
+.dq-message{border-radius:10px;font-size:12px;margin-bottom:16px}
+@media(max-width:800px){.dq-page{padding:18px 12px 35px}.dq-hero{padding:22px 20px;align-items:flex-start;flex-direction:column}.dq-hero h1{font-size:23px}.dq-count{width:100%;text-align:left}.dq-toolbar{align-items:stretch;flex-direction:column}.dq-search{max-width:none}.dq-note{display:none}.dq-table th,.dq-table td{padding:12px 11px}}
+</style>
+<div class="main-content"><div class="dq-page"><div class="dq-shell">
+  <div class="dq-hero">
+    <div><div class="dq-kicker">Pharmacy · Fulfilment</div><h1><i class="fas fa-clipboard-check mr-2"></i>Dispensing Queue</h1><p>Review prescribed medicines, confirm dosage instructions and complete dispensing.</p></div>
+    <div class="dq-count"><strong><?=($rows?$rows->num_rows:0)?></strong><span>Pending prescriptions</span></div>
+  </div>
+  <?php if($message): ?><div class="alert alert-info dq-message"><?=htmlspecialchars($message)?></div><?php endif; ?>
+  <div class="dq-toolbar">
+    <div class="dq-search"><i class="fas fa-search"></i><input id="queueSearch" type="search" placeholder="Search patient, number or medicine..."></div>
+    <div class="dq-note"><i class="fas fa-circle-info mr-1"></i>Oldest requests appear first</div>
+  </div>
+  <div class="dq-table-card">
+    <div class="dq-table-head"><strong>Pending prescriptions</strong><span><?=($rows?$rows->num_rows:0)?> awaiting dispensing</span></div>
+    <div class="dq-table-wrap">
+      <table class="dq-table" id="dispensingTable">
+        <thead><tr><th>Patient</th><th>Medicine</th><th>Qty</th><th>Dosage / Instructions</th><th>Requested</th><th>Action</th></tr></thead>
+        <tbody>
+        <?php if($rows&&$rows->num_rows): while($r=$rows->fetch_assoc()): ?>
+          <tr>
+            <td><div class="dq-patient"><?=htmlspecialchars($r['full_name'])?><small><?=htmlspecialchars($r['patient_number'])?></small></div></td>
+            <td><div class="dq-medicine"><?=htmlspecialchars($r['drug_name'])?></div></td>
+            <td><span class="dq-qty"><?=$r['quantity']?></span></td>
+            <td><div class="dq-dosage"><?=!empty(trim((string)($r['dosage_instructions']??''))?htmlspecialchars($r['dosage_instructions']):'<span class="dq-muted">No instructions</span>'?></div></td>
+            <td><span class="dq-time"><i class="far fa-clock mr-1"></i><?=htmlspecialchars($r['created_at'])?></span></td>
+            <td><form method="post" class="m-0"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="dispense_id" value="<?=$r['id']?>"><button class="dq-action" type="submit"><i class="fas fa-check mr-1"></i>Dispense</button></form></td>
+          </tr>
+        <?php endwhile; else: ?>
+          <tr><td colspan="6"><div class="dq-empty"><div class="icon"><i class="fas fa-check"></i></div><strong>Dispensing queue is clear</strong><p>There are no pending prescriptions waiting for pharmacy action.</p></div></td></tr>
+        <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div></div></div>
+<script>
+document.getElementById('queueSearch')?.addEventListener('input',function(){
+  const term=this.value.toLowerCase().trim();
+  document.querySelectorAll('#dispensingTable tbody tr').forEach(row=>{
+    if(row.querySelector('.dq-empty')) return;
+    row.style.display=row.innerText.toLowerCase().includes(term)?'':'none';
+  });
+});
+</script>
 <?php include __DIR__.'/../includes/footer.php'; ?>
