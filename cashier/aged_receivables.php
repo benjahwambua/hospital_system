@@ -166,8 +166,9 @@ $openShift = get_open_cashier_shift($conn, $cashierId);
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 
-<div class="main-content"><div class="container-fluid hms-workspace">
+<div class="main-content finance-workspace"><div class="container-fluid hms-workspace">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-user-clock"></i> Aged Receivables</h2>
