@@ -20,6 +20,7 @@ if($r) while($row=$r->fetch_assoc()){ $accountingIssues[]=$row; $summary['unbala
 $healthy=($summary['invoice_mismatches']===0 && $summary['payment_mismatches']===0 && $summary['unbalanced_refs']===0);
 include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .recon-page{background:radial-gradient(circle at 8% 0%,rgba(35,132,198,.08),transparent 30%),#f4f7fb;min-height:calc(100vh - 70px);padding:30px 0 52px}
 .recon-shell{max-width:1450px;margin:auto}
@@ -55,7 +56,7 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 .recon-success{color:#087443!important}
 .recon-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#edf6fc;color:#126ba5;font-size:.72rem;font-weight:800}
 @media(max-width:767px){.recon-page{padding:18px 0 35px}.recon-hero{padding:23px 20px;border-radius:16px}.recon-hero h2{font-size:1.4rem}.recon-hero .btn{margin-top:16px}.recon-table{min-width:700px}.recon-card .card-body{overflow-x:auto}}
-</style><div class="main-content"><div class="container-fluid recon-page"><div class="recon-shell">
+</style><div class="main-content finance-workspace"><div class="container-fluid recon-page"><div class="recon-shell">
 <div class="recon-hero"><div class="d-flex justify-content-between align-items-center flex-wrap"><div><div class="eyebrow">Finance &amp; Controls</div><h2><i class="fas fa-balance-scale mr-2"></i>Financial Reconciliation</h2><p>Review invoice totals, payments and accounting references for integrity.</p></div><a href="/hospital_system/accounting/ledger.php" class="btn"><i class="fas fa-book mr-1"></i> Open Ledger</a></div></div>
 <div class="alert alert-<?= $healthy?'success':'warning' ?> recon-alert"><i class="fas fa-<?= $healthy?'check-circle':'exclamation-triangle' ?>"></i> <?= $healthy?'No current financial integrity mismatches were detected.':'Exceptions were detected. Review the affected records before closing the accounting period.' ?></div>
 <div class="row recon-stats">
