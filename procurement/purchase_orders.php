@@ -29,9 +29,9 @@ $viewId = max(0, (int)($_GET['view_id'] ?? 0));
 .proc-shell{max-width:1480px;margin:0 auto}
 .proc-hero,.proc-topbar{
   position:relative;overflow:hidden;color:#fff;
-  background:linear-gradient(135deg,#082f55 0%,#0d5f91 52%,#2196d2 100%);
+  background:linear-gradient(135deg,#0b3d91 0%,#1261c9 55%,#13a8b8 100%);
   border-radius:22px;margin-bottom:22px;
-  padding:29px 31px;box-shadow:0 18px 42px rgba(8,47,85,.20)
+  padding:29px 31px;box-shadow:0 16px 38px rgba(16,77,153,.22)
 }
 .proc-hero:after,.proc-topbar:after{
   content:"";position:absolute;width:270px;height:270px;border:1px solid rgba(255,255,255,.12);
