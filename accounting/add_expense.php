@@ -34,6 +34,7 @@ $cats = $conn->query("SELECT * FROM expense_categories");
 include __DIR__.'/../includes/header.php';
 include __DIR__.'/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <div class="card p-4">
     <h3>Log General Expense</h3>
     <?= $message ?>
