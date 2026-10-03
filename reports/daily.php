@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <?php
 require_once __DIR__ . '/../config/config.php'; require_once __DIR__ . '/../includes/session.php'; require_login();
 include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sidebar.php';
