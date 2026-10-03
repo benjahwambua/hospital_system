@@ -20,6 +20,7 @@ $pharmacyPending = report_count($conn, "SELECT COUNT(*) AS total FROM pharmacy_q
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .report-page{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 60px)}
 .report-wrap{max-width:1500px;margin:auto}
