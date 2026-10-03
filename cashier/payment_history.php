@@ -1,27 +1,3 @@
-<style>
-/* HMS visual refresh — styling only; page structure/workflow unchanged */
-.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
-.main-content>.container-fluid{max-width:1500px}
-.main-content h2{color:#25324a;font-size:24px;font-weight:800}
-.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
-.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
-.main-content .card-body{background:#fff}
-.main-content .border-left-primary{border-left:4px solid #075b9d!important}
-.main-content .border-left-success{border-left:4px solid #198754!important}
-.main-content .border-left-info{border-left:4px solid #0d6efd!important}
-.main-content .text-xs{font-size:10px;letter-spacing:.6px}
-.main-content .form-control{border-color:#d7dee8;border-radius:9px;min-height:40px}
-.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
-.main-content .btn{border-radius:8px;font-weight:700}
-.main-content .btn-primary{background:#075b9d;border-color:#075b9d}
-.main-content .btn-info{background:#075b9d;border-color:#075b9d}
-.main-content .table{margin-bottom:0}
-.main-content .table thead th{background:#f8fafc;border-top:0;border-color:#e5eaf1;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px;white-space:nowrap}
-.main-content .table td{border-color:#edf0f5;vertical-align:middle;font-size:13px}
-.main-content .table tbody tr:hover{background:#f8fbff}
-.main-content .table .badge{padding:6px 9px;border-radius:999px;font-size:10px}
-@media(max-width:900px){.main-content>.container-fluid{padding-left:12px;padding-right:12px}.main-content .table{min-width:1050px}}
-</style>
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
@@ -107,35 +83,30 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 <link rel="stylesheet" href="../assets/css/finance_modules.css">
 <div class="main-content finance-workspace">
-    <div class="container-fluid">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="h3 mb-1 text-gray-800"><i class="fas fa-receipt"></i> Payment History</h2>
-                
-            </div>
-            <a href="/hospital_system/cashier/index.php" class="btn btn-primary"><i class="fas fa-cash-register"></i> Central Cashier</a>
+<div class="container-fluid">
+    <section class="finance-hero">
+        <div>
+            <div class="finance-kicker">Finance &amp; Controls</div>
+            <h1>Payment History</h1>
+            <p>Review recorded collections, payment methods, references and cashier activity.</p>
         </div>
+        <div class="finance-hero-actions">
+            <a href="/hospital_system/cashier/index.php" class="btn btn-light"><i class="fas fa-cash-register"></i> Central Cashier</a>
+            <a href="/hospital_system/cashier/aged_receivables.php" class="btn btn-outline-light"><i class="fas fa-user-clock"></i> Aged Receivables</a>
+        </div>
+    </section>
 
-        <?php if (isset($_GET['success'])): ?>
+    <?php if (isset($_GET['success'])): ?>
             <div class="alert alert-success"><i class="fas fa-check-circle"></i> Payment received successfully.</div>
         <?php endif; ?>
 
-        <div class="row mb-4">
-            <div class="col-md-4 mb-3"><div class="card border-left-primary shadow h-100 py-2"><div class="card-body">
-                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Collected</div>
-                <div class="h4 mb-0 font-weight-bold">KSH <?= number_format($totalCollected, 2) ?></div>
-            </div></div></div>
-            <div class="col-md-4 mb-3"><div class="card border-left-success shadow h-100 py-2"><div class="card-body">
-                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Cash</div>
-                <div class="h4 mb-0 font-weight-bold">KSH <?= number_format($cashTotal, 2) ?></div>
-            </div></div></div>
-            <div class="col-md-4 mb-3"><div class="card border-left-info shadow h-100 py-2"><div class="card-body">
-                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">M-Pesa</div>
-                <div class="h4 mb-0 font-weight-bold">KSH <?= number_format($mpesaTotal, 2) ?></div>
-            </div></div></div>
-        </div>
+        <div class="row finance-metrics mb-4">
+<div class="col-xl-4 col-md-6 mb-3"><div class="finance-metric"><div class="finance-metric-icon"><i class="fas fa-wallet"></i></div><div><div class="finance-metric-label">Total Collected</div><div class="finance-metric-value">KSH <?= number_format($totalCollected,2) ?></div><div class="finance-metric-hint"><?= count($payments) ?> payment(s)</div></div></div></div>
+<div class="col-xl-4 col-md-6 mb-3"><div class="finance-metric"><div class="finance-metric-icon"><i class="fas fa-money-bill-wave"></i></div><div><div class="finance-metric-label">Cash Collections</div><div class="finance-metric-value">KSH <?= number_format($cashTotal,2) ?></div><div class="finance-metric-hint">Recorded cash payments</div></div></div></div>
+<div class="col-xl-4 col-md-6 mb-3"><div class="finance-metric"><div class="finance-metric-icon"><i class="fas fa-mobile-alt"></i></div><div><div class="finance-metric-label">M-Pesa Collections</div><div class="finance-metric-value">KSH <?= number_format($mpesaTotal,2) ?></div><div class="finance-metric-hint">Recorded mobile payments</div></div></div></div>
+</div>
 
-        <div class="card shadow mb-4">
+<div class="finance-section card shadow mb-4">
             <div class="card-body">
                 <form method="get" class="row align-items-end">
                     <div class="col-md-2 mb-2">
@@ -165,8 +136,8 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
 
-        <div class="card shadow">
-            <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Recorded Payments</h6></div>
+        <div class="finance-section card shadow">
+<div class="card-header finance-section-header"><div><div class="finance-section-kicker">Collection register</div><h3 class="m-0">Recorded Payments</h3><div class="finance-section-subtitle">Detailed payment activity for the selected period</div></div><span class="finance-status info"><?= count($payments) ?> payment(s)</span></div>
             <div class="card-body">
                 <?php if (!$payments): ?>
                     <div class="text-center text-muted py-5"><i class="fas fa-receipt fa-3x mb-3"></i><h5>No payments found for the selected period.</h5></div>
