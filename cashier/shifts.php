@@ -38,63 +38,161 @@ if($historyStmt){$historyStmt->bind_param('i',$cashierId);$historyStmt->execute(
 include __DIR__.'/../includes/header.php';
 include __DIR__.'/../includes/sidebar.php';
 ?>
-<link rel="stylesheet" href="../assets/css/finance_modules.css"><div class="hms-form-page"><div class="hms-form-shell"><style>
-.hms-form-page{padding:26px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 60px)}
-.hms-form-shell{max-width:1450px;margin:0 auto}
-.hms-form-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:21px 24px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:18px}
-.hms-form-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;font-weight:700;color:#6c7a91;margin-bottom:4px}
-.hms-form-hero h1{font-size:24px;font-weight:700;color:#25324a;margin:0 0 5px}.hms-form-hero p{margin:0;color:#718096;font-size:14px}
-.hms-form-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}
-.hms-form-card .card-header{background:#fff;border-bottom:1px solid #edf0f5;padding:16px 20px;color:#25324a;font-weight:700}
-.hms-form-card .card-body{padding:21px}
-.hms-form-page label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667085;margin-bottom:6px}
-.hms-form-page .form-control{border:1px solid #d8dee8;border-radius:8px;background:#fff;color:#344054;min-height:42px;padding:10px 12px}
-.hms-form-page .form-control:focus{border-color:#4c84ff;box-shadow:0 0 0 3px rgba(76,132,255,.10);outline:0}
-.hms-form-page textarea.form-control{min-height:auto}.hms-form-page .btn{border-radius:8px;font-weight:700}
-.hms-form-page hr{border-color:#edf0f5}.hms-form-page .table{margin-bottom:0}.hms-form-page .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-@media(max-width:767px){.hms-form-page{padding:18px 12px 35px}.hms-form-hero{align-items:flex-start;flex-direction:column}}
-
-/* HMS unified operational workspace */
-.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
-.main-content>.container-fluid{max-width:1500px}
-.main-content h1,.main-content h2,.main-content h3{color:#25324a}
-.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
-.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
-.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-.main-content .table td{border-color:#edf0f5;vertical-align:middle;font-size:13px}
-.main-content .table tbody tr:hover{background:#f8fbff}
-.main-content .form-control{border-color:#d7dee8;border-radius:9px}
-.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
-.main-content .btn{border-radius:8px;font-weight:700}
-.main-content .btn-primary{background:#075b9d;border-color:#075b9d}
-.main-content .page-header,.main-content .d-flex.justify-content-between.align-items-center{margin-bottom:20px!important}
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
+<style>
+.cashier-shifts{padding:28px 24px 50px;background:#f4f7fb;min-height:calc(100vh - 72px)}
+.cashier-shifts .finance-shell{max-width:1500px;margin:0 auto}
+.shift-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b3d91 0%,#1261c9 55%,#13a8b8 100%);color:#fff;border-radius:22px;padding:30px 32px;margin-bottom:22px;box-shadow:0 16px 38px rgba(16,77,153,.22);display:flex;justify-content:space-between;align-items:center;gap:24px}
+.shift-hero:after{content:"";position:absolute;width:280px;height:280px;border:1px solid rgba(255,255,255,.13);border-radius:50%;right:-90px;top:-130px;box-shadow:0 0 0 35px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.015);pointer-events:none}
+.shift-hero>*{position:relative;z-index:1}
+.shift-eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:800;opacity:.72}
+.shift-hero h1{color:#fff!important;font-size:30px;font-weight:800;margin:5px 0 7px}
+.shift-hero p{color:rgba(255,255,255,.82);margin:0;font-size:14px}
+.shift-hero .btn{background:#fff;border:0;color:#0b3d91;border-radius:10px;font-weight:800;padding:11px 17px}
+.shift-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.shift-metric{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 8px 25px rgba(20,40,70,.065)}
+.shift-metric small{display:block;color:#697586;font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:800;margin-bottom:7px}
+.shift-metric strong{display:block;color:#182334;font-size:21px;font-weight:800}
+.shift-card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065);overflow:hidden;margin-bottom:20px}
+.shift-card-head{padding:17px 21px;border-bottom:1px solid #e8edf3;background:linear-gradient(180deg,#fff,#f8fafc);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.shift-card-head h2{margin:0;color:#182334;font-size:16px;font-weight:800}
+.shift-card-head span{font-size:11px;color:#697586}
+.shift-card-body{padding:22px}
+.shift-form-grid{display:grid;grid-template-columns:1fr 2fr;gap:18px}
+.shift-form-actions{margin-top:4px}
+.shift-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#697586;margin-bottom:7px}
+.shift-input{width:100%;min-height:44px;padding:10px 12px;border:1px solid #d8e0ea;border-radius:9px;background:#fff;color:#344054}
+.shift-input:focus{border-color:#2f78c8;box-shadow:0 0 0 3px rgba(47,120,200,.10);outline:0}
+.shift-btn{border:0;border-radius:9px;padding:11px 17px;font-weight:800}
+.shift-btn-open{background:#0f9d70;color:#fff}.shift-btn-close{background:#dc3545;color:#fff}
+.shift-alert{border-radius:12px;margin-bottom:20px;padding:13px 16px;border:1px solid}
+.shift-alert.alert-success{background:#ecfdf3;border-color:#a7f3d0;color:#087443}
+.shift-alert.alert-danger{background:#fff1f2;border-color:#fecdd3;color:#b42318}
+.shift-status{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;background:#eaf4ff;color:#1261c9;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:800}
+.shift-status.open{background:#ecfdf3;color:#087443}.shift-status.closed{background:#f1f5f9;color:#475467}
+.shift-table-wrap{overflow-x:auto}.shift-table{width:100%;border-collapse:separate;border-spacing:0}
+.shift-table th{background:#f1f5f9;color:#64748b;text-transform:uppercase;letter-spacing:.06em;font-size:10px;font-weight:800;padding:12px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.shift-table td{padding:13px 12px;border-bottom:1px solid #edf1f5;color:#344054;font-size:12px;white-space:nowrap}
+.shift-table tbody tr:hover{background:#f7fbff}.shift-table tbody tr:last-child td{border-bottom:0}
+.shift-reconcile{background:#f8fafc;border:1px solid #e5eaf1;border-radius:12px;padding:14px 16px;margin-bottom:20px}
+.shift-reconcile-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.shift-reconcile small{display:block;color:#697586;font-size:10px;text-transform:uppercase;font-weight:800}.shift-reconcile strong{display:block;color:#182334;font-size:15px;margin-top:4px}
+@media(max-width:900px){.shift-metrics{grid-template-columns:1fr 1fr}.shift-form-grid{grid-template-columns:1fr}.shift-hero{align-items:flex-start;flex-direction:column}}
+@media(max-width:600px){.cashier-shifts{padding:18px 12px 35px}.shift-hero{padding:23px;border-radius:17px}.shift-hero h1{font-size:24px}.shift-metrics{grid-template-columns:1fr}.shift-card-body{padding:16px}.shift-reconcile-grid{grid-template-columns:1fr}}
 </style>
-<div class="main-content finance-workspace"><div class="container-fluid">
-<div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h3 mb-1 text-gray-800"><i class="fas fa-door-open"></i> Cashier Shift</h2><p class="text-muted mb-0">Open, monitor and close your collection shift.</p></div><a href="/hospital_system/cashier/index.php" class="btn btn-outline-primary"><i class="fas fa-cash-register"></i> Cashier</a></div>
-<?= $message ?>
-<?php if(!$open): ?>
-<div class="hms-form-card card shadow"><div class="card-header"><h6 class="m-0 font-weight-bold text-primary">Open New Shift</h6></div><div class="card-body">
-<form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>"><input type="hidden" name="action" value="open"><div class="form-row">
-<div class="form-group col-md-4"><label>Opening Cash (KSH)</label><input type="number" name="opening_cash" class="form-control" min="0" step="0.01" value="0" required></div>
-<div class="form-group col-md-8"><label>Opening Notes</label><input type="text" name="opening_notes" class="form-control" maxlength="500"></div></div>
-<button class="btn btn-success"><i class="fas fa-play"></i> Open Shift</button></form></div></div>
-<?php else: ?>
-<div class="row mb-4">
-<div class="col-md-3"><div class="card shadow h-100"><div class="card-body"><small class="text-muted">Opened</small><h5><?=htmlspecialchars($open['opened_at'])?></h5></div></div></div>
-<div class="col-md-3"><div class="card shadow h-100"><div class="card-body"><small class="text-muted">Opening Cash</small><h5>KSH <?=number_format((float)$open['opening_cash'],2)?></h5></div></div></div>
-<div class="col-md-3"><div class="card shadow h-100"><div class="card-body"><small class="text-muted">Cash Collected</small><h5>KSH <?=number_format($totals['cash'],2)?></h5></div></div></div>
-<div class="col-md-3"><div class="card shadow h-100"><div class="card-body"><small class="text-muted">M-Pesa Collected</small><h5>KSH <?=number_format($totals['mpesa'],2)?></h5></div></div></div>
-</div>
-<div class="card shadow"><div class="card-header"><h6 class="m-0 font-weight-bold text-danger">Close Shift & Reconcile</h6></div><div class="card-body">
 
-<form method="post" onsubmit="return confirm('Close this cashier shift? This action cannot be undone.');"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>"><input type="hidden" name="action" value="close"><input type="hidden" name="shift_id" value="<?= (int)$open['id']?>">
-<div class="form-row"><div class="form-group col-md-4"><label>Physical Closing Cash (KSH)</label><input type="number" name="closing_cash" class="form-control" min="0" step="0.01" required></div><div class="form-group col-md-8"><label>Closing Notes</label><input type="text" name="closing_notes" class="form-control" maxlength="500"></div></div>
-<button class="btn btn-danger"><i class="fas fa-lock"></i> Close Shift</button></form></div></div>
-<?php endif; ?>
-<div class="hms-form-card card shadow mt-4"><div class="card-header"><h6 class="m-0 font-weight-bold text-primary">Recent Reconciled Shifts</h6></div><div class="card-body">
-<div class="table-responsive"><table class="table table-bordered table-sm"><thead><tr><th>Opened</th><th>Closed</th><th>Opening</th><th>Cash</th><th>M-Pesa</th><th>Other</th><th>Closing Cash</th><th>Variance</th></tr></thead><tbody>
-<?php foreach($closedShifts as $s): $closedTotals=cashier_shift_totals($conn,(int)$s['id']); ?><tr><td><?=htmlspecialchars($s['opened_at'])?></td><td><?=htmlspecialchars($s['closed_at'])?></td><td>KSH <?=number_format((float)$s['opening_cash'],2)?></td><td>KSH <?=number_format($closedTotals['cash'],2)?></td><td>KSH <?=number_format($closedTotals['mpesa'],2)?></td><td>KSH <?=number_format($closedTotals['other'],2)?></td><td>KSH <?=number_format((float)$s['closing_cash'],2)?></td><td class="<?=abs((float)$s['cash_variance'])<0.01?'text-success':'text-danger'?> font-weight-bold">KSH <?=number_format((float)$s['cash_variance'],2)?></td></tr><?php endforeach; ?>
-<?php if(!$closedShifts): ?><tr><td colspan="8" class="text-center text-muted">No closed shifts yet.</td></tr><?php endif; ?>
-</tbody></table></div></div></div>
-</div></div>
-</div></div><?php include __DIR__.'/../includes/footer.php'; ?>
+<div class="cashier-shifts">
+  <div class="finance-shell">
+    <div class="shift-hero">
+      <div>
+        <div class="shift-eyebrow">Finance &amp; Controls / Cash Management</div>
+        <h1>Cashier Shifts</h1>
+        <p>Open, monitor and reconcile your daily collection shift.</p>
+      </div>
+      <a href="/hospital_system/cashier/index.php" class="btn"><i class="fas fa-cash-register"></i>&nbsp; Central Cashier</a>
+    </div>
+
+    <?= $message ?>
+
+    <?php if(!$open): ?>
+      <div class="shift-card">
+        <div class="shift-card-head">
+          <h2><i class="fas fa-play-circle"></i>&nbsp; Open New Shift</h2>
+          <span class="shift-status"><i class="fas fa-lock-open"></i> No active shift</span>
+        </div>
+        <div class="shift-card-body">
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+            <input type="hidden" name="action" value="open">
+            <div class="shift-form-grid">
+              <div>
+                <label class="shift-label">Opening Cash (KSH)</label>
+                <input type="number" name="opening_cash" class="shift-input" min="0" step="0.01" value="0" required>
+              </div>
+              <div>
+                <label class="shift-label">Opening Notes</label>
+                <input type="text" name="opening_notes" class="shift-input" maxlength="500" placeholder="Optional opening notes">
+              </div>
+            </div>
+            <div class="shift-form-actions">
+              <button class="shift-btn shift-btn-open"><i class="fas fa-play"></i>&nbsp; Open Shift</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    <?php else: ?>
+      <div class="shift-metrics">
+        <div class="shift-metric"><small>Shift Opened</small><strong><?=htmlspecialchars($open['opened_at'])?></strong></div>
+        <div class="shift-metric"><small>Opening Cash</small><strong>KSH <?=number_format((float)$open['opening_cash'],2)?></strong></div>
+        <div class="shift-metric"><small>Cash Collected</small><strong>KSH <?=number_format($totals['cash'],2)?></strong></div>
+        <div class="shift-metric"><small>M-Pesa Collected</small><strong>KSH <?=number_format($totals['mpesa'],2)?></strong></div>
+      </div>
+
+      <div class="shift-reconcile">
+        <div class="shift-reconcile-grid">
+          <div><small>Other Collections</small><strong>KSH <?=number_format($totals['other'],2)?></strong></div>
+          <div><small>Total Collections</small><strong>KSH <?=number_format($totals['total'],2)?></strong></div>
+          <div><small>Shift Status</small><strong><span class="shift-status open"><i class="fas fa-circle"></i> Open</span></strong></div>
+        </div>
+      </div>
+
+      <div class="shift-card">
+        <div class="shift-card-head">
+          <h2><i class="fas fa-balance-scale"></i>&nbsp; Close Shift &amp; Reconcile</h2>
+          <span>Physical cash is compared with expected cash at closure.</span>
+        </div>
+        <div class="shift-card-body">
+          <form method="post" onsubmit="return confirm('Close this cashier shift? This action cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+            <input type="hidden" name="action" value="close">
+            <input type="hidden" name="shift_id" value="<?= (int)$open['id']?>">
+            <div class="shift-form-grid">
+              <div>
+                <label class="shift-label">Physical Closing Cash (KSH)</label>
+                <input type="number" name="closing_cash" class="shift-input" min="0" step="0.01" required placeholder="Enter counted cash">
+              </div>
+              <div>
+                <label class="shift-label">Closing Notes</label>
+                <input type="text" name="closing_notes" class="shift-input" maxlength="500" placeholder="Optional reconciliation notes">
+              </div>
+            </div>
+            <div class="shift-form-actions">
+              <button class="shift-btn shift-btn-close"><i class="fas fa-lock"></i>&nbsp; Close &amp; Reconcile Shift</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    <?php endif; ?>
+
+    <div class="shift-card">
+      <div class="shift-card-head">
+        <h2><i class="fas fa-history"></i>&nbsp; Recent Reconciled Shifts</h2>
+        <span>Last 10 closed shifts</span>
+      </div>
+      <div class="shift-table-wrap">
+        <table class="shift-table">
+          <thead><tr><th>Opened</th><th>Closed</th><th>Opening</th><th>Cash</th><th>M-Pesa</th><th>Other</th><th>Closing Cash</th><th>Variance</th></tr></thead>
+          <tbody>
+          <?php foreach($closedShifts as $s): $closedTotals=cashier_shift_totals($conn,(int)$s['id']); ?>
+            <tr>
+              <td><?=htmlspecialchars($s['opened_at'])?></td>
+              <td><?=htmlspecialchars($s['closed_at'])?></td>
+              <td>KSH <?=number_format((float)$s['opening_cash'],2)?></td>
+              <td>KSH <?=number_format($closedTotals['cash'],2)?></td>
+              <td>KSH <?=number_format($closedTotals['mpesa'],2)?></td>
+              <td>KSH <?=number_format($closedTotals['other'],2)?></td>
+              <td>KSH <?=number_format((float)$s['closing_cash'],2)?></td>
+              <td class="<?=abs((float)$s['cash_variance'])<0.01?'text-success':'text-danger'?> font-weight-bold">KSH <?=number_format((float)$s['cash_variance'],2)?></td>
+            </tr>
+          <?php endforeach; ?>
+          <?php if(!$closedShifts): ?>
+            <tr><td colspan="8" style="text-align:center;padding:28px;color:#98a2b3">No closed shifts yet.</td></tr>
+          <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<?php include __DIR__.'/../includes/footer.php'; ?>
