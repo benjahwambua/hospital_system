@@ -119,6 +119,7 @@ foreach (['cash'=>'Cash','mpesa'=>'M-Pesa','insurance'=>'Insurance / SHA','other
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 .invoice-container { max-width: 1180px; margin: 30px auto; padding: 0 20px; }
