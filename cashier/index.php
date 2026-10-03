@@ -124,8 +124,9 @@ $shiftTotals = $openShift ? cashier_shift_totals($conn, (int)$openShift['id']) :
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 
-<div class="main-content"><div class="container-fluid hms-workspace">
+<div class="main-content finance-workspace"><div class="container-fluid hms-workspace">
         <?php if (!$openShift): ?>
             <div class="alert alert-warning mb-4"><i class="fas fa-lock"></i> <strong>No open cashier shift.</strong> <a href="/hospital_system/cashier/shifts.php" class="btn btn-sm btn-warning ml-2">Open Cashier Shift</a></div>
         <?php else: ?>
