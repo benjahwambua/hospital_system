@@ -319,6 +319,7 @@ if ($export === 'csv') {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .ledger-page{background:radial-gradient(circle at 8% 0%,rgba(33,150,210,.08),transparent 28%),#f4f7fb;min-height:calc(100vh - 70px);padding:30px 24px 52px}
 .ledger-shell{max-width:1480px;margin:0 auto}
