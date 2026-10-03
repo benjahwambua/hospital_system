@@ -1,19 +1,20 @@
-# Hospital Management System
+# Security and operational hardening
 
-A comprehensive web-based management system designed for healthcare facilities to handle patient records, admissions, accounting, and departmental workflows.
+This application now includes several safeguards introduced during the audit process:
 
-## 🚀 Features
-* **Patient Admission:** Streamlined registration and tracking.
-* **Accounting Module:** Manage billing, invoicing, and facility expenses.
-* **Departmental Isolation:** Separate control structures for administrative staff.
+- environment-backed database configuration via `.env`
+- login throttling and lockout protections
+- CSRF validation enhancements
+- idle session timeout enforcement
+- safer patient search handling using prepared statements
+- audit logging hooks for sensitive actions
 
-## 🔐 Security note
-This project now supports environment-based database configuration. Copy `.env.example` to `.env` and set your credentials before deployment. The application also includes a basic login throttling mechanism to slow down brute-force attacks.
+The smoke test script in `tests/security_smoke.php` validates these invariants before deployment.
 
-## 🛠️ Installation & Setup
-1. Clone this repository into your XAMPP `htdocs` directory.
-2. Copy `.env.example` to `.env` and update the values for your local environment.
-3. Start Apache and MySQL via the **XAMPP Control Panel**.
-4. Import the system database `.sql` file into your local `phpMyAdmin`.
-5. Open your browser and navigate to `http://localhost/hospital_system`.
+## Running the smoke test
 
+```bash
+php tests/security_smoke.php
+```
+
+This is a lightweight validation layer and does not replace a full staging test or database-backed QA run.
