@@ -6,7 +6,9 @@ $open=fcnt($conn,"SELECT COUNT(*) total FROM cashier_shifts WHERE status='Open'"
 $payments=fcnt($conn,"SELECT COUNT(*) total FROM payments WHERE DATE(created_at)=CURDATE()");
 $unpaid=fcnt($conn,"SELECT COUNT(*) total FROM invoices WHERE status IN ('Unpaid','Partially Paid')");
 $canView=can_module_action($conn,'finance','view');
-include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php'; ?>
+include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
+?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .fd{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 60px)}.fs{max-width:1500px;margin:auto}.fh{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:18px;padding:28px 30px;display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px;box-shadow:0 12px 30px rgba(6,59,115,.18)}.fh h1{margin:5px 0;font-size:28px}.fh p{margin:0;color:rgba(255,255,255,.8);font-size:14px}.fk{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#c7edff}.fm{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}.fc{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:20px;box-shadow:0 4px 14px rgba(31,45,61,.05)}.fc small{display:block;color:#7b8798;text-transform:uppercase;font-size:10px;font-weight:800}.fc strong{font-size:30px;color:#25324a}.fg{display:grid;grid-template-columns:2fr 1fr;gap:18px}.fp{background:#fff;border:1px solid #e7ebf2;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(31,45,61,.05)}.fph{padding:16px 20px;border-bottom:1px solid #edf0f5}.fpb{padding:20px}.fl{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fl a{padding:18px;border:1px solid #e7ebf2;border-radius:12px;text-decoration:none;color:#344054}.fl a:hover{background:#f2fbff;text-decoration:none}.fl i{color:#075b9d;margin-right:10px}@media(max-width:900px){.fg{grid-template-columns:1fr}}@media(max-width:600px){.fd{padding:18px 12px}.fh{flex-direction:column;align-items:flex-start}.fm{grid-template-columns:1fr}.fl{grid-template-columns:1fr}}
 </style>
