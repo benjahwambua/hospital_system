@@ -18,3 +18,64 @@
 .finance-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.finance-metric{background:#fff;border:1px solid #e2e8f0;border-radius:15px;padding:18px;box-shadow:0 7px 22px rgba(20,40,70,.055)}.finance-metric small{display:block;text-transform:uppercase;letter-spacing:.06em;color:#697586;font-weight:800;font-size:.64rem}.finance-metric strong{display:block;font-size:1.35rem;color:#182334;margin-top:5px}
 @media(max-width:900px){.finance-metrics{grid-template-columns:1fr 1fr}}@media(max-width:700px){.finance-workspace,.finance-page{padding:18px 12px 35px}.finance-hero{padding:22px;border-radius:17px}.finance-hero h1,.finance-hero h2{font-size:1.45rem}.finance-metrics{grid-template-columns:1fr}.finance-workspace .table,.finance-page .table{min-width:850px}}
 @media print{.finance-workspace,.finance-page{background:#fff!important;padding:0!important;min-height:auto}.finance-hero{box-shadow:none!important}}
+
+/* ============================================================
+   FINANCE & CONTROLS — FINAL OVERRIDE LAYER
+   This intentionally overrides legacy page CSS so every finance
+   screen visibly follows the Finance Dashboard language.
+   ============================================================ */
+.main-content.finance-workspace,.finance-workspace,.finance-page{
+  background:#f4f7fb!important;min-height:calc(100vh - 72px)!important;padding:28px 24px 48px!important;
+}
+.main-content.finance-workspace>.container-fluid,.finance-workspace>.container-fluid{
+  max-width:1500px!important;margin:0 auto!important;
+}
+.finance-workspace .card,.finance-page .card{
+  border:1px solid #e2e8f0!important;border-radius:17px!important;
+  box-shadow:0 8px 25px rgba(20,40,70,.065)!important;background:#fff!important;
+}
+.finance-workspace .card-header,.finance-page .card-header{
+  background:linear-gradient(180deg,#fff,#f8fafc)!important;border-bottom:1px solid #e8edf3!important;
+  color:#182334!important;font-weight:800!important;
+}
+.finance-workspace .table thead th,.finance-page .table thead th{
+  background:#f1f5f9!important;color:#64748b!important;border:0!important;
+  font-size:.65rem!important;text-transform:uppercase!important;letter-spacing:.07em!important;font-weight:800!important;
+}
+.finance-workspace .table tbody tr:hover,.finance-page .table tbody tr:hover{background:#f7fbff!important}
+.finance-workspace .form-control,.finance-page .form-control{
+  border:1px solid #d8e0ea!important;border-radius:9px!important;min-height:42px!important;
+}
+.finance-workspace .btn,.finance-page .btn{border-radius:9px!important;font-weight:800!important}
+.finance-workspace h1,.finance-workspace h2,.finance-workspace h3,.finance-workspace h4{color:#182334}
+.finance-workspace .bg-white.shadow-sm.border-bottom,
+.finance-workspace .bg-white.shadow-sm.border-bottom.mb-4{
+  border:1px solid #e2e8f0!important;border-radius:17px!important;box-shadow:0 8px 25px rgba(20,40,70,.065)!important;
+  padding:20px!important;
+}
+.finance-workspace .border-left-danger{border-left:4px solid #dc3545!important}
+.finance-workspace .metric-card,.finance-dashboard .metric-card{
+  border-radius:17px!important;box-shadow:0 10px 28px rgba(20,40,70,.07)!important;
+  border:1px solid #e2e8f0!important;
+}
+.finance-workspace .metric-title{color:#64748b!important}
+.finance-workspace .metric-value{color:#182334!important}
+.finance-workspace .chart-card{border-radius:18px!important;box-shadow:0 10px 28px rgba(20,40,70,.07)!important}
+.finance-workspace .fd{padding:0!important;background:transparent!important;min-height:auto!important}
+.finance-workspace .fh{
+  background:linear-gradient(135deg,#0b3d91 0%,#1261c9 55%,#13a8b8 100%)!important;
+  border-radius:22px!important;padding:28px 30px!important;box-shadow:0 16px 38px rgba(16,77,153,.22)!important;
+}
+.finance-workspace .fh h1{color:#fff!important;font-weight:800!important}
+.finance-workspace .fh p{color:rgba(255,255,255,.82)!important}
+.finance-workspace .fk{color:#fff!important;opacity:.72!important}
+.finance-workspace .fc{
+  border:1px solid #e2e8f0!important;border-radius:15px!important;box-shadow:0 8px 22px rgba(20,40,70,.06)!important;
+}
+.finance-workspace .fp{
+  border:1px solid #e2e8f0!important;border-radius:17px!important;box-shadow:0 8px 25px rgba(20,40,70,.065)!important;
+}
+.finance-workspace .fph{background:linear-gradient(180deg,#fff,#f8fafc)!important}
+@media(max-width:700px){
+ .main-content.finance-workspace,.finance-workspace,.finance-page{padding:18px 12px 35px!important}
+}
