@@ -20,6 +20,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
 $viewId = max(0, (int)($_GET['view_id'] ?? 0));
 
+?>
 <style>
 /* Purchase Orders — procurement visual system */
 .proc-page{
@@ -226,6 +227,7 @@ $viewId = max(0, (int)($_GET['view_id'] ?? 0));
 }
 </style>
 
+<?php
 if ($viewId > 0):
     $po_stmt = $conn->prepare("SELECT po.*, s.name AS s_name, s.phone, s.email, u.username
                                FROM purchase_orders po
