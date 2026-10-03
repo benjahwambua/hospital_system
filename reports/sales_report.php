@@ -92,6 +92,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 
 <style>
 .main-content {
@@ -340,7 +341,7 @@ include __DIR__ . '/../includes/sidebar.php';
 }
 </style>
 
-<div class="main-content">
+<div class="main-content finance-workspace">
     <h1 class="page-title">Daily Sales Report</h1>
     <p class="page-subtitle">Collections by date, customer and payment method.</p>
 
