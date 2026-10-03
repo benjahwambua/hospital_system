@@ -55,19 +55,9 @@ include __DIR__.'/../includes/header.php';
 include __DIR__.'/../includes/sidebar.php';
 ?>
 <style>
-.statement-wrap{max-width:1100px;margin:24px auto}.statement-card{background:#fff;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.08);padding:28px}
-.statement-head{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #e9ecef;padding-bottom:18px;margin-bottom:20px}
-.statement-head h2{margin:0}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.summary-box{border:1px solid #e5e7eb;border-radius:10px;padding:14px}.summary-box small{display:block;color:#6b7280}.summary-box strong{font-size:1.15rem}
-@media(max-width:768px){.summary-grid{grid-template-columns:1fr 1fr}.statement-head{display:block}}
-@media print{
- @page{size:A4 portrait;margin:12mm}
- header,footer,nav,aside,.sidebar,.navbar,.no-print{display:none!important}
- html,body,.content{width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
- .statement-wrap{max-width:none!important;margin:0!important}.statement-card{box-shadow:none!important;border:0!important;padding:0!important}
- .summary-grid{grid-template-columns:repeat(4,1fr)}.table{font-size:11px}
-}
+.statement-wrap{max-width:1150px;margin:28px auto;padding:0 18px}.statement-card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065);padding:28px}.statement-head{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #e8edf3;padding-bottom:18px;margin-bottom:20px}.statement-head h2{color:#25324a}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}.summary-box{border:1px solid #e2e8f0;border-radius:13px;padding:16px;background:#fbfcfe}.summary-box small{display:block;color:#697586;font-size:.68rem;text-transform:uppercase;font-weight:800;letter-spacing:.05em;margin-bottom:6px}.summary-box strong{font-size:1.12rem;color:#152033}.statement-wrap .card{border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065)}.statement-wrap .form-control{border:1px solid #dfe5ed;border-radius:9px}.statement-wrap .btn{border-radius:9px;font-weight:800}.statement-wrap table thead th{background:#f7f9fc;color:#687386;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;border:0}@media(max-width:768px){.summary-grid{grid-template-columns:1fr 1fr}.statement-head{display:block}}@media print{@page{size:A4 portrait;margin:12mm}.statement-wrap{max-width:none!important;margin:0!important;padding:0!important}.statement-card{box-shadow:none!important;border:0!important;padding:0!important}}
 </style>
-<div class="statement-wrap">
+<div class="procurement-page" style="min-height:calc(100vh - 60px);background:radial-gradient(circle at 8% 0%,rgba(19,168,184,.07),transparent 28%),#f4f7fb;padding:28px 0 48px"><div class="statement-wrap">
  <div class="no-print d-flex justify-content-between align-items-center mb-3">
   <h2 class="h4 mb-0">Supplier Statement</h2>
   <?php if($supplier):?><button onclick="window.print()" class="btn btn-primary btn-sm">Print Statement</button><?php endif;?>
@@ -123,4 +113,4 @@ include __DIR__.'/../includes/sidebar.php';
  <?php elseif($supplierId>0):?><div class="alert alert-warning">Supplier not found.</div>
  <?php endif;?>
 </div>
-<?php include __DIR__.'/../includes/footer.php'; ?>
+</div></div><?php include __DIR__.'/../includes/footer.php'; ?>
