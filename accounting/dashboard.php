@@ -2,20 +2,45 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'finance_admin', 'view');
 
-// Revenue: sum of total from paid invoices
-$revenue = $conn->query("SELECT SUM(total) as rev FROM invoices WHERE status = 'paid'")->fetch_assoc()['rev'] ?? 0;
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
-// Expenses: prefer the dedicated expenses table, fallback to expense ledger entries if needed
-$expenses = $conn->query("SELECT COALESCE(SUM(amount), 0) as exp FROM expenses")->fetch_assoc()['exp'] ?? 0;
+// Use prepared statements to prevent SQL injection in financial dashboards.
+$revStmt = $conn->prepare("SELECT COALESCE(SUM(total), 0) as rev FROM invoices WHERE status = ?");
+$status = 'paid';
+$revStmt->bind_param('s', $status);
+$revStmt->execute();
+$revenue = (float)($revStmt->get_result()->fetch_assoc()['rev'] ?? 0);
+$revStmt->close();
+
+// Expenses from dedicated table
+$expStmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as exp FROM expenses");
+$expStmt->execute();
+$expenses = (float)($expStmt->get_result()->fetch_assoc()['exp'] ?? 0);
+$expStmt->close();
+
+// Fallback to accounting entries if no expenses in dedicated table
 if ($expenses <= 0) {
-    $expenses = $conn->query("SELECT COALESCE(SUM(debit - credit), 0) as exp FROM accounting_entries WHERE LOWER(account) LIKE '%expense%'")->fetch_assoc()['exp'] ?? 0;
+    $accStmt = $conn->prepare("SELECT COALESCE(SUM(debit - credit), 0) as exp FROM accounting_entries WHERE LOWER(account) LIKE ?");
+    $pattern = '%expense%';
+    $accStmt->bind_param('s', $pattern);
+    $accStmt->execute();
+    $expenses = (float)($accStmt->get_result()->fetch_assoc()['exp'] ?? 0);
+    $accStmt->close();
 }
 
 $profit = $revenue - $expenses;
 
-// Pending payments: sum of total from unpaid/partial invoices
-$pending = $conn->query("SELECT SUM(total) as pend FROM invoices WHERE status IN ('unpaid', 'partial')")->fetch_assoc()['pend'] ?? 0;
+// Pending payments using prepared statement
+$pendStmt = $conn->prepare("SELECT COALESCE(SUM(total), 0) as pend FROM invoices WHERE status IN ('unpaid', 'partial')");
+$pendStmt->execute();
+$pending = (float)($pendStmt->get_result()->fetch_assoc()['pend'] ?? 0);
+$pendStmt->close();
+
+audit('finance_dashboard_view', 'Revenue: ' . $revenue . ', Expenses: ' . $expenses . ', Profit: ' . $profit);
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
