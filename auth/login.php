@@ -1,12 +1,50 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+
+function hms_login_failures(): array {
+    if (!isset($_SESSION['hms_login_attempts']) || !is_array($_SESSION['hms_login_attempts'])) {
+        $_SESSION['hms_login_attempts'] = [];
+    }
+
+    $cutoff = time() - 900;
+    $_SESSION['hms_login_attempts'] = array_values(array_filter($_SESSION['hms_login_attempts'], static fn($ts) => (int)$ts > $cutoff));
+
+    return $_SESSION['hms_login_attempts'];
+}
+
+function hms_login_is_locked(): bool {
+    $lockUntil = (int)($_SESSION['hms_login_lock_until'] ?? 0);
+    return $lockUntil > time();
+}
+
+function hms_register_failed_login(): void {
+    $attempts = hms_login_failures();
+    $attempts[] = time();
+    $_SESSION['hms_login_attempts'] = $attempts;
+
+    if (count($attempts) >= 5) {
+        $_SESSION['hms_login_lock_until'] = time() + 900;
+    }
+}
+
+function hms_reset_login_security(): void {
+    unset($_SESSION['hms_login_attempts'], $_SESSION['hms_login_lock_until']);
+}
+
 if (!empty($_SESSION['user_id'])) { header('Location: /hospital_system/dashboard.php'); exit; }
+
 $error = '';
 $csrfToken = csrf_token();
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+if (hms_login_is_locked()) {
+    $error = 'Too many failed login attempts. Please wait 15 minutes before trying again.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === '') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
         $error = 'Security token expired. Please refresh the page and try again.';
+        hms_register_failed_login();
     } else {
         $username = trim((string)($_POST['username'] ?? ''));
         $password = (string)($_POST['password'] ?? '');
@@ -18,13 +56,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $u = ($result && $result->num_rows === 1) ? $result->fetch_assoc() : null;
             if ($u && password_verify($password, $u['password'])) {
                 session_regenerate_id(true);
-                $_SESSION['user_id']=(int)$u['id']; $_SESSION['username']=$u['username']; $_SESSION['role']=$u['role'];
-                $_SESSION['is_super']=(int)$u['is_super']; $_SESSION['full_name']=$u['full_name'];
-                $_SESSION['csrf_token']=bin2hex(random_bytes(32));
-                header('Location: /hospital_system/dashboard.php'); exit;
+                $_SESSION['user_id'] = (int)$u['id'];
+                $_SESSION['username'] = $u['username'];
+                $_SESSION['role'] = $u['role'];
+                $_SESSION['is_super'] = (int)$u['is_super'];
+                $_SESSION['full_name'] = $u['full_name'];
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                hms_reset_login_security();
+                audit('login_success', 'User logged in via web portal.');
+                header('Location: /hospital_system/dashboard.php');
+                exit;
             }
         }
+
         $error = 'Incorrect credentials. Please try again.';
+        hms_register_failed_login();
     }
 }
 ?>
@@ -37,57 +83,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="/hospital_system/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { 
-            --primary-color: #0056b3; 
-            --accent-color: #00a8cc; 
-            --dark-bg: #1a2a3a; /* New Deep Slate Outside Background */
-            --soft-white: #fcfdfe; /* New Inner Form Background */
+        :root {
+            --primary-color: #0056b3;
+            --accent-color: #00a8cc;
+            --dark-bg: #1a2a3a;
+            --soft-white: #fcfdfe;
         }
 
-        body { 
-            background-color: var(--dark-bg); 
+        body {
+            background-color: var(--dark-bg);
             background-image: radial-gradient(circle at 50% 50%, #2c3e50 0%, #1a2a3a 100%);
-            font-family: 'Segoe UI', Roboto, sans-serif; 
-            min-height: 100vh; 
-            margin: 0; 
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            margin: 0;
         }
-        
-        .login-container { 
-            min-height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 20px; 
+
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
-        
-        .login-box { 
-            background: #fff; 
-            display: flex; 
-            width: 1050px; 
-            max-width: 100%; 
-            border-radius: 30px; 
-            overflow: hidden; 
-            /* Stronger shadow to lift it off the dark background */
+
+        .login-box {
+            background: #fff;
+            display: flex;
+            width: 1050px;
+            max-width: 100%;
+            border-radius: 30px;
+            overflow: hidden;
             box-shadow: 0 25px 60px rgba(0,0,0,0.4);
         }
 
-        /* Brand Side (Blue) */
-        .login-brand { 
-            background: linear-gradient(135deg, var(--primary-color), var(--accent-color)); 
-            width: 50%; 
-            padding: 70px 40px; 
-            color: white; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
+        .login-brand {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            width: 50%;
+            padding: 70px 40px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
             text-align: center;
         }
 
-        /* Significantly larger Logo and Container */
         .logo-placeholder {
             background: white;
-            padding: 35px; 
+            padding: 35px;
             border-radius: 50%;
             margin-bottom: 30px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.2);
@@ -99,41 +142,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .brand-name { font-size: 3rem; letter-spacing: 3px; font-weight: 800; margin-bottom: 5px; }
         .brand-sub { font-size: 1.1rem; opacity: 0.9; font-weight: 300; }
 
-        /* Form Side (Soft White) */
-        .login-form-section { 
-            width: 50%; 
-            padding: 60px; 
-            background-color: var(--soft-white); 
+        .login-form-section {
+            width: 50%;
+            padding: 60px;
+            background-color: var(--soft-white);
         }
-        
-        .form-control { 
-            background: #ffffff; 
-            border: 1px solid #e1e8ed; 
-            padding: 16px 18px; 
+
+        .form-control {
+            background: #ffffff;
+            border: 1px solid #e1e8ed;
+            padding: 16px 18px;
             border-radius: 15px;
             transition: all 0.3s;
         }
-        .form-control:focus { 
-            background: #fff; 
-            box-shadow: 0 0 0 4px rgba(0,86,179,0.15); 
-            border-color: var(--primary-color); 
+        .form-control:focus {
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(0,86,179,0.15);
+            border-color: var(--primary-color);
         }
-        
-        .btn-login { 
-            background: var(--primary-color); 
-            border: none; 
-            border-radius: 15px; 
-            padding: 18px; 
-            font-weight: 700; 
+
+        .btn-login {
+            background: var(--primary-color);
+            border: none;
+            border-radius: 15px;
+            padding: 18px;
+            font-weight: 700;
             letter-spacing: 1px;
             transition: 0.3s;
             margin-top: 20px;
             box-shadow: 0 10px 20px rgba(0,86,179,0.2);
         }
-        .btn-login:hover { 
-            background: #004494; 
-            transform: translateY(-2px); 
-            box-shadow: 0 15px 25px rgba(0,86,179,0.3); 
+        .btn-login:hover {
+            background: #004494;
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(0,86,179,0.3);
         }
 
         .input-group-text { background: #ffffff; border: 1px solid #e1e8ed; border-radius: 15px 0 0 15px; }
@@ -174,12 +216,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <?php if ($error): ?>
                 <div class="alert alert-danger border-0 py-3 mb-4 shadow-sm" style="border-radius: 15px; border-left: 5px solid #dc3545 !important;">
-                    <i class="fas fa-exclamation-circle mr-2"></i> <?php echo $error; ?>
+                    <i class="fas fa-exclamation-circle mr-2"></i> <?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?>
                 </div>
             <?php endif; ?>
 
             <form method="post" autocomplete="off">
-                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, "UTF-8"); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="form-group mb-4">
                     <label class="small font-weight-bold text-muted mb-2">STAFF USERNAME</label>
                     <div class="input-group">
@@ -205,14 +247,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-login btn-block">
+                <button type="submit" class="btn btn-primary btn-login btn-block" <?php if (hms_login_is_locked()) { echo 'disabled'; } ?>>
                     <i class="fas fa-sign-in-alt mr-2"></i> ACCESS SYSTEM
                 </button>
             </form>
 
             <div class="mt-5 text-center">
                 <p class="text-muted" style="font-size: 0.85rem;">
-                    &copy; 2026 Emaqure Medical Centre. <br> 
+                    &copy; 2026 Emaqure Medical Centre. <br>
                     <span class="opacity-50">Secure ERP Environment</span>
                 </p>
             </div>
