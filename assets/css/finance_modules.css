@@ -1,0 +1,20 @@
+/* EMAQURE Finance & Controls — shared visual system */
+.finance-workspace,.finance-page{background:radial-gradient(circle at 8% 0%,rgba(19,168,184,.07),transparent 28%),#f4f7fb;min-height:calc(100vh - 72px);padding:28px 24px 48px}
+.finance-workspace>.container-fluid,.finance-page>.container-fluid{max-width:1500px;margin:0 auto}
+.finance-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b3d91 0%,#1261c9 55%,#13a8b8 100%);color:#fff;border-radius:22px;padding:28px 30px;margin-bottom:20px;box-shadow:0 16px 38px rgba(16,77,153,.22)}
+.finance-hero:after{content:"";position:absolute;width:270px;height:270px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-80px;top:-120px;box-shadow:0 0 0 35px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.015);pointer-events:none}
+.finance-hero>*{position:relative;z-index:1}
+.finance-hero h1,.finance-hero h2{color:#fff!important;font-weight:800;margin:3px 0 5px}
+.finance-eyebrow{font-size:.68rem;text-transform:uppercase;letter-spacing:.17em;font-weight:800;opacity:.72}
+.finance-hero p{color:#fff!important;opacity:.82;margin:0}
+.finance-actions{display:flex;gap:8px;flex-wrap:wrap}.finance-actions .btn{border-radius:9px;font-weight:800}
+.finance-card,.finance-workspace .card,.finance-page .card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065);overflow:hidden}
+.finance-workspace .card-header,.finance-page .card-header{background:linear-gradient(180deg,#fff,#fbfcfe);border-bottom:1px solid #e8edf3;color:#182334;font-weight:800}
+.finance-workspace .table,.finance-page .table{margin-bottom:0}.finance-workspace .table thead th,.finance-page .table thead th{background:#f7f9fc;border:0;color:#687386;font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;white-space:nowrap}
+.finance-workspace .table td,.finance-page .table td{border-color:#edf1f5;vertical-align:middle}.finance-workspace .table tbody tr:hover,.finance-page .table tbody tr:hover{background:#f7fbff}
+.finance-workspace .form-control,.finance-page .form-control{border:1px solid #dfe5ed;border-radius:9px;min-height:42px}.finance-workspace .form-control:focus,.finance-page .form-control:focus{border-color:#2f78c8;box-shadow:0 0 0 3px rgba(47,120,200,.10)}
+.finance-workspace label,.finance-page label{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;font-weight:800;color:#697586;margin-bottom:6px}
+.finance-workspace .btn,.finance-page .btn{border-radius:9px;font-weight:800}
+.finance-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.finance-metric{background:#fff;border:1px solid #e2e8f0;border-radius:15px;padding:18px;box-shadow:0 7px 22px rgba(20,40,70,.055)}.finance-metric small{display:block;text-transform:uppercase;letter-spacing:.06em;color:#697586;font-weight:800;font-size:.64rem}.finance-metric strong{display:block;font-size:1.35rem;color:#182334;margin-top:5px}
+@media(max-width:900px){.finance-metrics{grid-template-columns:1fr 1fr}}@media(max-width:700px){.finance-workspace,.finance-page{padding:18px 12px 35px}.finance-hero{padding:22px;border-radius:17px}.finance-hero h1,.finance-hero h2{font-size:1.45rem}.finance-metrics{grid-template-columns:1fr}.finance-workspace .table,.finance-page .table{min-width:850px}}
+@media print{.finance-workspace,.finance-page{background:#fff!important;padding:0!important;min-height:auto}.finance-hero{box-shadow:none!important}}
