@@ -137,7 +137,8 @@ if (!$stmt) {
 
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
-?><style>
+?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css"><style>
 .hms-form-page{padding:26px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 60px)}
 .hms-form-shell{max-width:1450px;margin:0 auto}
 .hms-form-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:21px 24px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:18px}
