@@ -148,6 +148,7 @@ $invoiceNumber = (string)($invoice['invoice_number'] ?? ('#'.str_pad((string)$id
 include __DIR__.'/../includes/header.php';
 include __DIR__.'/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .payment-page{padding:26px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 72px)}
 .payment-shell{width:100%;max-width:1180px;margin:0 auto}
