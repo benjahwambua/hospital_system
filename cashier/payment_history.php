@@ -105,7 +105,8 @@ foreach ($payments as $payment) {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
-<div class="main-content">
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
+<div class="main-content finance-workspace">
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
