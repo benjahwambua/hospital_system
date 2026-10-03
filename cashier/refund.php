@@ -1,18 +1,3 @@
-
-/* HMS unified operational workspace */
-.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
-.main-content>.container-fluid{max-width:1500px}
-.main-content h1,.main-content h2,.main-content h3{color:#25324a}
-.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
-.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
-.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-.main-content .table td{border-color:#edf0f5;vertical-align:middle;font-size:13px}
-.main-content .table tbody tr:hover{background:#f8fbff}
-.main-content .form-control{border-color:#d7dee8;border-radius:9px}
-.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
-.main-content .btn{border-radius:8px;font-weight:700}
-.main-content .btn-primary{background:#075b9d;border-color:#075b9d}
-.main-content .page-header,.main-content .d-flex.justify-content-between.align-items-center{margin-bottom:20px!important}
 <?php
 require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/session.php';
@@ -66,16 +51,15 @@ include __DIR__.'/../includes/sidebar.php';
 ?>
 <link rel="stylesheet" href="../assets/css/finance_modules.css">
 <div class="main-content finance-workspace"><div class="container-fluid">
-<div class="d-flex justify-content-between align-items-center mb-4">
- <div><h2 class="h3 mb-1 text-gray-800"><i class="fas fa-undo"></i> Payment Refund / Reversal</h2>
- <p class="text-muted mb-0">Financial transactions are reversed, not deleted.</p></div>
- <a href="/hospital_system/cashier/payment_history.php" class="btn btn-outline-primary"><i class="fas fa-arrow-left"></i> Payment History</a>
-</div>
+<section class="finance-hero">
+ <div><div class="finance-kicker">Finance &amp; Controls</div><h1>Refund &amp; Reversal</h1><p>Reverse approved payments while preserving the original transaction and audit trail.</p></div>
+ <div class="finance-hero-actions"><a href="/hospital_system/cashier/payment_history.php" class="btn btn-light"><i class="fas fa-receipt"></i> Payment History</a><a href="/hospital_system/cashier/index.php" class="btn btn-outline-light"><i class="fas fa-cash-register"></i> Central Cashier</a></div>
+</section>
 <?php if($message): ?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif; ?>
 <?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; ?>
 <div class="row">
- <div class="col-lg-5">
-  <div class="card shadow mb-4"><div class="card-header"><h6 class="m-0 font-weight-bold text-primary">Original Payment</h6></div><div class="card-body">
+ <div class="col-xl-5">
+  <div class="finance-panel card shadow mb-4"><div class="card-header finance-section-header"><div><div class="finance-section-kicker">Transaction details</div><h3 class="m-0">Original Payment</h3><div class="finance-section-subtitle">Payment #<?= $paymentId ?></div></div><span class="finance-status info"><?= htmlspecialchars($payment['method']??'') ?></span></div><div class="card-body">
    <p><strong>Patient:</strong> <?=htmlspecialchars($payment['full_name']??'Unknown')?> (<?=htmlspecialchars($payment['patient_number']??'N/A')?>)</p>
    <p><strong>Invoice:</strong> <?=htmlspecialchars($payment['invoice_number']??('#'.$payment['invoice_id']))?></p>
    <p><strong>Payment:</strong> KSH <?=number_format((float)$payment['amount'],2)?></p>
@@ -85,8 +69,8 @@ include __DIR__.'/../includes/sidebar.php';
    <p class="mb-0"><strong>Remaining refundable:</strong> <span class="text-danger font-weight-bold">KSH <?=number_format($refundable,2)?></span></p>
   </div></div>
  </div>
- <div class="col-lg-7">
-  <div class="card shadow mb-4"><div class="card-header"><h6 class="m-0 font-weight-bold text-danger">Record Refund</h6></div><div class="card-body">
+ <div class="col-xl-7">
+  <div class="finance-panel card shadow mb-4"><div class="card-header finance-section-header"><div><div class="finance-section-kicker">Controlled adjustment</div><h3 class="m-0">Record Refund</h3><div class="finance-section-subtitle">Approval is required and the original payment remains in the audit trail.</div></div><span class="finance-status danger">Approval Required</span></div><div class="card-body">
   <?php if($refundable<=0): ?><div class="alert alert-info">This payment has been fully refunded.</div>
   <?php else: ?>
   <form method="post" onsubmit="return confirm('Approve this refund? The original payment will remain in the audit trail and accounting will be reversed.');">
@@ -102,7 +86,7 @@ include __DIR__.'/../includes/sidebar.php';
   </div></div>
  </div>
 </div>
-<div class="card shadow"><div class="card-header"><h6 class="m-0 font-weight-bold text-primary">Refund History</h6></div><div class="card-body">
+<div class="finance-panel card shadow"><div class="card-header finance-section-header"><div><div class="finance-section-kicker">Audit trail</div><h3 class="m-0">Refund History</h3><div class="finance-section-subtitle">All approved reversals linked to this payment</div></div><span class="finance-status info"><?= count($refunds) ?> record(s)</span></div><div class="card-body">
 <table class="table table-bordered table-sm"><thead><tr><th>#</th><th>Amount</th><th>Method</th><th>Reference</th><th>Reason</th><th>By</th><th>Date</th></tr></thead><tbody>
 <?php foreach($refunds as $r): ?><tr><td><?= (int)$r['id']?></td><td>KSH <?=number_format((float)$r['amount'],2)?></td><td><?=htmlspecialchars($r['refund_method'])?></td><td><?=htmlspecialchars($r['reference']??'')?></td><td><?=htmlspecialchars($r['reason'])?></td><td><?=htmlspecialchars($r['refunded_by_name']??'')?></td><td><?=htmlspecialchars($r['created_at'])?></td></tr><?php endforeach; ?>
 <?php if(!$refunds): ?><tr><td colspan="7" class="text-center text-muted">No refunds recorded.</td></tr><?php endif; ?>
