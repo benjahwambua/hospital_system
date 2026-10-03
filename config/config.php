@@ -3,6 +3,45 @@
 // Centralize session initialization before any audit/auth-dependent work.
 require_once __DIR__ . '/../includes/session.php';
 
+function hms_load_env_file(string $path): void {
+    if (!is_file($path)) {
+        return;
+    }
+
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return;
+    }
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+            continue;
+        }
+
+        $parts = explode('=', $line, 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+
+        $key = trim($parts[0]);
+        $value = trim($parts[1]);
+        if ($key === '') {
+            continue;
+        }
+
+        if ((str_starts_with($value, '"') && str_ends_with($value, '"')) || (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
+            $value = substr($value, 1, -1);
+        }
+
+        $_ENV[$key] = $value;
+        putenv($key . '=' . $value);
+    }
+}
+
+$envPath = __DIR__ . '/../.env';
+hms_load_env_file($envPath);
+
 function hms_env(string $key, $default = null) {
     $value = getenv($key);
     if ($value === false || $value === null || $value === '') {
