@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <?php
 require_once __DIR__ . '/../config/config.php'; 
 require_once __DIR__ . '/../includes/session.php'; 
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
-<div class="main-content">
+<div class="main-content finance-workspace">
     <div class="container-fluid pt-4">
         <div class="row justify-content-center">
             <div class="col-lg-8">
