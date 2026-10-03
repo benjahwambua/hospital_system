@@ -20,6 +20,7 @@ $pending = $conn->query("SELECT SUM(total) as pend FROM invoices WHERE status IN
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .finance-dashboard .metric-card {
     border-radius: 18px;
