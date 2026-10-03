@@ -1,4 +1,3 @@
-<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <?php
 require_once __DIR__ . '/../config/config.php'; 
 require_once __DIR__ . '/../includes/session.php'; 
@@ -8,7 +7,9 @@ require_role(['admin','accountant']);
 
 include __DIR__ . '/../includes/header.php'; 
 include __DIR__ . '/../includes/sidebar.php';
-
+?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
+<?php
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date']   ?? date('Y-m-t');
 
