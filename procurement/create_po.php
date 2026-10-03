@@ -142,22 +142,7 @@ $stockRes = null;
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?><style>
-.hms-form-page{padding:26px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 60px)}
-.hms-form-shell{max-width:1450px;margin:0 auto}
-.hms-form-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:21px 24px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:18px}
-.hms-form-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;font-weight:700;color:#6c7a91;margin-bottom:4px}
-.hms-form-hero h1{font-size:24px;font-weight:700;color:#25324a;margin:0 0 5px}.hms-form-hero p{margin:0;color:#718096;font-size:14px}
-.hms-form-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden;margin-bottom:18px}
-.hms-form-card .card-header{background:#fff;border-bottom:1px solid #edf0f5;padding:16px 20px;color:#25324a;font-weight:700}
-.hms-form-card .card-body{padding:21px}
-.hms-form-page label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667085;margin-bottom:6px}
-.hms-form-page .form-control{border:1px solid #d8dee8;border-radius:8px;background:#fff;color:#344054;min-height:42px;padding:10px 12px}
-.hms-form-page .form-control:focus{border-color:#4c84ff;box-shadow:0 0 0 3px rgba(76,132,255,.10);outline:0}
-.hms-form-page textarea.form-control{min-height:auto}.hms-form-page .btn{border-radius:8px;font-weight:700}
-.hms-form-page hr{border-color:#edf0f5}.hms-form-page .table{margin-bottom:0}.hms-form-page .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-@media(max-width:767px){.hms-form-page{padding:18px 12px 35px}.hms-form-hero{align-items:flex-start;flex-direction:column}}
-
-.proc-shell{background:#f5f7fb;min-height:calc(100vh - 60px);padding:28px 24px 44px}.proc-shell-inner{max-width:1500px;margin:auto}.proc-hero{background:linear-gradient(135deg,#063b73,#075b9d 55%,#2b78b8);color:#fff;border-radius:18px;padding:26px 30px;margin-bottom:20px;box-shadow:0 12px 30px rgba(6,59,115,.18)}.proc-hero h1{font-size:26px;font-weight:800;margin:4px 0}.proc-hero p{margin:0;color:rgba(255,255,255,.82);font-size:13px}.hms-form-card{border-radius:14px!important;box-shadow:0 5px 18px rgba(31,45,61,.045)!important}.hms-form-page .table thead th{background:#fafbfc!important;color:#7b8798!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.5px}.hms-form-page .btn{border-radius:8px!important;font-weight:800}
+.hms-form-page{padding:0;background:transparent;min-height:auto}.hms-form-shell{max-width:1480px;margin:0 auto}.proc-shell{background:radial-gradient(circle at 8% 0%,rgba(19,168,184,.07),transparent 28%),#f4f7fb;min-height:calc(100vh - 60px);padding:28px 24px 48px}.proc-shell-inner{max-width:1480px;margin:auto}.proc-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b3d91,#1261c9 55%,#13a8b8);color:#fff;border-radius:22px;padding:28px 30px;margin-bottom:20px;box-shadow:0 16px 38px rgba(16,77,153,.22)}.proc-hero:after{content:"";position:absolute;width:270px;height:270px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-80px;top:-120px}.proc-hero>*{position:relative;z-index:1}.proc-hero h1{font-size:1.8rem!important;color:#fff!important;font-weight:800;margin:3px 0 5px}.hms-form-card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;box-shadow:0 8px 25px rgba(20,40,70,.065);overflow:hidden}.hms-form-card .card-body{padding:22px}.hms-form-page label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#697586;margin-bottom:6px}.hms-form-page .form-control{border:1px solid #dfe5ed;border-radius:9px;min-height:42px}.hms-form-page .form-control:focus{border-color:#2f78c8;box-shadow:0 0 0 3px rgba(47,120,200,.10)}.hms-form-page .table thead th{background:#f7f9fc;color:#687386;border:0;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em}.hms-form-page .btn{border-radius:9px;font-weight:800}@media(max-width:767px){.proc-shell{padding:18px 12px 35px}.proc-hero{padding:22px}}
 </style>
 
 <div class="proc-shell"><div class="proc-shell-inner"><div class="proc-hero"><div><div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d9ebfb">Procurement</div><h1>Create Purchase Order</h1><p>Prepare supplier orders and submit them through the procurement workflow.</p></div></div><div class="hms-form-page"><div class="hms-form-shell">
