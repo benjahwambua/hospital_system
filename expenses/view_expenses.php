@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <?php
 require_once __DIR__ . '/../config/config.php'; 
 require_once __DIR__ . '/../includes/session.php'; 
@@ -49,7 +50,7 @@ $sum_stmt->execute();
 $total_val = $sum_stmt->get_result()->fetch_assoc()['total'] ?? 0;
 ?>
 
-<div class="main-content">
+<div class="main-content finance-workspace">
     <div class="bg-white shadow-sm border-bottom mb-4 p-3">
         <form method="GET" class="row align-items-center">
             <div class="col-md-3"><h4 class="font-weight-bold m-0 text-primary">Expense History</h4></div>
