@@ -167,6 +167,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css">
 <style>
 .billing-page{padding:26px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 72px)}
 .billing-shell{width:100%;max-width:none;margin:0}
