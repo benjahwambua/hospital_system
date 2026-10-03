@@ -37,7 +37,8 @@ $historyStmt=$conn->prepare("SELECT cs.*,u.full_name AS cashier_name FROM cashie
 if($historyStmt){$historyStmt->bind_param('i',$cashierId);$historyStmt->execute();$hr=$historyStmt->get_result();while($row=$hr->fetch_assoc())$closedShifts[]=$row;$historyStmt->close();}
 include __DIR__.'/../includes/header.php';
 include __DIR__.'/../includes/sidebar.php';
-?><div class="hms-form-page"><div class="hms-form-shell"><style>
+?>
+<link rel="stylesheet" href="../assets/css/finance_modules.css"><div class="hms-form-page"><div class="hms-form-shell"><style>
 .hms-form-page{padding:26px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 60px)}
 .hms-form-shell{max-width:1450px;margin:0 auto}
 .hms-form-hero{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:21px 24px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,45,61,.06);display:flex;justify-content:space-between;align-items:center;gap:18px}
@@ -68,7 +69,7 @@ include __DIR__.'/../includes/sidebar.php';
 .main-content .btn-primary{background:#075b9d;border-color:#075b9d}
 .main-content .page-header,.main-content .d-flex.justify-content-between.align-items-center{margin-bottom:20px!important}
 </style>
-<div class="main-content"><div class="container-fluid">
+<div class="main-content finance-workspace"><div class="container-fluid">
 <div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h3 mb-1 text-gray-800"><i class="fas fa-door-open"></i> Cashier Shift</h2><p class="text-muted mb-0">Open, monitor and close your collection shift.</p></div><a href="/hospital_system/cashier/index.php" class="btn btn-outline-primary"><i class="fas fa-cash-register"></i> Cashier</a></div>
 <?= $message ?>
 <?php if(!$open): ?>
