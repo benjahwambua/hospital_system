@@ -20,31 +20,6 @@ include __DIR__ . '/../includes/sidebar.php';
 
 $viewId = max(0, (int)($_GET['view_id'] ?? 0));
 
-if ($viewId > 0):
-    $po_stmt = $conn->prepare("SELECT po.*, s.name AS s_name, s.phone, s.email, u.username
-                               FROM purchase_orders po
-                               JOIN suppliers s ON po.supplier_id = s.id
-                               LEFT JOIN users u ON po.user_id = u.id
-                               WHERE po.id = ? LIMIT 1");
-    $po_stmt->bind_param('i', $viewId);
-    $po_stmt->execute();
-    $po = $po_stmt->get_result()->fetch_assoc();
-    $po_stmt->close();
-
-    $items = [];
-    if ($po) {
-        $items_stmt = $conn->prepare('SELECT item_name, quantity, unit_price, line_total FROM purchase_order_items WHERE purchase_order_id = ? ORDER BY id ASC');
-        $items_stmt->bind_param('i', $viewId);
-        $items_stmt->execute();
-        $itemsRes = $items_stmt->get_result();
-        while ($row = $itemsRes->fetch_assoc()) {
-            $items[] = $row;
-        }
-        $items_stmt->close();
-    }
-
-    // PO accounting is recognized at GRN/receiving, when inventory is actually received.
-?>
 <style>
 /* Purchase Orders — procurement visual system */
 .proc-page{
@@ -250,6 +225,33 @@ if ($viewId > 0):
   .proc-hero,.proc-topbar,.proc-card,.po-card{box-shadow:none!important;border:1px solid #ddd!important}
 }
 </style>
+
+if ($viewId > 0):
+    $po_stmt = $conn->prepare("SELECT po.*, s.name AS s_name, s.phone, s.email, u.username
+                               FROM purchase_orders po
+                               JOIN suppliers s ON po.supplier_id = s.id
+                               LEFT JOIN users u ON po.user_id = u.id
+                               WHERE po.id = ? LIMIT 1");
+    $po_stmt->bind_param('i', $viewId);
+    $po_stmt->execute();
+    $po = $po_stmt->get_result()->fetch_assoc();
+    $po_stmt->close();
+
+    $items = [];
+    if ($po) {
+        $items_stmt = $conn->prepare('SELECT item_name, quantity, unit_price, line_total FROM purchase_order_items WHERE purchase_order_id = ? ORDER BY id ASC');
+        $items_stmt->bind_param('i', $viewId);
+        $items_stmt->execute();
+        $itemsRes = $items_stmt->get_result();
+        while ($row = $itemsRes->fetch_assoc()) {
+            $items[] = $row;
+        }
+        $items_stmt->close();
+    }
+
+    // PO accounting is recognized at GRN/receiving, when inventory is actually received.
+?>
+
 
 <div class="proc-page"><div class="proc-shell"><div class="proc-hero"><div class="proc-hero-main"><div class="proc-kicker">Supply Chain · Procurement</div><h1>Purchase Orders</h1><p>Create, approve, receive and track the hospital procurement lifecycle.</p></div><div class="proc-actions"><a href="purchase_orders.php" class="btn btn-light">Purchase Orders</a><?php if (can_create($conn, 'procurement')): ?><a href="create_po.php" class="btn btn-outline-light">New Order</a><?php endif; ?></div></div><div class="proc-detail"><div class="po-container">
     <div class="no-print d-flex justify-content-between align-items-center mb-3">
