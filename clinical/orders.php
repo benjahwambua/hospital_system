@@ -246,7 +246,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['place_order'])) {
             } else throw new Exception('Select a department.');
         } catch (Throwable $e) {
             $conn->rollback();
-            $message=$e->getMessage();
+            $message = 'Unable to save the request. Please try again.';
+            error_log('Clinical order error: '.$e->getMessage());
         }
     }
 }
