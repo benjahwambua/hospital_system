@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try { $conn->rollback(); } catch (Throwable $ignored) {}
             }
             error_log('HMS payment error: '.$e->getMessage());
-            $error = $e->getMessage();
+            $error = 'Unable to record the payment. Please verify the payment details and try again.';
         }
     }
 }
