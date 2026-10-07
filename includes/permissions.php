@@ -10,6 +10,9 @@ function has_access_control_tables(mysqli $conn): bool {
 }
 
 function can_access_module(mysqli $conn, string $moduleKey): bool {
+    // Administration is reserved for super users. A normal role named "admin"
+    // must not inherit the Administration module merely from its role label.
+    if ($moduleKey === 'administration') return !empty($_SESSION['is_super']);
     if (!empty($_SESSION['is_super'])) return true;
     if (!has_access_control_tables($conn)) return true; // preserve existing role access until migration is run
     $uid = (int)($_SESSION['user_id'] ?? 0);
