@@ -29,7 +29,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 }
 include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
 ?>
-<div class="main-content" style="padding:25px"><div class="container-fluid" style="max-width:900px"><div class="card shadow-sm border-0"><div class="card-body p-4"><div class="d-flex justify-content-between align-items-center mb-4"><div><div class="text-uppercase small text-muted font-weight-bold">Staff Leave</div><h2 class="h4 font-weight-bold mb-0">Request Leave</h2></div><a href="index.php" class="btn btn-light">Back</a></div>
+<style>
+.lv-page{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 60px)}
+.lv-wrap{max-width:1000px;margin:auto}.lv-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}
+.lv-head{background:linear-gradient(135deg,#273449,#475569);color:#fff;padding:26px 30px}.lv-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d6dee8}.lv-head h1{margin:5px 0;font-size:26px}.lv-head p{margin:0;color:rgba(255,255,255,.8);font-size:14px}.lv-body{padding:26px 30px}
+@media(max-width:700px){.lv-page{padding:18px 12px}.lv-body{padding:20px}.lv-head{padding:22px}.lv-head h1{font-size:22px}}
+</style>
+<div class="lv-page"><div class="lv-wrap"><div class="lv-card"><div class="lv-head"><div class="lv-kicker">Administration · Staff Leave</div><h1>Request Leave</h1><p>Submit a leave request for review and approval.</p></div><div class="lv-body"><div class="d-flex justify-content-between align-items-center mb-4"><strong class="text-muted">New Leave Request</strong><a href="index.php" class="btn btn-light">Back to Leave</a></div>
 <?php if($message): ?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif; ?><?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; ?>
 <form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><div class="form-row"><div class="form-group col-md-6"><label>Leave Type</label><select name="leave_type" class="form-control" required><option value="">Select</option><?php foreach(['Annual','Sick','Maternity','Paternity','Compassionate','Unpaid','Other'] as $x): ?><option><?=htmlspecialchars($x)?></option><?php endforeach; ?></select></div><div class="form-group col-md-3"><label>Start Date</label><input type="date" name="start_date" class="form-control" required></div><div class="form-group col-md-3"><label>End Date</label><input type="date" name="end_date" class="form-control" required></div></div><div class="form-group"><label>Reason / Notes</label><textarea name="reason" class="form-control" rows="4" maxlength="500"></textarea></div><button class="btn btn-primary"><i class="fas fa-paper-plane mr-1"></i> Submit Request</button></form>
 </div></div></div></div><?php include __DIR__.'/../includes/footer.php'; ?>
