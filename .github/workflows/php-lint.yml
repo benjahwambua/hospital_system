@@ -2,7 +2,7 @@ name: PHP Syntax Audit
 
 on:
   push:
-    branches: ["main", "audit-operational-hardening-2026-09-28"]
+    branches: ["main", "security-hardening-prod-readiness"]
   pull_request:
     branches: ["main"]
 
