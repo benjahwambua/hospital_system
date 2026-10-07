@@ -96,7 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
             $invoiceTotal=$itemTotal>0?$itemTotal:(float)$invoice['total'];
             $balance = max($invoiceTotal - $paid, 0);
             if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
-            if ($stkAmount > $balance + 0.00001) {\n                throw new Exception('STK payment cannot exceed the outstanding invoice balance.');\n            }
+            if ($stkAmount > $balance + 0.00001) {
+                throw new Exception('STK payment cannot exceed the outstanding invoice balance.');
+            }
 
             $shift=get_open_cashier_shift($conn,(int)$_SESSION['user_id']);
             if(!$shift) throw new Exception('Open a cashier shift before initiating an M-Pesa payment.');
