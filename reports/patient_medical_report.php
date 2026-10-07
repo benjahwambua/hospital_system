@@ -131,6 +131,17 @@ if (report_table_exists($conn, 'admissions')) {
     );
 }
 
+$currentAdmission = null;
+if (report_table_exists($conn, 'admissions')) {
+    $currentAdmissionRows = report_rows(
+        $conn,
+        "SELECT a.*, u.full_name AS doctor_name FROM admissions a LEFT JOIN users u ON u.id=a.attending_doctor WHERE a.patient_id=? AND LOWER(COALESCE(a.status,''))='admitted' ORDER BY a.admission_date DESC, a.id DESC LIMIT 1",
+        [$patient_id],
+        'i'
+    );
+    $currentAdmission = $currentAdmissionRows[0] ?? null;
+}
+
 $appointments = [];
 if (report_table_exists($conn, 'appointments')) {
     $appointments = report_rows(
@@ -209,10 +220,10 @@ if (report_table_exists($conn, 'payments')) {
     );
     $totalPaid = (float)($paid[0]['total_paid'] ?? 0);
 }
-if (report_table_exists($conn, 'refunds')) {
+if (report_table_exists($conn, 'payment_refunds')) {
     $ref = report_rows(
         $conn,
-        "SELECT COALESCE(SUM(r.amount),0) total_refunded FROM refunds r INNER JOIN payments p ON p.id=r.payment_id INNER JOIN invoices i ON i.id=p.invoice_id WHERE i.patient_id=?",
+        "SELECT COALESCE(SUM(r.amount),0) total_refunded FROM payment_refunds r INNER JOIN payments p ON p.id=r.payment_id INNER JOIN invoices i ON i.id=p.invoice_id WHERE i.patient_id=? AND COALESCE(r.status,'Approved')='Approved'",
         [$patient_id],
         'i'
     );
@@ -323,7 +334,7 @@ foreach ($encounters as $e) {
         </div>
         <div class="metric">
             <div class="label">Current Admission</div>
-            <div class="value"><?= ($admissions && (($admissions[0]['status'] ?? '') === 'Admitted')) ? 'Admitted' : 'Outpatient' ?></div>
+            <div class="value"><?= $currentAdmission ? 'Admitted' : 'Outpatient' ?></div>
         </div>
         <div class="metric balance">
             <div class="label">Balance Due</div>
