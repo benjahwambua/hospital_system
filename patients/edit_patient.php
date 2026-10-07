@@ -87,7 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         } catch (Throwable $e) {
             $conn->rollback();
-            $errors[] = $e->getMessage();
+            $errors[] = 'Unable to update patient. No changes were saved. Please try again.';
+            error_log('Patient update error: ' . $e->getMessage());
         }
     }
 
