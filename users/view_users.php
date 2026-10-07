@@ -51,10 +51,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_with_message('You cannot delete the final Super User account.');
         }
 
-        $deleteStmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-        $deleteStmt->bind_param('i', $deleteId);
-        $deleteStmt->execute();
-        $deleteStmt->close();
+        $conn->begin_transaction();
+        try {
+            $deleteStmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+            if (!$deleteStmt) throw new Exception('Unable to delete user.');
+            $deleteStmt->bind_param('i', $deleteId);
+            $deleteStmt->execute();
+            if ($deleteStmt->affected_rows !== 1) throw new Exception('User was not deleted.');
+            $deleteStmt->close();
+
+            if (function_exists('audit')) {
+                audit('user_deleted', 'user_id=' . $deleteId . ',full_name=' . $userToDelete['full_name']);
+            }
+
+            $conn->commit();
+        } catch (Exception $e) {
+            $conn->rollback();
+            error_log('HMS user deletion failed: ' . $e->getMessage());
+            redirect_with_message('Unable to delete the user. No changes were made.');
+        }
         redirect_with_message('User deleted successfully.');
     }
 
