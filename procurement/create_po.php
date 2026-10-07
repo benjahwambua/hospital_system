@@ -46,48 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                     throw new Exception('Selected supplier was not found.');
                 }
 
-                /* Schema changes belong in database migrations, not a live PO request. */
-                if (false) {
-                $conn->query("CREATE TABLE IF NOT EXISTS expenses (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    expense_date DATE NOT NULL,
-                    category VARCHAR(120) NOT NULL,
-                    description VARCHAR(255) NOT NULL,
-                    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-                    source_type VARCHAR(80) DEFAULT NULL,
-                    source_id INT DEFAULT NULL,
-                    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-                    created_by INT DEFAULT NULL,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )");
-
-                $expenseColumns = [];
-                $expenseColsRes = $conn->query("SHOW COLUMNS FROM expenses");
-                if ($expenseColsRes) {
-                    while ($col = $expenseColsRes->fetch_assoc()) {
-                        $expenseColumns[] = $col['Field'] ?? '';
-                    }
-                }
-                if (!in_array('source_type', $expenseColumns, true)) {
-                    $conn->query("ALTER TABLE expenses ADD COLUMN source_type VARCHAR(80) DEFAULT NULL AFTER amount");
-                }
-                if (!in_array('source_id', $expenseColumns, true)) {
-                    $conn->query("ALTER TABLE expenses ADD COLUMN source_id INT DEFAULT NULL AFTER source_type");
-                }
-                if (!in_array('status', $expenseColumns, true)) {
-                    $conn->query("ALTER TABLE expenses ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'Pending' AFTER source_id");
-                }
-                if (!in_array('created_by', $expenseColumns, true)) {
-                    $conn->query("ALTER TABLE expenses ADD COLUMN created_by INT DEFAULT NULL AFTER status");
-                }
-                if (!in_array('created_at', $expenseColumns, true)) {
-                    $conn->query("ALTER TABLE expenses ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_by");
-                }
-                if (!in_array('payment_method', $expenseColumns, true)) {
-                    $conn->query("ALTER TABLE expenses ADD COLUMN payment_method VARCHAR(50) DEFAULT NULL AFTER expense_date");
-                }
-                }
-
                 $stmt = $conn->prepare("INSERT INTO purchase_orders (supplier_id, order_date, total_amount, user_id, status) VALUES (?, ?, ?, ?, 'Pending')");
                 $stmt->bind_param('isdi', $supplier_id, $order_date, $total_amount, $user_id);
                 $stmt->execute();
