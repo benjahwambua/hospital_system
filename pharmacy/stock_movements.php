@@ -13,34 +13,56 @@ if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes
 // Handle Form Stock Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_stock_submit'])) {
     require_module_access($conn, 'pharmacy', 'edit');
-    if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) { die('Invalid security token.'); }
-    $stock_id     = intval($_POST['stock_id']);
-    $new_quantity = intval($_POST['new_quantity']);
-    $new_price    = floatval($_POST['new_price']);
-    $note         = trim($_POST['note'] ?? '');
+    if (!hash_equals($_SESSION['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) {
+        http_response_code(419);
+        exit('Invalid security token.');
+    }
 
-    $currentStmt = $conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id = ? FOR UPDATE");
-    $currentStmt->bind_param("i", $stock_id);
-    $currentStmt->execute();
-    $current = $currentStmt->get_result()->fetch_assoc();
-    $currentStmt->close();
-    
-    if ($current) {
-        $quantity_change = $new_quantity - $current['quantity'];
+    $stock_id     = (int)($_POST['stock_id'] ?? 0);
+    $new_quantity = (int)($_POST['new_quantity'] ?? -1);
+    $new_price    = (float)($_POST['new_price'] ?? -1);
+    $note         = trim((string)($_POST['note'] ?? ''));
+
+    if ($stock_id <= 0 || $new_quantity < 0 || $new_price < 0) {
+        http_response_code(422);
+        exit('Invalid stock adjustment.');
+    }
+
+    $conn->begin_transaction();
+    try {
+        $currentStmt = $conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id = ? FOR UPDATE");
+        if (!$currentStmt) throw new Exception('Unable to lock stock item.');
+        $currentStmt->bind_param("i", $stock_id);
+        $currentStmt->execute();
+        $current = $currentStmt->get_result()->fetch_assoc();
+        $currentStmt->close();
+
+        if (!$current) throw new Exception('Stock item not found.');
+
+        $quantity_change = $new_quantity - (int)$current['quantity'];
 
         $stmt = $conn->prepare("UPDATE pharmacy_stock SET quantity = ?, selling_price = ? WHERE id = ?");
-        $stmt->bind_param("ddi", $new_quantity, $new_price, $stock_id);
-        $stmt->execute();
+        if (!$stmt) throw new Exception('Unable to prepare stock update.');
+        $stmt->bind_param("idi", $new_quantity, $new_price, $stock_id);
+        if (!$stmt->execute()) throw new Exception('Unable to update stock.');
         $stmt->close();
 
+        $user_id = (int)($_SESSION['user_id'] ?? 0);
         $stmt = $conn->prepare("INSERT INTO stock_movements (stock_id, quantity_change, balance_after, user_id, note, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $user_id = $_SESSION['user_id'] ?? 0;
+        if (!$stmt) throw new Exception('Unable to prepare stock movement.');
         $stmt->bind_param("iiiis", $stock_id, $quantity_change, $new_quantity, $user_id, $note);
-        $stmt->execute();
+        if (!$stmt->execute()) throw new Exception('Unable to record stock movement.');
         $stmt->close();
-        
+
+        if (function_exists('audit')) audit('pharmacy_stock_adjusted', "stock_id={$stock_id},change={$quantity_change},balance={$new_quantity}");
+        $conn->commit();
+
         header("Location: " . $_SERVER['PHP_SELF'] . "?success=1");
         exit;
+    } catch (Throwable $e) {
+        $conn->rollback();
+        http_response_code(422);
+        exit(htmlspecialchars($e->getMessage()));
     }
 }
 
