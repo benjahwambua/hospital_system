@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 }
                 $conn->commit();
                 $message='Sale created successfully. Invoice #'.$invoiceId.' — KES '.number_format($qty*$unit,2).'.';
-            } catch(Throwable $e) { $conn->rollback(); $error=$e->getMessage(); }
+            } catch(Throwable $e) { $conn->rollback(); error_log('Pharmacy walk-in sale error: '.$e->getMessage()); $error='Unable to complete the walk-in sale. Please verify the sale details and try again.'; }
         }
     }
 }
