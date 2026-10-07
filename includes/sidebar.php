@@ -192,6 +192,13 @@ function isParentActive($paths) {
         <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'staff_leave')): ?>
+        <div class="menu-title">Staff</div>
+        <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>">
+            <i class="fas fa-calendar-alt icon-main"></i> Staff Leave
+        </a>
+        <?php endif; ?>
+
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
         <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/', 'services/']) ?>">
