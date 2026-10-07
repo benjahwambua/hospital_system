@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
 
         $mpesa_message = 'M-Pesa payment ' . htmlspecialchars($receipt) . ' recorded successfully for KES ' . number_format($payment['amount'], 2) . '.';
     } catch (Throwable $e) {
-        $mpesa_error = $e->getMessage();
+        $mpesa_error = 'Unable to record the M-Pesa transaction. Please verify the payment details and try again.';
     }
 }
 
