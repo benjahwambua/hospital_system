@@ -30,7 +30,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                         }
                         if(function_exists('audit'))audit('maternity_charge',"maternity_id={$id},service_id={$serviceId},amount={$amount}");
                         $conn->commit();header("Location:view.php?id={$id}&charge=1");exit;
-                    }catch(Throwable $e){$conn->rollback();$error=$e->getMessage();}
+                    }catch(Throwable $e){$conn->rollback();$error = 'Unable to complete the requested operation. No changes were saved.';
+            error_log('HMS operation error: '.$e->getMessage());}
                 }
             }
         }
