@@ -1,6 +1,10 @@
-require('../vendor/fpdf/fpdf.php');
-$pdf = new FPDF();
-$pdf->AddPage();
-$pdf->SetFont('Arial','B',16);
-$pdf->Cell(0,10,'Hospital Invoice',0,1);
-$pdf->Output();
+<?php
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
+
+require_login();
+require_module_access($conn, 'finance', 'view');
+
+http_response_code(410);
+exit('This legacy invoice print route has been retired. Use billing/view_invoice.php.');
