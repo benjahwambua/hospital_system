@@ -83,7 +83,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['dispense_id'])){
 
                 if(function_exists('audit'))audit('pharmacy_dispensed',"queue_id={$id},prescription_id=".(int)$row['prescription_id'].",patient_id=".(int)$row['patient_id'].",quantity={$qty}");
                 $conn->commit();$message='Medicine dispensed and stock updated successfully.';
-            }catch(Throwable $e){$conn->rollback();$message=$e->getMessage();}
+            }catch(Throwable $e){$conn->rollback();error_log('Pharmacy dispensing error: '.$e->getMessage());$message='Unable to complete dispensing. Please verify the prescription and stock details.';}
         }
     }
 }
