@@ -73,15 +73,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
         $errorMessage = 'Security token mismatch. Please refresh and try again.';
     } else {
         $deleteId = (int)($_POST['delete_id'] ?? 0);
-        if ($deleteId > 0) {
-            $stmt = $conn->prepare('DELETE FROM pharmacy_stock WHERE id = ?');
-            $stmt->bind_param('i', $deleteId);
-            if ($stmt->execute()) {
+        if ($deleteId <= 0) {
+            $errorMessage = 'Invalid stock item.';
+        } else {
+            $conn->begin_transaction();
+            try {
+                $lock = $conn->prepare('SELECT id, quantity, drug_name FROM pharmacy_stock WHERE id = ? LIMIT 1 FOR UPDATE');
+                if (!$lock) throw new Exception('Unable to validate stock item.');
+                $lock->bind_param('i', $deleteId);
+                $lock->execute();
+                $stock = $lock->get_result()->fetch_assoc();
+                $lock->close();
+                if (!$stock) throw new Exception('Stock item not found.');
+
+                if ((float)$stock['quantity'] > 0) {
+                    throw new Exception('Stock cannot be deleted while quantity remains. Reduce it to zero first.');
+                }
+
+                $movementCheck = $conn->prepare('SELECT COUNT(*) AS c FROM stock_movements WHERE stock_id = ?');
+                if ($movementCheck) {
+                    $movementCheck->bind_param('i', $deleteId);
+                    $movementCheck->execute();
+                    $movementCount = (int)($movementCheck->get_result()->fetch_assoc()['c'] ?? 0);
+                    $movementCheck->close();
+                    if ($movementCount > 0) {
+                        throw new Exception('This stock item has movement history and cannot be deleted.');
+                    }
+                }
+
+                $stmt = $conn->prepare('DELETE FROM pharmacy_stock WHERE id = ?');
+                if (!$stmt) throw new Exception('Unable to delete stock item.');
+                $stmt->bind_param('i', $deleteId);
+                $stmt->execute();
+                if ($stmt->affected_rows !== 1) throw new Exception('Stock item was not deleted.');
+                $stmt->close();
+
+                if (function_exists('audit')) {
+                    audit('pharmacy_stock_deleted', 'stock_id=' . $deleteId . ',drug_name=' . $stock['drug_name']);
+                }
+
+                $conn->commit();
                 $successMessage = 'Medicine deleted successfully.';
-            } else {
-                $errorMessage = 'Unable to delete medicine right now.';
+            } catch (Exception $e) {
+                $conn->rollback();
+                error_log('HMS pharmacy stock deletion failed: ' . $e->getMessage());
+                $errorMessage = 'Unable to delete this stock item. No changes were made.';
             }
-            $stmt->close();
         }
     }
 }
