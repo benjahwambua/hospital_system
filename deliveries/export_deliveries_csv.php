@@ -1,20 +1,10 @@
 <?php
-include('../config.php');
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
 
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename=deliveries_export.csv');
+require_login();
+require_module_access($conn, 'maternity', 'view');
 
-$output = fopen("php://output", "w");
-
-// CSV column headers
-fputcsv($output, ['ID', 'Mother Name', 'Delivery Date', 'Type', 'Baby Weight', 'Remarks']);
-
-$query = mysqli_query($conn, "SELECT * FROM deliveries ORDER BY id DESC");
-
-while ($row = mysqli_fetch_assoc($query)) {
-    fputcsv($output, $row);
-}
-
-fclose($output);
+header('Location: /hospital_system/maternity/stats_export_csv.php');
 exit;
-?>
