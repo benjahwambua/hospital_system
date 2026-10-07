@@ -1,8 +1,181 @@
 <?php
-require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_login();require_module_access($conn,'maternity','view');
-$patient_id=max(0,(int)($_GET['patient_id']??0));if(!$patient_id){http_response_code(400);exit('Invalid patient id.');}
-$s=$conn->prepare("SELECT p.*,m.* FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? ORDER BY m.id DESC LIMIT 1");$s->bind_param('i',$patient_id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
-$mid=(int)$m['id'];$visits=$conn->query("SELECT * FROM maternity_visits WHERE maternity_id={$mid} ORDER BY created_at DESC")->fetch_all(MYSQLI_ASSOC);$deliveries=$conn->query("SELECT * FROM maternity_delivery WHERE maternity_id={$mid} ORDER BY created_at DESC")->fetch_all(MYSQLI_ASSOC);$babies=$conn->query("SELECT * FROM maternity_baby WHERE maternity_id={$mid} ORDER BY created_at ASC")->fetch_all(MYSQLI_ASSOC);
-$invoiceItems=[];$inv=$conn->prepare("SELECT i.id,i.invoice_number,ii.description,ii.quantity,ii.unit_price,ii.total FROM invoices i JOIN invoice_items ii ON ii.invoice_id=i.id WHERE i.patient_id=? ORDER BY i.created_at DESC,ii.id ASC");if($inv){$inv->bind_param('i',$patient_id);$inv->execute();$invoiceItems=$inv->get_result()->fetch_all(MYSQLI_ASSOC);$inv->close();}
-ob_start();?><!doctype html><html><head><meta charset="utf-8"><title>Maternity Summary</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222}.table{width:100%;border-collapse:collapse}.table th,.table td{border:1px solid #ddd;padding:6px;text-align:left}.header{border-bottom:2px solid #2f6fed;padding-bottom:10px;margin-bottom:15px}</style></head><body><div class="header"><h2><?=htmlspecialchars($SITE_NAME??'Hospital')?></h2><strong>Maternity Clinical Summary</strong></div><p><strong>Patient:</strong> <?=htmlspecialchars($m['full_name'])?> &nbsp; <strong>Patient No:</strong> <?=htmlspecialchars($m['patient_number']??'')?> &nbsp; <strong>ANC:</strong> <?=htmlspecialchars($m['anc_number']??'')?></p><p><strong>Gravida/Parity:</strong> <?=htmlspecialchars((string)$m['gravida'])?> / <?=htmlspecialchars((string)$m['parity'])?> &nbsp; <strong>LMP:</strong> <?=htmlspecialchars((string)$m['last_menstrual_period'])?> &nbsp; <strong>EDD:</strong> <?=htmlspecialchars((string)$m['expected_delivery'])?></p><h3>Clinical Visits</h3><table class="table"><thead><tr><th>Date</th><th>Type</th><th>BP</th><th>Weight</th><th>FHR</th><th>Notes</th></tr></thead><tbody><?php foreach($visits as $v):?><tr><td><?=htmlspecialchars($v['created_at'])?></td><td><?=htmlspecialchars($v['visit_type'])?></td><td><?=htmlspecialchars($v['bp'])?></td><td><?=htmlspecialchars($v['weight'])?></td><td><?=htmlspecialchars($v['fetal_heart_rate'])?></td><td><?=htmlspecialchars($v['notes'])?></td></tr><?php endforeach;?></tbody></table><h3>Deliveries</h3><table class="table"><thead><tr><th>Date</th><th>Mode</th><th>Mother Condition</th><th>Complications</th></tr></thead><tbody><?php foreach($deliveries as $d):?><tr><td><?=htmlspecialchars($d['delivery_time']??$d['created_at'])?></td><td><?=htmlspecialchars($d['delivery_mode'])?></td><td><?=htmlspecialchars($d['mother_condition'])?></td><td><?=htmlspecialchars($d['complications'])?></td></tr><?php endforeach;?></tbody></table><h3>Newborns</h3><table class="table"><thead><tr><th>#</th><th>Gender</th><th>Weight</th><th>APGAR</th><th>Outcome</th></tr></thead><tbody><?php foreach($babies as $b):?><tr><td><?=htmlspecialchars($b['baby_number'])?></td><td><?=htmlspecialchars($b['gender'])?></td><td><?=htmlspecialchars($b['weight'])?></td><td><?=htmlspecialchars($b['apgar'])?></td><td><?=!empty($b['alive'])?'Live Birth':'Stillbirth'?></td></tr><?php endforeach;?></tbody></table><h3>Central Billing Items</h3><table class="table"><thead><tr><th>Invoice</th><th>Description</th><th>Qty</th><th>Amount</th></tr></thead><tbody><?php foreach($invoiceItems as $i):?><tr><td><?=htmlspecialchars($i['invoice_number']??('#'.$i['id']))?></td><td><?=htmlspecialchars($i['description'])?></td><td><?=htmlspecialchars($i['quantity'])?></td><td>KSH <?=number_format((float)$i['total'],2)?></td></tr><?php endforeach;?></tbody></table></body></html><?php
-$html=ob_get_clean();require_once __DIR__.'/../vendor/autoload.php';$dompdf=new \Dompdf\Dompdf();$dompdf->loadHtml($html);$dompdf->setPaper('A4','portrait');$dompdf->render();$dompdf->stream("maternity_summary_{$patient_id}.pdf",["Attachment"=>0]);exit;
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_login();
+require_module_access($conn, 'maternity', 'view');
+
+$patient_id = max(0, (int)($_GET['patient_id'] ?? 0));
+if (!$patient_id) {
+    http_response_code(400);
+    exit('Invalid patient id.');
+}
+
+$stmt = $conn->prepare("SELECT p.*, m.* FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? ORDER BY m.id DESC LIMIT 1");
+if (!$stmt) {
+    http_response_code(500);
+    exit('Unable to load maternity record.');
+}
+$stmt->bind_param('i', $patient_id);
+$stmt->execute();
+$m = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+if (!$m) {
+    http_response_code(404);
+    exit('Maternity record not found.');
+}
+
+$mid = (int)$m['id'];
+
+$visitsStmt = $conn->prepare("SELECT * FROM maternity_visits WHERE maternity_id=? ORDER BY created_at DESC");
+$visits = [];
+if ($visitsStmt) {
+    $visitsStmt->bind_param('i', $mid);
+    $visitsStmt->execute();
+    $visits = $visitsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $visitsStmt->close();
+}
+
+$deliveriesStmt = $conn->prepare("SELECT * FROM maternity_delivery WHERE maternity_id=? ORDER BY created_at DESC");
+$deliveries = [];
+if ($deliveriesStmt) {
+    $deliveriesStmt->bind_param('i', $mid);
+    $deliveriesStmt->execute();
+    $deliveries = $deliveriesStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $deliveriesStmt->close();
+}
+
+$babiesStmt = $conn->prepare("SELECT * FROM maternity_baby WHERE maternity_id=? ORDER BY created_at ASC");
+$babies = [];
+if ($babiesStmt) {
+    $babiesStmt->bind_param('i', $mid);
+    $babiesStmt->execute();
+    $babies = $babiesStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $babiesStmt->close();
+}
+
+$invoiceItems = [];
+$inv = $conn->prepare("SELECT i.id, i.invoice_number, ii.description, ii.quantity, ii.unit_price, ii.total FROM invoices i JOIN invoice_items ii ON ii.invoice_id=i.id WHERE i.patient_id=? ORDER BY i.created_at DESC, ii.id ASC");
+if ($inv) {
+    $inv->bind_param('i', $patient_id);
+    $inv->execute();
+    $invoiceItems = $inv->get_result()->fetch_all(MYSQLI_ASSOC);
+    $inv->close();
+}
+
+ob_start();
+?><!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Maternity Summary</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #222; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { border: 1px solid #dfe4ea; padding: 6px; text-align: left; }
+        h2, h3 { margin: 0 0 10px; }
+        .section { margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <h2>Maternity Summary</h2>
+    <p><strong>Patient:</strong> <?= htmlspecialchars($m['full_name'] ?? '') ?> (<?= htmlspecialchars($m['patient_number'] ?? '') ?>)</p>
+    <p><strong>ANC Number:</strong> <?= htmlspecialchars($m['anc_number'] ?? '') ?></p>
+
+    <div class="section">
+        <h3>Visits</h3>
+        <?php if ($visits): ?>
+            <table class="table">
+                <thead><tr><th>Date</th><th>Type</th><th>BP</th><th>Temp</th><th>Weight</th><th>Notes</th></tr></thead>
+                <tbody>
+                    <?php foreach ($visits as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['created_at'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['visit_type'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['bp'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['temp'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['weight'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['notes'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No visits recorded.</p>
+        <?php endif; ?>
+    </div>
+
+    <div class="section">
+        <h3>Deliveries</h3>
+        <?php if ($deliveries): ?>
+            <table class="table">
+                <thead><tr><th>Date</th><th>Mode</th><th>Outcome</th><th>Notes</th></tr></thead>
+                <tbody>
+                    <?php foreach ($deliveries as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['created_at'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['delivery_mode'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['outcome'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['notes'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No deliveries recorded.</p>
+        <?php endif; ?>
+    </div>
+
+    <div class="section">
+        <h3>Babies</h3>
+        <?php if ($babies): ?>
+            <table class="table">
+                <thead><tr><th>Name</th><th>Gender</th><th>Weight</th><th>Apgar</th><th>Alive</th></tr></thead>
+                <tbody>
+                    <?php foreach ($babies as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['name'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['gender'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['weight'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['apgar'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['alive'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No babies recorded.</p>
+        <?php endif; ?>
+    </div>
+
+    <div class="section">
+        <h3>Invoice Items</h3>
+        <?php if ($invoiceItems): ?>
+            <table class="table">
+                <thead><tr><th>Invoice</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                <tbody>
+                    <?php foreach ($invoiceItems as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['invoice_number'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['description'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['quantity'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['unit_price'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['total'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No invoice items recorded.</p>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
+<?php
+$html = ob_get_clean();
+require_once __DIR__ . '/../vendor/autoload.php';
+$dompdf = new \Dompdf\Dompdf();
+$dompdf->loadHtml($html);
+$dompdf->setPaper('A4', 'portrait');
+$dompdf->render();
+$dompdf->stream("maternity_summary_{$patient_id}.pdf");
