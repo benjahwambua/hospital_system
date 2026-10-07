@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
         $invoiceTotal=$itemTotal>0?$itemTotal:(float)$invoice['total'];
         $balance = max($invoiceTotal - $paid, 0);
         if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
-        if ($amount > $balance + 0.00001) {\n            throw new Exception('Payment cannot exceed the outstanding invoice balance.');\n        }
+        if ($amount > $balance + 0.00001) {            throw new Exception('Payment cannot exceed the outstanding invoice balance.');        }
 
         $shift=get_open_cashier_shift($conn,(int)$_SESSION['user_id']);
         if(!$shift) throw new Exception('Open a cashier shift before recording M-Pesa payments.');
