@@ -12,9 +12,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(419);
         exit('Invalid security token.');
     }
+    $amount = filter_var($_POST['amount'] ?? null, FILTER_VALIDATE_FLOAT);
+    $category = trim((string)($_POST['category'] ?? ''));
+    $description = trim((string)($_POST['description'] ?? ''));
+    $date = trim((string)($_POST['date'] ?? ''));
+    $allowedCategories = ['Utilities', 'Supplies', 'Repairs', 'Other'];
+
+    if ($amount === false || $amount <= 0 || !in_array($category, $allowedCategories, true) || $description === '' || !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $date)) {
+        http_response_code(422);
+        exit('Invalid expense details.');
+    }
+
     $stmt = $conn->prepare("INSERT INTO expenses (amount, category, description, date_incurred) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("dsss", $_POST['amount'], $_POST['category'], $_POST['description'], $_POST['date']);
-    $stmt->execute();
+    if (!$stmt) {
+        error_log('Expense prepare error: ' . $conn->error);
+        http_response_code(500);
+        exit('Unable to save expense.');
+    }
+    $stmt->bind_param("dsss", $amount, $category, $description, $date);
+    if (!$stmt->execute()) {
+        error_log('Expense save error: ' . $stmt->error);
+        $stmt->close();
+        http_response_code(500);
+        exit('Unable to save expense.');
+    }
+    $stmt->close();
     header("Location: add_expense.php?success=1");
     exit;
 }
