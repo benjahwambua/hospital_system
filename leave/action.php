@@ -17,7 +17,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $s=$conn->prepare("UPDATE staff_leave_requests SET status=?,reviewed_by=?,reviewed_at=NOW(),review_notes=?,updated_at=NOW() WHERE id=? AND status='Pending'");
    $uid=(int)$_SESSION['user_id']; $s->bind_param('sisi',$decision,$uid,$notes,$id); $s->execute(); $changed=$s->affected_rows; $s->close();
    if($changed!==1) $error='The request could not be updated.';
-   else { header('Location: index.php'); exit; }
+   else {
+    if(function_exists('audit')) audit('staff_leave_'.strtolower($decision),"leave_request_id={$id},staff_user_id=".(int)$row['user_id']);
+    header('Location: index.php'); exit;
+   }
   }
  }
 }
