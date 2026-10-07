@@ -25,13 +25,21 @@ try {
 
     $resultCode=(string)($callback['ResultCode'] ?? '');
     $resultDesc=(string)($callback['ResultDesc'] ?? '');
-    $receipt=null; $phone=(string)($tx['phone'] ?? '');
+    $receipt=null; $phone=(string)($tx['phone'] ?? ''); $callbackAmount=null;
     foreach(($callback['CallbackMetadata']['Item'] ?? []) as $item){
         $name=$item['Name'] ?? '';
         if($name==='MpesaReceiptNumber') $receipt=trim((string)($item['Value'] ?? ''));
+        if($name==='Amount') $callbackAmount=(float)($item['Value'] ?? 0);
         if($name==='PhoneNumber') $phone=(string)($item['Value'] ?? $phone);
     }
     $status=($resultCode==='0')?'completed':'failed';
+    if($status==='completed' && $callbackAmount===null){
+        $status='failed';
+        $resultDesc='M-Pesa callback did not include a payment amount.';
+    } elseif($status==='completed' && abs($callbackAmount-(float)$tx['amount'])>0.00001){
+        $status='failed';
+        $resultDesc='M-Pesa callback amount does not match the initiated transaction amount.';
+    }
 
     $stmt=$conn->prepare("UPDATE mpesa_transactions SET result_code=?, result_desc=?, mpesa_receipt=?, phone=?, status=?, raw_response=?, updated_at=NOW() WHERE id=?");
     if(!$stmt) throw new Exception('Unable to update M-Pesa transaction.');
@@ -39,6 +47,18 @@ try {
     if(!$stmt->execute()) throw new Exception($stmt->error);
     $stmt->close();
 
+    if($status==='completed' && $receipt!==''){
+        $checkTx=$conn->prepare("SELECT id,invoice_id,status FROM mpesa_transactions WHERE mpesa_receipt=? AND id<>? LIMIT 1 FOR UPDATE");
+        if(!$checkTx) throw new Exception('Unable to check M-Pesa receipt uniqueness.');
+        $checkTx->bind_param('si',$receipt,$tx['id']); $checkTx->execute(); $duplicateTx=$checkTx->get_result()->fetch_assoc(); $checkTx->close();
+        if($duplicateTx){
+            $status='failed';
+            $resultDesc='M-Pesa receipt is already linked to another transaction.';
+            $dup=$conn->prepare("UPDATE mpesa_transactions SET status='failed', result_desc=?, updated_at=NOW() WHERE id=?");
+            if(!$dup) throw new Exception('Unable to reject duplicate M-Pesa receipt.');
+            $dup->bind_param('si',$resultDesc,$tx['id']); if(!$dup->execute()) throw new Exception('Unable to reject duplicate M-Pesa receipt.'); $dup->close();
+        }
+    }
     if($status==='completed' && $receipt!==''){
         $check=$conn->prepare("SELECT id FROM payments WHERE reference=? LIMIT 1");
         if(!$check) throw new Exception('Unable to check payment reference.');
