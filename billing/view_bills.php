@@ -19,7 +19,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id']))
     $conn->begin_transaction();
     try {
         if ($del_id <= 0) throw new Exception('Invalid invoice.');
-            $checks = [
+
+        $lock = $conn->prepare("SELECT id FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE");
+        if (!$lock) throw new Exception('Unable to validate invoice.');
+        $lock->bind_param('i', $del_id);
+        $lock->execute();
+        $invoice = $lock->get_result()->fetch_assoc();
+        $lock->close();
+        if (!$invoice) throw new Exception('Invoice not found.');
+
+        $checks = [
             'payments' => "SELECT COUNT(*) AS c FROM payments WHERE invoice_id = ?",
             'payment_refunds' => "SELECT COUNT(*) AS c FROM payment_refunds WHERE invoice_id = ?",
             'accounting_entries' => "SELECT COUNT(*) AS c FROM accounting_entries WHERE invoice_id = ?"
@@ -31,21 +40,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice_id']))
             $check->execute();
             $count = (int)($check->get_result()->fetch_assoc()['c'] ?? 0);
             $check->close();
-            if ($count > 0) throw new Exception("Invoice #$del_id has financial activity ($label) and cannot be deleted.");
+            if ($count > 0) throw new Exception("Invoice #$del_id has financial activity and cannot be deleted.");
         }
 
         $stmt = $conn->prepare("DELETE FROM invoice_items WHERE invoice_id = ?");
-        $stmt->bind_param('i', $del_id); $stmt->execute(); $stmt->close();
+        if (!$stmt) throw new Exception('Unable to remove invoice items.');
+        $stmt->bind_param('i', $del_id);
+        $stmt->execute();
+        $stmt->close();
+
         $stmt = $conn->prepare("DELETE FROM invoices WHERE id = ?");
-        $stmt->bind_param('i', $del_id); $stmt->execute();
+        if (!$stmt) throw new Exception('Unable to remove invoice.');
+        $stmt->bind_param('i', $del_id);
+        $stmt->execute();
         if ($stmt->affected_rows !== 1) throw new Exception('Invoice not found.');
         $stmt->close();
-        
+
+        if (function_exists('audit')) {
+            audit('invoice_deleted', 'invoice_id=' . $del_id);
+        }
+
         $conn->commit();
         $_SESSION['success'] = "Invoice #$del_id deleted successfully.";
     } catch (Exception $e) {
         $conn->rollback();
-        $_SESSION['error'] = "Critical Error: " . $e->getMessage();
+        error_log('HMS invoice deletion failed: ' . $e->getMessage());
+        $_SESSION['error'] = 'Unable to delete the invoice. No changes were made.';
     }
     header("Location: view_bills.php");
     exit();
