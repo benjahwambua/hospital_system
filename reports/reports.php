@@ -13,8 +13,8 @@ $patients = report_count($conn, "SELECT COUNT(*) AS total FROM patients WHERE CO
 $visits = report_count($conn, "SELECT COUNT(*) AS total FROM visits WHERE DATE(visit_date)=CURDATE()");
 $appointments = report_count($conn, "SELECT COUNT(*) AS total FROM appointments WHERE DATE(appointment_date)=CURDATE()");
 $admissions = report_count($conn, "SELECT COUNT(*) AS total FROM admissions WHERE LOWER(COALESCE(status,'')) IN ('admitted','active','inpatient')");
-$labPending = report_count($conn, "SELECT COUNT(*) AS total FROM lab_requests WHERE LOWER(COALESCE(status,'')) IN ('pending','requested','in progress')");
-$radPending = report_count($conn, "SELECT COUNT(*) AS total FROM radiology_requests WHERE LOWER(COALESCE(status,'')) IN ('pending','requested','in progress')");
+$labPending = report_count($conn, "SELECT COUNT(*) AS total FROM patient_services WHERE category='lab' AND LOWER(COALESCE(status,'pending')) IN ('pending','requested','in progress')");
+$radPending = report_count($conn, "SELECT COUNT(*) AS total FROM patient_services WHERE category='radiology' AND LOWER(COALESCE(status,'pending')) IN ('pending','requested','in progress')");
 $pharmacyPending = report_count($conn, "SELECT COUNT(*) AS total FROM pharmacy_queue WHERE LOWER(COALESCE(status,''))='pending'");
 
 include __DIR__ . '/../includes/header.php';
