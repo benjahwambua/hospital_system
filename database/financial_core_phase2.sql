@@ -96,3 +96,39 @@ SET @sql=IF(
  'ALTER TABLE cashier_shifts ADD COLUMN reconciled_at DATETIME NULL AFTER reconciled_by',
  'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Database-level idempotency for payment/refund references.
+-- Existing duplicate references are deliberately detected first; if duplicates
+-- already exist, application-level checks remain active and the migration does
+-- not fail or destroy historical records.
+SET @sql=IF(
+ EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME='payments')
+ AND EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='payments' AND COLUMN_NAME='reference')
+ AND NOT EXISTS(SELECT 1 FROM payments WHERE reference IS NOT NULL AND TRIM(reference)<>'' GROUP BY reference HAVING COUNT(*)>1)
+ AND NOT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='payments' AND INDEX_NAME='uq_payments_reference'),
+ 'CREATE UNIQUE INDEX uq_payments_reference ON payments(reference)',
+ 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql=IF(
+ EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME='payment_refunds')
+ AND NOT EXISTS(SELECT 1 FROM payment_refunds WHERE reference IS NOT NULL AND TRIM(reference)<>'' GROUP BY reference HAVING COUNT(*)>1)
+ AND NOT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='payment_refunds' AND INDEX_NAME='uq_refund_reference'),
+ 'CREATE UNIQUE INDEX uq_refund_reference ON payment_refunds(reference)',
+ 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql=IF(
+ EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME='mpesa_transactions')
+ AND NOT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='mpesa_transactions' AND INDEX_NAME='uq_mpesa_checkout'),
+ 'CREATE UNIQUE INDEX uq_mpesa_checkout ON mpesa_transactions(checkout_request_id)',
+ 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql=IF(
+ EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME='mpesa_transactions')
+ AND NOT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND INDEX_NAME='uq_mpesa_receipt')
+ AND NOT EXISTS(SELECT 1 FROM mpesa_transactions WHERE mpesa_receipt IS NOT NULL AND TRIM(mpesa_receipt)<>'' GROUP BY mpesa_receipt HAVING COUNT(*)>1),
+ 'CREATE UNIQUE INDEX uq_mpesa_receipt ON mpesa_transactions(mpesa_receipt)',
+ 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
