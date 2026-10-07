@@ -92,7 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_walkin_lab']))
                         exit;
                     } catch (Throwable $e) {
                         $conn->rollback();
-                        $walkin_error = $e->getMessage();
+                        $walkin_error = 'Unable to process the laboratory request. Please try again.';
+                        error_log('Lab request error: '.$e->getMessage());
                     }
                 }
             }
