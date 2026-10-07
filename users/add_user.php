@@ -63,25 +63,15 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
+    .admin-page{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 72px)}.admin-shell{max-width:760px;margin:auto}.admin-hero{background:linear-gradient(135deg,#273449,#475569);color:#fff;border-radius:18px;padding:26px 30px;margin-bottom:20px;box-shadow:0 12px 30px rgba(39,52,73,.2)}.admin-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d6dee8}.admin-hero h1{margin:5px 0;font-size:28px}.admin-hero p{margin:0;color:rgba(255,255,255,.8);font-size:14px}.admin-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}.admin-body{padding:26px 30px}@media(max-width:700px){.admin-page{padding:18px 12px}.admin-hero{padding:22px}.admin-hero h1{font-size:23px}.admin-body{padding:20px}}
     .form-control:focus { border-color: #007bff; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.15); }
     .input-group-text { cursor: pointer; background: #f8f9fc; }
     .password-strength { height: 5px; margin-top: 5px; transition: all 0.3s; border-radius: 5px; }
 </style>
 
-<div class="main-content" style="padding: 25px; background: #f8f9fc; min-height: 100vh;">
-    <div class="container-fluid">
-        <div class="row justify-content-center">
-            <div class="col-md-5">
-                <div class="card shadow border-0" style="border-radius: 15px;">
-                    <div class="card-header bg-white border-0 pt-4 text-center">
-                        <div class="icon-circle bg-primary text-white mb-3" style="width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                            <i class="fas fa-user-shield"></i>
-                        </div>
-                        <h4 class="font-weight-bold text-gray-800">Create Official Staff Account</h4>
-                        <p class="text-muted small">Authorization Level: <span class="badge badge-danger">SUPER USER</span></p>
-                    </div>
-                    
-                    <div class="card-body px-4 pb-4">
+<div class="admin-page"><div class="admin-shell">
+                <div class="admin-hero"><div class="admin-kicker">Administration · Staff Accounts</div><h1>Create Staff Account</h1><p>Authorize a new user and assign their professional role.</p></div>
+                <div class="admin-card"><div class="admin-body">
                         <?php if($msg): ?>
                             <div class="alert alert-success border-0 small"><i class="fas fa-check-circle mr-2"></i> <?= $msg ?></div>
                         <?php endif; ?>
