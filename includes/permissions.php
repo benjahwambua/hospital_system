@@ -31,7 +31,8 @@ function can_access_module(mysqli $conn, string $moduleKey): bool {
                 'finance'=>in_array($role,['admin','cashier','accountant'],true),
                 'procurement'=>in_array($role,['admin','procurement','storekeeper','stores'],true),
                 'finance_admin'=>in_array($role,['admin','accountant'],true),
-                'administration'=>in_array($role,['admin'],true)
+                'administration'=>in_array($role,['admin'],true),
+                'staff_leave'=>in_array($role,['admin','doctor','nurse','receptionist','reception','lab','lab_tech','radiologist','pharmacist','cashier','accountant','procurement','storekeeper','stores'],true)
             ];
             return !empty($defaults[$moduleKey]);
         }
@@ -68,6 +69,11 @@ function can_module_action(mysqli $conn, string $moduleKey, string $action='view
         $n=(int)($countStmt->get_result()->fetch_assoc()['n'] ?? 0); $countStmt->close();
         if ($n===0) {
             // Preserve legacy role-based access until explicit assignments are created.
+            // Approval is deliberately stricter for Staff Leave: ordinary staff may
+            // request/view leave, but approvals must remain an administrative action.
+            if ($moduleKey === 'staff_leave' && $action === 'approve') {
+                return $role === 'admin';
+            }
             return can_access_module($conn,$moduleKey);
         }
     }
