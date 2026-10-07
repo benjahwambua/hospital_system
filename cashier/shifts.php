@@ -28,7 +28,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             $result=close_cashier_shift($conn,$shiftId,$cashierId,(float)($_POST['closing_cash']??0),trim((string)($_POST['closing_notes']??'')));
             $message='<div class="alert alert-success"><i class="fas fa-check-circle"></i> Shift closed. Expected cash: KSH '.number_format($result['expected_cash'],2).'. Physical cash: KSH '.number_format($result['closing_cash'],2).'. Variance: KSH '.number_format($result['variance'],2).'.</div>';
         }
-    }catch(Throwable $e){ $message='<div class="alert alert-danger">'.htmlspecialchars($e->getMessage()).'</div>'; }
+    }catch(Throwable $e){ $message='<div class="alert alert-danger">'.'Unable to close cashier shift. No changes were saved.'.'</div>'; }
 }
 $open=get_open_cashier_shift($conn,$cashierId);
 $totals=$open?cashier_shift_totals($conn,(int)$open['id']):['cash'=>0,'mpesa'=>0,'other'=>0,'total'=>0];
