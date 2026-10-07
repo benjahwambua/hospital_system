@@ -11,7 +11,7 @@ if (!$patient_id) {
     exit('Invalid patient id.');
 }
 
-$stmt = $conn->prepare("SELECT p.*, m.* FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? ORDER BY m.id DESC LIMIT 1");
+$stmt = $conn->prepare("SELECT p.*, m.* FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.patient_id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY m.id DESC LIMIT 1");
 if (!$stmt) {
     http_response_code(500);
     exit('Unable to load maternity record.');
