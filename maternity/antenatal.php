@@ -16,8 +16,22 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($stmt){$stmt->bind_param('isssssssss',$maternity_id,$bp,$temp,$pulse,$weight,$fhr,$cervix,$membrane,$drugs,$notes);if($stmt->execute()){if(function_exists('audit'))audit('maternity_anc_add',"maternity_id={$maternity_id}");header("Location: antenatal.php?patient_id={$patient_id}&saved=1");exit;}$error=$stmt->error;$stmt->close();}else $error=$conn->error;
  }
 }
-$res=$conn->query("SELECT v.*,p.full_name,m.anc_number,m.patient_id FROM maternity_visits v JOIN maternity m ON m.id=v.maternity_id JOIN patients p ON p.id=m.patient_id WHERE v.visit_type='ANC' ".($patient_id?"AND m.patient_id=".((int)$patient_id):"")." ORDER BY v.created_at DESC LIMIT 200");
-$matList=$conn->query("SELECT m.id,p.full_name,p.patient_number,m.anc_number FROM maternity m JOIN patients p ON p.id=m.patient_id ORDER BY p.full_name ASC");
+$sql = "SELECT v.*,p.full_name,m.anc_number,m.patient_id
+          FROM maternity_visits v
+          JOIN maternity m ON m.id=v.maternity_id
+          JOIN patients p ON p.id=m.patient_id
+          WHERE v.visit_type='ANC'";
+if ($patient_id > 0) $sql .= " AND m.patient_id = ?";
+$sql .= " ORDER BY v.created_at DESC LIMIT 200";
+$stmtList=$conn->prepare($sql);
+if ($patient_id > 0) $stmtList->bind_param('i',$patient_id);
+$stmtList->execute();
+$res=$stmtList->get_result();
+
+$matList=$conn->query("SELECT m.id,p.full_name,p.patient_number,m.anc_number
+                       FROM maternity m JOIN patients p ON p.id=m.patient_id
+                       WHERE p.clinic_category IN ('ANC','PNC','Maternity')
+                       ORDER BY p.full_name ASC");
 include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';
 ?>
 <div class="main-content"><div class="container-fluid pt-4">
