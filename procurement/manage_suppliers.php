@@ -10,7 +10,13 @@ if (empty($_SESSION['csrf_token'])) {
 }
 $csrfToken = $_SESSION['csrf_token'];
 
-// Ensure richer supplier columns exist (Odoo-style details)
+// Supplier profile fields are managed by the versioned procurement migration.
+// Do not mutate production schema from a normal request.
+$requiredSupplierColumns = [
+    'contact_person', 'mobile', 'website', 'tax_pin', 'vat_number',
+    'payment_terms', 'bank_name', 'bank_account', 'credit_limit',
+    'address_line', 'city', 'country', 'status', 'notes', 'created_at'
+];
 $columns = [];
 $colRes = $conn->query('SHOW COLUMNS FROM suppliers');
 if ($colRes) {
@@ -18,24 +24,11 @@ if ($colRes) {
         $columns[] = $col['Field'] ?? '';
     }
 }
-$addCol = static function (mysqli $conn, string $name, string $def) {
-    $conn->query("ALTER TABLE suppliers ADD COLUMN {$name} {$def}");
-};
-if (!in_array('contact_person', $columns, true)) $addCol($conn, 'contact_person', 'VARCHAR(150) DEFAULT NULL');
-if (!in_array('mobile', $columns, true)) $addCol($conn, 'mobile', 'VARCHAR(60) DEFAULT NULL');
-if (!in_array('website', $columns, true)) $addCol($conn, 'website', 'VARCHAR(255) DEFAULT NULL');
-if (!in_array('tax_pin', $columns, true)) $addCol($conn, 'tax_pin', 'VARCHAR(80) DEFAULT NULL');
-if (!in_array('vat_number', $columns, true)) $addCol($conn, 'vat_number', 'VARCHAR(80) DEFAULT NULL');
-if (!in_array('payment_terms', $columns, true)) $addCol($conn, 'payment_terms', 'VARCHAR(120) DEFAULT NULL');
-if (!in_array('bank_name', $columns, true)) $addCol($conn, 'bank_name', 'VARCHAR(120) DEFAULT NULL');
-if (!in_array('bank_account', $columns, true)) $addCol($conn, 'bank_account', 'VARCHAR(120) DEFAULT NULL');
-if (!in_array('credit_limit', $columns, true)) $addCol($conn, 'credit_limit', 'DECIMAL(12,2) NOT NULL DEFAULT 0');
-if (!in_array('address_line', $columns, true)) $addCol($conn, 'address_line', 'VARCHAR(255) DEFAULT NULL');
-if (!in_array('city', $columns, true)) $addCol($conn, 'city', 'VARCHAR(120) DEFAULT NULL');
-if (!in_array('country', $columns, true)) $addCol($conn, 'country', 'VARCHAR(120) DEFAULT NULL');
-if (!in_array('status', $columns, true)) $addCol($conn, 'status', "VARCHAR(40) NOT NULL DEFAULT 'Active'");
-if (!in_array('notes', $columns, true)) $addCol($conn, 'notes', 'TEXT DEFAULT NULL');
-if (!in_array('created_at', $columns, true)) $addCol($conn, 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+$missingSupplierColumns = array_values(array_diff($requiredSupplierColumns, $columns));
+if ($missingSupplierColumns) {
+    http_response_code(503);
+    exit('Supplier management requires the current procurement database migration. Missing fields: ' . htmlspecialchars(implode(', ', $missingSupplierColumns)));
+}
 
 $msg = '';
 $msgType = 'success';
