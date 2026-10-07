@@ -19,7 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_stock_submit']
     $new_price    = floatval($_POST['new_price']);
     $note         = trim($_POST['note'] ?? '');
 
-    $current = $conn->query("SELECT quantity FROM pharmacy_stock WHERE id = $stock_id")->fetch_assoc();
+    $currentStmt = $conn->prepare("SELECT quantity FROM pharmacy_stock WHERE id = ? FOR UPDATE");
+    $currentStmt->bind_param("i", $stock_id);
+    $currentStmt->execute();
+    $current = $currentStmt->get_result()->fetch_assoc();
+    $currentStmt->close();
     
     if ($current) {
         $quantity_change = $new_quantity - $current['quantity'];
