@@ -45,7 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = "<div class='alert alert-success shadow-sm'>Transaction processed successfully.</div>";
         } catch (Exception $e) {
             mysqli_rollback($conn);
-            $message = "<div class='alert alert-danger shadow-sm'>System Error: " . $e->getMessage() . "</div>";
+            error_log('HMS expense error: '.$e->getMessage());
+            $message = "<div class='alert alert-danger shadow-sm'>Unable to process the expense right now. Please verify the transaction details and try again.</div>";
         }
     }
 }
