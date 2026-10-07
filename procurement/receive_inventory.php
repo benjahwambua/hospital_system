@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $pou=$conn->prepare("UPDATE purchase_orders SET status=? WHERE id=?");$pou->bind_param('si',$newStatus,$poId);$pou->execute();$pou->close();
 
                 $conn->commit(); $message="GRN #$printId created. $qty unit(s) added to ".strtoupper($inventoryType)." inventory and KES ".number_format($receiptTotal,2)." added to Supplier Payables.";
-            } catch(Throwable $e){$conn->rollback();$message=$e->getMessage();$type='danger';}
+            } catch(Throwable $e){$conn->rollback();error_log('GRN creation error: '.$e->getMessage());$message='Unable to receive inventory right now. Please verify the GRN details and try again.';$type='danger';}
         }
     }
 }
