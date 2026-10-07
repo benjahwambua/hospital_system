@@ -16,6 +16,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($error==='') { if($stmt){$stmt->bind_param('isssssssss',$maternity_id,$bp,$temp,$pulse,$weight,$fhr,$cervix,$membrane,$drugs,$notes);if($stmt->execute()){if(function_exists('audit'))audit('maternity_anc_add',"maternity_id={$maternity_id}");header("Location: antenatal.php?patient_id={$patient_id}&saved=1");exit;}$error=$stmt->error;$stmt->close();}else $error='Unable to prepare the ANC visit record.'; }
  }
 }
+}
 $sql = "SELECT v.*,p.full_name,m.anc_number,m.patient_id
           FROM maternity_visits v
           JOIN maternity m ON m.id=v.maternity_id
