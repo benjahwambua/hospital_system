@@ -1,10 +1,11 @@
 <?php
 function ensure_walkin_column($conn): void {
+    // Schema changes belong in versioned migrations, never in a request.
+    // Keep this helper as a compatibility check for callers that need the
+    // walk-in field, while preventing runtime DDL in production.
     $check = $conn->query("SHOW COLUMNS FROM patients LIKE 'is_walkin'");
     if (!$check || $check->num_rows === 0) {
-        if (!$conn->query("ALTER TABLE patients ADD COLUMN is_walkin TINYINT(1) NOT NULL DEFAULT 0")) {
-            throw new Exception('Unable to prepare walk-in patient field: ' . $conn->error);
-        }
+        throw new Exception('The walk-in patient field is not installed. Run the required database migration before using this workflow.');
     }
 }
 
