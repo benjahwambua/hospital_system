@@ -89,4 +89,4 @@ try{
  $d=$conn->prepare("DELETE FROM {$table} WHERE id=? AND patient_id=?");if(!$d)throw new Exception('Unable to remove item.');$d->bind_param('ii',$id,$patientId);if(!$d->execute()||$d->affected_rows!==1)throw new Exception('Item could not be removed.');$d->close();
  if(function_exists('audit'))audit('clinical_item_removed',"type={$type},item_id={$id},patient_id={$patientId},invoice_id={$invoiceId}");
  $conn->commit();header("Location: patient_dashboard.php?id={$patientId}&tab=billing&success=Item+Removed");exit;
-}catch(Throwable $e){$conn->rollback();http_response_code(409);exit(htmlspecialchars($e->getMessage()));}
+}catch(Throwable $e){$conn->rollback();error_log('HMS clinical item removal error: '.$e->getMessage());http_response_code(409);exit('Unable to remove the selected item. Please refresh and try again.');}
