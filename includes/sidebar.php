@@ -191,11 +191,9 @@ function isParentActive($paths) {
         <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock icon-main"></i> Aged Receivables</a>
         <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
         <?php endif; ?>
-
-        <?php if (can_access_module($conn, 'administration') || can_access_module($conn, 'staff_leave')): ?>
+        <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
-        <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/', 'services/', 'leave/']) ?>">
-
+        <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/', 'services/', 'reports/reports.php']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-cogs icon-main"></i> Administration <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/administration/dashboard.php" class="<?= isActive('administration/dashboard.php') ?>"><i class="fas fa-th-large"></i> Administration Dashboard</a>
@@ -204,12 +202,16 @@ function isParentActive($paths) {
                 <a href="/hospital_system/services/view_services.php" class="<?= isActive('services/view_services.php') ?>"><i class="fas fa-list-alt"></i> Service Catalogue</a>
                 <a href="/hospital_system/services/price_history.php" class="<?= isActive('services/price_history.php') ?>"><i class="fas fa-history"></i> Price History</a>
                 <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
-                <?php if (can_access_module($conn, 'staff_leave')): ?>
-                <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>"><i class="fas fa-calendar-alt"></i> Staff Leave</a>
-                <?php endif; ?>
                 <a href="/hospital_system/reports/reports.php" class="<?= isActive('reports/reports.php') ?>"><i class="fas fa-file-alt"></i> System Reports</a>
             </div>
         </div>
+        <?php endif; ?>
+
+        <?php if (can_access_module($conn, 'staff_leave')): ?>
+        <div class="menu-title">Staff</div>
+        <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>">
+            <i class="fas fa-calendar-alt icon-main"></i> Staff Leave
+        </a>
         <?php endif; ?>
 
         <div class="menu-title">Exit</div>
