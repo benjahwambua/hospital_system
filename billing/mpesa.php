@@ -103,7 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
             mpesa_initiate_stk($conn, $invoiceId, (int)$invoice['patient_id'], $stkAmount, $phone,(int)$shift['id']);
             $mpesa_message = 'STK Push sent to ' . htmlspecialchars($phone) . ' for KES ' . number_format($stkAmount, 2) . '. Awaiting customer confirmation.';
         } catch (Throwable $e) {
-            error_log('HMS M-Pesa STK error: '.$e->getMessage());\n            $mpesa_error = 'Unable to initiate the M-Pesa payment. Please verify the payment details and try again.';
+            error_log('HMS M-Pesa STK error: '.$e->getMessage());
+            $mpesa_error = 'Unable to initiate the M-Pesa payment. Please verify the payment details and try again.';
         }
     }
 }
