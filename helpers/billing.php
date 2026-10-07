@@ -1077,6 +1077,9 @@ function refund_payment($conn, int $paymentId, float $amount, string $reason, st
     post_journal_entry($conn,$account,0,$amount,$note,(int)$payment['invoice_id'],'REF-'.$refundId.'-'.strtoupper(str_replace(' ','',$account)));
 
     $state=refresh_invoice_payment_state($conn,(int)$payment['invoice_id']);
+    if (function_exists('audit')) {
+        audit('payment_refunded', 'refund_id='.$refundId.',payment_id='.$paymentId.',invoice_id='.(int)$payment['invoice_id'].',amount='.number_format($amount,2,'.',''));
+    }
     return ['refund_id'=>$refundId,'payment_id'=>$paymentId,'invoice_id'=>(int)$payment['invoice_id'],'amount'=>$amount,'balance'=>$state['balance'],'status'=>$state['status']];
 }
 
