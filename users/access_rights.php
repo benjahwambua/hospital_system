@@ -44,7 +44,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $message='Access rights saved successfully.';
         } catch (Throwable $e) {
             $conn->rollback();
-            $error='Unable to save access rights: '.$e->getMessage();
+            $error='Unable to save access rights. Please verify the selected permissions and try again.';
+            error_log('HMS access-rights error: '.$e->getMessage());
         }
     }
 }
