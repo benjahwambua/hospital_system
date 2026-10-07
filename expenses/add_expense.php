@@ -5,7 +5,10 @@ require_once __DIR__ . '/../helpers/billing.php';
 require_login(); 
 require_once __DIR__ . '/../includes/auth.php'; 
 require_module_access($conn, 'finance_admin', 'create');
-require_role(['admin','accountant']); 
+require_role(['admin','accountant']);
+
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrfToken = $_SESSION['csrf_token'];
 
 include __DIR__ . '/../includes/header.php'; 
 include __DIR__ . '/../includes/sidebar.php';
@@ -15,6 +18,10 @@ include __DIR__ . '/../includes/sidebar.php';
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
+        http_response_code(419);
+        exit('Invalid security token.');
+    }
     $category       = mysqli_real_escape_string($conn, $_POST['category']);
     $amount         = floatval($_POST['amount']);
     $payment_method = mysqli_real_escape_string($conn, $_POST['payment_method']);
@@ -63,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="card-body p-4">
                         <?= $message ?>
                         <form method="POST" autocomplete="off">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                             <div class="row">
                                 <div class="col-md-6 form-group">
                                     <label class="small font-weight-bold">EXPENSE CATEGORY</label>
