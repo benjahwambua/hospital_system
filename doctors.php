@@ -6,6 +6,9 @@ require_login();
 require_module_access($conn, 'clinical', 'edit');
 require_role(['admin','doctor']);
 
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrfToken = $_SESSION['csrf_token'];
+
 include __DIR__ . '/includes/header.php';
 include __DIR__ . '/includes/sidebar.php';
 
@@ -32,6 +35,7 @@ $save_msg = "";
 //--------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['patient_id'])) {
 
+    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) { http_response_code(419); exit('Invalid security token.'); }
     $pid = intval($_POST['patient_id']);
 
     $complaint      = trim($_POST['complaint']);
@@ -114,10 +118,12 @@ if ($patient_id) {
         SELECT d.*, u.full_name AS doctor_name
         FROM diagnosis d
         LEFT JOIN users u ON u.id = d.doctor_id
-        WHERE d.patient_id = $patient_id
+        WHERE d.patient_id = ?
         ORDER BY d.created_at DESC
     ");
-    while ($r = $q->fetch_assoc()) $diagnoses[] = $r;
+    $q->bind_param('i', $patient_id);
+    $q->execute();
+    $q->bind_result($dummy);
 
     $q = $conn->query("SELECT * FROM vitals WHERE patient_id=$patient_id ORDER BY created_at DESC");
     while ($r = $q->fetch_assoc()) $vitals[] = $r;
