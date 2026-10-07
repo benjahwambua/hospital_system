@@ -42,7 +42,7 @@ function mpesa_initiate_stk($conn,int $invoiceId,int $patientId,float $amount,st
  $paidStmt=$conn->prepare("SELECT COALESCE(SUM(amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.invoice_id=p.invoice_id AND r.status='Approved'),0) paid FROM payments p WHERE p.invoice_id=?");
  $paid=0.0;if($paidStmt){$paidStmt->bind_param('i',$invoiceId);$paidStmt->execute();$paid=(float)($paidStmt->get_result()->fetch_assoc()['paid']??0);$paidStmt->close();}
  $balance=max($total-$paid,0);
- $amount=round($amount,2);if($amount<=0||$amount>$balance+0.00001)throw new Exception('M-Pesa amount exceeds the invoice balance.');
+ $amount=round($amount,2);if($amount<=0||$amount>$balance+0.00001)throw new Exception('M-Pesa amount exceeds the invoice balance.');if(abs($amount-round($amount))>0.00001)throw new Exception('M-Pesa STK amount must be a whole KES amount.');
  if($cashierShiftId<=0)throw new Exception('An open cashier shift is required before starting an M-Pesa collection.');
  $currentCashierId=(int)($_SESSION['user_id'] ?? 0);
  if($currentCashierId<=0)throw new Exception('A logged-in cashier is required for M-Pesa collection.');
