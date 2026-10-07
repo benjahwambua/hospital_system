@@ -34,7 +34,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if($visitId>0){$v=$conn->prepare("UPDATE visits SET visit_type='Inpatient',clinic_category=?,status='In Progress',updated_at=NOW() WHERE id=? AND patient_id=?");if(!$v||!$v->execute())throw new Exception('Admission was created but the inpatient visit could not be updated.');if($v)$v->close();}
     if(function_exists('audit'))audit('patient_admission',"admission_id={$admissionId},patient_id={$patientId},ward={$ward},bed={$bed},visit_id={$visitId}");
     $conn->commit();header('Location: ward_management.php?admitted=1');exit;
-   }catch(Throwable $e){$conn->rollback();error_log('Admission Error: '.$e->getMessage());$message="<div class='alert alert-danger'>".htmlspecialchars($e->getMessage())."</div>";}
+   }catch(Throwable $e){$conn->rollback();error_log('Admission Error: '.$e->getMessage());$message="<div class='alert alert-danger'>Unable to complete the admission. Please review the admission details and try again.</div>";}
   }
  }
 }
