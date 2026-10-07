@@ -23,7 +23,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $s->bind_param('i',$payableId);$s->execute();$p=$s->get_result()->fetch_assoc();$s->close();
     if(!$p) throw new Exception('Supplier payable not found.');
     $balance=(float)$p['balance']; if($balance<=0) throw new Exception('This payable is already fully paid.');
-    if($amount>$balance) $amount=$balance;
+    if($amount>$balance) throw new Exception('Payment amount cannot exceed the outstanding payable balance.');
+    if(in_array($method,['M-Pesa','Bank Transfer'],true) && $reference==='') throw new Exception('A payment reference is required for M-Pesa and bank transfers.');
     if($reference!==''){
         $dup=$conn->prepare("SELECT id FROM supplier_payments WHERE supplier_id=? AND reference=? LIMIT 1");
         $dup->bind_param('is',$p['supplier_id'],$reference); $dup->execute(); $duplicate=$dup->get_result()->fetch_assoc(); $dup->close();
@@ -48,7 +49,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?,0,?,?,NOW())");$a->bind_param('sds',$account,$amount,$note);$a->execute();$a->close();
     }
     $conn->commit();$message='Supplier payment recorded. Payable balance: KES '.number_format($newBal,2).'.';
-   }catch(Throwable $e){$conn->rollback();$error=$e->getMessage();}
+   }catch(Throwable $e){$conn->rollback();$error='Unable to record supplier payment. Please verify the payment details and try again.';}
   }
  }
 }
