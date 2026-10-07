@@ -16,12 +16,22 @@ if (isset($_POST['save_lab_result'])) {
     require_module_access($conn, 'laboratory', $action === 'complete' ? 'approve' : 'edit');
     if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) { $error='Invalid security token.'; }
     else {
-        $record_id = intval($_POST['record_id']);
-        $findings = $_POST['findings'] ?? '';
-        $status = ($action === 'complete') ? 'Completed' : 'Pending';
-
+        $record_id = (int)($_POST['record_id'] ?? 0);
+        $findings = trim((string)($_POST['findings'] ?? ''));
+        if ($record_id <= 0 || $findings === '') { $error='A valid laboratory record and result are required.'; }
+        else {
         $conn->begin_transaction();
         try {
+            $check = $conn->prepare("SELECT id,status FROM patient_services WHERE id = ? AND category = 'lab' LIMIT 1 FOR UPDATE");
+            $check->bind_param('i',$record_id);
+            $check->execute();
+            $serviceRow = $check->get_result()->fetch_assoc();
+            $check->close();
+            if (!$serviceRow) throw new Exception('Laboratory request not found.');
+            if (($serviceRow['status'] ?? '') === 'Cancelled') throw new Exception('Cancelled laboratory requests cannot receive results.');
+            if ($action === 'complete' && ($serviceRow['status'] ?? '') === 'Completed') throw new Exception('This laboratory result is already approved.');
+
+            $status = ($action === 'complete') ? 'Completed' : 'Pending';
             $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ? AND category = 'lab'");
             $stmt->bind_param("ssi", $findings, $status, $record_id);
             if (!$stmt->execute()) throw new Exception("Error updating laboratory record: " . $stmt->error);
@@ -37,6 +47,7 @@ if (isset($_POST['save_lab_result'])) {
         } catch (Throwable $e) {
             $conn->rollback();
             $error = $e->getMessage();
+        }
         }
     }
 }
