@@ -16,5 +16,6 @@ try{
  $s=$conn->prepare("DELETE FROM purchase_order_items WHERE purchase_order_id=?");$s->bind_param('i',$id);$s->execute();$s->close();
  $s=$conn->prepare("DELETE FROM purchase_orders WHERE id=?");$s->bind_param('i',$id);if(!$s->execute())throw new Exception('Unable to delete purchase order.');$s->close();
  $conn->commit();header('Location: purchase_orders.php?deleted=1');exit;
-}catch(Throwable $e){$conn->rollback();header('Location: view_po.php?id='.$id.'&error='.urlencode($e->getMessage()));exit;}
+}catch(Throwable $e){$conn->rollback();header('Location: view_po.php?id='.$id.'&error=Unable+to+delete+purchase+order');
+ error_log('PO deletion error: '.$e->getMessage());exit;}
 ?>
