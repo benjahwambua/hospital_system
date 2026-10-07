@@ -37,6 +37,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
         } else {
             $conn->begin_transaction();
             try {
+                $supplierCheck = $conn->prepare("SELECT id FROM suppliers WHERE id=? LIMIT 1");
+                $supplierCheck->bind_param('i', $supplier_id);
+                $supplierCheck->execute();
+                $supplierExists = $supplierCheck->get_result()->fetch_assoc();
+                $supplierCheck->close();
+                if (!$supplierExists) {
+                    throw new Exception('Selected supplier was not found.');
+                }
+
+                /* Schema changes belong in database migrations, not a live PO request. */
+                if (false) {
                 $conn->query("CREATE TABLE IF NOT EXISTS expenses (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     expense_date DATE NOT NULL,
@@ -75,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                 if (!in_array('payment_method', $expenseColumns, true)) {
                     $conn->query("ALTER TABLE expenses ADD COLUMN payment_method VARCHAR(50) DEFAULT NULL AFTER expense_date");
                 }
+                }
 
                 $stmt = $conn->prepare("INSERT INTO purchase_orders (supplier_id, order_date, total_amount, user_id, status) VALUES (?, ?, ?, ?, 'Pending')");
                 $stmt->bind_param('isdi', $supplier_id, $order_date, $total_amount, $user_id);
@@ -101,7 +113,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                         continue;
                     }
 
-                    $item_stmt->bind_param('issiidd', $po_id, $name, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
+                    if ($stockId !== $inventoryItemId) {
+                        throw new Exception('Invalid inventory item reference.');
+                    }
+
+                    if ($inventoryType === 'pharmacy') {
+                        $itemCheck = $conn->prepare("SELECT id, drug_name FROM pharmacy_stock WHERE id=? LIMIT 1");
+                    } else {
+                        $itemCheck = $conn->prepare("SELECT id, item_name FROM lab_inventory WHERE id=? AND status='active' LIMIT 1");
+                    }
+                    $itemCheck->bind_param('i', $inventoryItemId);
+                    $itemCheck->execute();
+                    $serverItem = $itemCheck->get_result()->fetch_assoc();
+                    $itemCheck->close();
+                    $serverName = trim((string)($serverItem['drug_name'] ?? $serverItem['item_name'] ?? ''));
+                    if (!$serverItem || $serverName === '' || strcasecmp($serverName, $name) !== 0) {
+                        throw new Exception('One or more selected inventory items are invalid or no longer active.');
+                    }
+
+                    $item_stmt->bind_param('issiidd', $po_id, $serverName, $inventoryType, $inventoryItemId, $qty, $u_price, $l_total);
                     if (!$item_stmt->execute()) {
                         throw new Exception('Unable to save PO item: ' . $item_stmt->error);
                     }
@@ -126,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                 exit;
             } catch (Throwable $e) {
                 $conn->rollback();
-                $error = 'Error creating PO: ' . $e->getMessage();
+                $error = 'Unable to create the purchase order. Please verify the supplier and item details and try again.';
             }
         }
     }
