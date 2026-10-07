@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
+require_module_access($conn, 'front_desk', 'view');
 $canPatientEdit = can_module_action($conn, 'front_desk', 'edit');
 
 include __DIR__ . '/../includes/header.php';
@@ -11,18 +12,25 @@ include __DIR__ . '/../includes/sidebar.php';
 $search = '';
 $where = '';
 if (isset($_GET['search']) && !empty($_GET['search'])) {
-    $search = $conn->real_escape_string(trim($_GET['search']));
-    $where = " WHERE (p.full_name LIKE '%{$search}%' OR p.patient_number LIKE '%{$search}%' OR p.phone LIKE '%{$search}%' OR p.next_of_kin_name LIKE '%{$search}%')";
+    $search = trim((string)$_GET['search']);
+    $where = " WHERE (p.full_name LIKE ? OR p.patient_number LIKE ? OR p.phone LIKE ? OR p.next_of_kin_name LIKE ?)";
+
 }
 
 // Fetch all patients
-$patients = $conn->query("
+$stmt = $conn->prepare("
     SELECT p.id, p.patient_number, p.full_name, p.gender, p.age, p.phone, p.next_of_kin_name, p.next_of_kin_phone, u.full_name AS doctor_name, p.appointment_date, p.created_at
     FROM patients p
     LEFT JOIN users u ON p.doctor_id = u.id
     {$where}
     ORDER BY p.created_at DESC
 ");
+if ($search !== '') {
+    $like = "%{$search}%";
+    $stmt->bind_param('ssss', $like, $like, $like, $like);
+}
+$stmt->execute();
+$patients = $stmt->get_result();
 ?>
 
 <style>
