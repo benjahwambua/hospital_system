@@ -46,7 +46,7 @@ if (isset($_POST['save_lab_result'])) {
             exit;
         } catch (Throwable $e) {
             $conn->rollback();
-            $error = $e->getMessage();
+            $error = 'The laboratory result could not be saved. Please verify the request and try again.';
         }
         }
     }
