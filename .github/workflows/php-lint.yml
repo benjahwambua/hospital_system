@@ -2,12 +2,14 @@ name: PHP Syntax Audit
 
 on:
   push:
-    branches: ["main", "security-hardening-prod-readiness"]
+    branches:
+      - "**"
   pull_request:
     branches: ["main"]
 
 jobs:
   php-lint:
+    name: php-lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
