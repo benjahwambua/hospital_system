@@ -215,7 +215,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $conn->commit();
         } catch (Throwable $e) {
             $conn->rollback();
-            $error = 'Error: ' . $e->getMessage();
+            $error = 'Unable to save the maternity record. No changes were saved.';
+            error_log('Maternity record error: '.$e->getMessage());
         }
     }
 }
