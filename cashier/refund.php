@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     } catch(Throwable $e) {
         if ($transactionStarted) { $conn->rollback(); $transactionStarted=false; }
         error_log('HMS refund error: '.$e->getMessage());
-        $error=$e->getMessage();
+        $error='Unable to process the refund. Please verify the refund details and try again.';
     }
 }
 
