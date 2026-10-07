@@ -11,11 +11,15 @@ $csrfToken=$_SESSION['csrf_token']; $error='';
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!$canCreate){http_response_code(403);exit('You do not have permission to record maternity visits.');}
  if(!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))){$error='Security token mismatch.';} else {
-  $maternity_id=(int)($_POST['maternity_id']??0);$eligibleStmt=$conn->prepare("SELECT m.id FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");if(!$eligibleStmt){$error='Unable to validate the maternity record.';}else{$eligibleStmt->bind_param('i',$maternity_id);$eligibleStmt->execute();$eligible=$eligibleStmt->get_result()->fetch_assoc();$eligibleStmt->close();if(!$eligible)$error='Select a valid registered maternity patient.';}$bp=trim((string)($_POST['bp']??''));$temp=trim((string)($_POST['temp']??''));$pulse=trim((string)($_POST['pulse']??''));$weight=trim((string)($_POST['weight']??''));$fhr=trim((string)($_POST['fetal_heart_rate']??''));$cervix=trim((string)($_POST['cervix']??''));$membrane=trim((string)($_POST['membrane_status']??''));$drugs=trim((string)($_POST['drugs_given']??''));$notes=trim((string)($_POST['notes']??''));
-  if($error!==''){ } else { $stmt=$conn->prepare("INSERT INTO maternity_visits (maternity_id,visit_type,bp,temp,pulse,weight,fetal_heart_rate,cervix,membrane_status,drugs_given,notes,created_at) VALUES (?, 'ANC', ?,?,?,?,?,?,?,?,?,NOW())");
-  if($error==='') { if($stmt){$stmt->bind_param('isssssssss',$maternity_id,$bp,$temp,$pulse,$weight,$fhr,$cervix,$membrane,$drugs,$notes);if($stmt->execute()){if(function_exists('audit'))audit('maternity_anc_add',"maternity_id={$maternity_id}");header("Location: antenatal.php?patient_id={$patient_id}&saved=1");exit;}$error=$stmt->error;$stmt->close();}else $error='Unable to prepare the ANC visit record.'; }
+  $maternity_id=(int)($_POST['maternity_id']??0);
+  $eligibleStmt=$conn->prepare("SELECT m.id FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");
+  if(!$eligibleStmt){$error='Unable to validate the maternity record.';}else{$eligibleStmt->bind_param('i',$maternity_id);$eligibleStmt->execute();$eligible=$eligibleStmt->get_result()->fetch_assoc();$eligibleStmt->close();if(!$eligible)$error='Select a valid registered maternity patient.';}
+  $bp=trim((string)($_POST['bp']??''));$temp=trim((string)($_POST['temp']??''));$pulse=trim((string)($_POST['pulse']??''));$weight=trim((string)($_POST['weight']??''));$fhr=trim((string)($_POST['fetal_heart_rate']??''));$cervix=trim((string)($_POST['cervix']??''));$membrane=trim((string)($_POST['membrane_status']??''));$drugs=trim((string)($_POST['drugs_given']??''));$notes=trim((string)($_POST['notes']??''));
+  if($error===''){
+   $stmt=$conn->prepare("INSERT INTO maternity_visits (maternity_id,visit_type,bp,temp,pulse,weight,fetal_heart_rate,cervix,membrane_status,drugs_given,notes,created_at) VALUES (?, 'ANC', ?,?,?,?,?,?,?,?,?,NOW())");
+   if($stmt){$stmt->bind_param('isssssssss',$maternity_id,$bp,$temp,$pulse,$weight,$fhr,$cervix,$membrane,$drugs,$notes);if($stmt->execute()){if(function_exists('audit'))audit('maternity_anc_add',"maternity_id={$maternity_id}");header("Location: antenatal.php?patient_id={$patient_id}&saved=1");exit;}$error='Unable to save the ANC visit.';$stmt->close();}else $error='Unable to prepare the ANC visit record.';
+  }
  }
-}
 }
 $sql = "SELECT v.*,p.full_name,m.anc_number,m.patient_id
           FROM maternity_visits v
@@ -31,7 +35,8 @@ $res=$stmtList->get_result();
 
 $matList=$conn->query("SELECT m.id,p.full_name,p.patient_number,m.anc_number
                        FROM maternity m JOIN patients p ON p.id=m.patient_id
-                       WHERE p.clinic_category IN ('ANC','PNC','Maternity')
+                       WHERE COALESCE(p.is_walkin,0)=0
+                         AND p.clinic_category IN ('ANC','PNC','Maternity')
                        ORDER BY p.full_name ASC");
 include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';
 ?>
