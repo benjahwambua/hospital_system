@@ -119,6 +119,9 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
+    .admin-page{padding:28px 24px 42px;background:#f5f7fb;min-height:calc(100vh - 72px)}
+    .admin-shell{max-width:1500px;margin:auto}.admin-hero{background:linear-gradient(135deg,#273449,#475569);color:#fff;border-radius:18px;padding:26px 30px;display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px;box-shadow:0 12px 30px rgba(39,52,73,.2)}.admin-hero h1{margin:5px 0;font-size:28px}.admin-hero p{margin:0;color:rgba(255,255,255,.8);font-size:14px}.admin-kicker{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#d6dee8}.admin-card{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 4px 16px rgba(31,45,61,.05);overflow:hidden}.admin-card-head{padding:16px 20px;border-bottom:1px solid #edf0f5}.admin-table th{font-size:11px;letter-spacing:.6px}.admin-table td{vertical-align:middle}
+    @media(max-width:700px){.admin-page{padding:18px 12px}.admin-hero{flex-direction:column;align-items:flex-start}.admin-hero h1{font-size:23px}}
     .inline-input { border: 1px solid transparent; background: transparent; padding: 5px; width: 100%; border-radius: 4px; transition: 0.3s; }
     .inline-input:focus, .inline-input:hover { border: 1px solid #d1d3e2; background: #fff; outline: none; }
     .role-select { border: 1px solid transparent; background: transparent; cursor: pointer; appearance: none; -webkit-appearance: none; }
@@ -133,11 +136,9 @@ include __DIR__ . '/../includes/sidebar.php';
     .security-note { background:#f8f9fc; border-left:4px solid #4e73df; padding:12px 16px; border-radius:6px; }
 </style>
 
-<div class="main-content" style="padding: 25px;">
-    <div class="container-fluid">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="h4 text-gray-800 font-weight-bold">Quick-Edit Staff Table</h2>
-        </div>
+<div class="admin-page"><div class="admin-shell">
+        <div class="admin-hero"><div><div class="admin-kicker">Administration · Staff Accounts</div><h1>Manage Users</h1><p>Create, edit and maintain authorized HMS staff accounts.</p></div><a href="add_user.php" class="btn btn-light"><i class="fas fa-user-plus mr-1"></i> Add Staff</a></div>
+        <div class="admin-card mb-3"><div class="admin-card-head"><strong>Staff Accounts</strong><span class="small text-muted">Super User controls remain protected.</span></div>
 
         <?php if(isset($_GET['msg'])): ?>
             <div class="alert alert-success py-2 small"><?= htmlspecialchars($_GET['msg']) ?></div>
@@ -149,7 +150,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
-                <table class="table mb-0">
+                <table class="table mb-0 admin-table">
                     <thead class="bg-light text-muted small text-uppercase">
                         <tr>
                             <th class="pl-4">Full Name</th>
@@ -220,7 +221,6 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <p class="text-muted small mt-3"><i class="fas fa-info-circle"></i> Tip: A Super User can update their own password, but the system prevents deletion or accidental removal of the last Super User account.</p>
-    </div>
-</div>
+    </div></div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
