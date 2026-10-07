@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_manual_mpesa']
         $invoiceTotal=$itemTotal>0?$itemTotal:(float)$invoice['total'];
         $balance = max($invoiceTotal - $paid, 0);
         if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
-        $amount = min($amount, $balance);
+        if ($amount > $balance + 0.00001) {\n            throw new Exception('Payment cannot exceed the outstanding invoice balance.');\n        }
 
         $shift=get_open_cashier_shift($conn,(int)$_SESSION['user_id']);
         if(!$shift) throw new Exception('Open a cashier shift before recording M-Pesa payments.');
@@ -96,14 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_stk'])) {
             $invoiceTotal=$itemTotal>0?$itemTotal:(float)$invoice['total'];
             $balance = max($invoiceTotal - $paid, 0);
             if ($balance <= 0) throw new Exception('This invoice is already fully paid.');
-            if ($stkAmount > $balance) $stkAmount = $balance;
+            if ($stkAmount > $balance + 0.00001) {\n                throw new Exception('STK payment cannot exceed the outstanding invoice balance.');\n            }
 
             $shift=get_open_cashier_shift($conn,(int)$_SESSION['user_id']);
             if(!$shift) throw new Exception('Open a cashier shift before initiating an M-Pesa payment.');
             mpesa_initiate_stk($conn, $invoiceId, (int)$invoice['patient_id'], $stkAmount, $phone,(int)$shift['id']);
             $mpesa_message = 'STK Push sent to ' . htmlspecialchars($phone) . ' for KES ' . number_format($stkAmount, 2) . '. Awaiting customer confirmation.';
         } catch (Throwable $e) {
-            $mpesa_error = $e->getMessage();
+            error_log('HMS M-Pesa STK error: '.$e->getMessage());\n            $mpesa_error = 'Unable to initiate the M-Pesa payment. Please verify the payment details and try again.';
         }
     }
 }
