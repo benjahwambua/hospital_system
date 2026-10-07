@@ -21,100 +21,8 @@ $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 $patient = null;
 
 if ($patient_id) {
-    $stmt = $conn->prepare("SELECT * FROM patients WHERE id = ?");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $patient = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-}
 
-$save_msg = "";
-
-//--------------------------------------------
-// SAVE CONSULTATION
-//--------------------------------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['patient_id'])) {
-
-    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) { http_response_code(419); exit('Invalid security token.'); }
-    $pid = intval($_POST['patient_id']);
-
-    $complaint      = trim($_POST['complaint']);
-    $diagnosis_text = trim($_POST['diagnosis_text']);
-    $notes          = trim($_POST['notes']);
-
-    // vitals (NULL if empty)
-    $temperature = $_POST['temperature'] === "" ? NULL : (float)$_POST['temperature'];
-    $bp          = $_POST['blood_pressure'] === "" ? NULL : $_POST['blood_pressure'];
-    $pulse       = $_POST['heart_rate'] === "" ? NULL : (int)$_POST['heart_rate'];
-    $resp        = $_POST['resp_rate'] === "" ? NULL : (int)$_POST['resp_rate'];
-    $oxygen      = $_POST['oxygen_saturation'] === "" ? NULL : (int)$_POST['oxygen_saturation'];
-    $weight      = $_POST['weight'] === "" ? NULL : (float)$_POST['weight'];
-    $height      = $_POST['height'] === "" ? NULL : (float)$_POST['height'];
-
-    //--------------------------------------------
-    // 1. Save VITALS
-    //--------------------------------------------
-    $stmt = $conn->prepare("
-        INSERT INTO vitals 
-        (patient_id, recorded_by_user_id, temperature, blood_pressure, heart_rate, respiratory_rate, oxygen_saturation, weight, height, notes)
-        VALUES (?,?,?,?,?,?,?,?,?,?)
-    ");
-
-    $stmt->bind_param(
-        "iidsiiidds",
-        $pid, $doctor_id, $temperature, $bp, $pulse, $resp, $oxygen, $weight, $height, $notes
-    );
-
-    $stmt->execute();
-    $stmt->close();
-
-    //--------------------------------------------
-    // 2. Save DIAGNOSIS
-    //--------------------------------------------
-    $stmt = $conn->prepare("
-        INSERT INTO diagnosis (patient_id, doctor_id, complaints, diagnosis_text, notes)
-        VALUES (?,?,?,?,?)
-    ");
-
-    $stmt->bind_param("iisss", $pid, $doctor_id, $complaint, $diagnosis_text, $notes);
-    $stmt->execute();
-    $stmt->close();
-
-    //--------------------------------------------
-    // 3. Save LAB REQUESTS
-    //--------------------------------------------
-    $lab_text = trim($_POST['lab_tests_text']);
-    if ($lab_text !== "") {
-        $tests = preg_split("/\r\n|\n|\r/", $lab_text);
-
-        $stmt = $conn->prepare("
-            INSERT INTO lab_requests (patient_id, recorded_by_user_id, tests, notes)
-            VALUES (?,?,?,?)
-        ");
-
-        foreach ($tests as $t) {
-            $t = trim($t);
-            if ($t === "") continue;
-            $stmt->bind_param("iiss", $pid, $doctor_id, $t, $notes);
-            $stmt->execute();
-        }
-        $stmt->close();
-    }
-
-    $save_msg = "Consultation saved successfully.";
-}
-
-//--------------------------------------------
-// LOAD HISTORY
-//--------------------------------------------
-$diagnoses = [];
-$vitals = [];
-$appointments = [];
-$labs = [];
-
-if ($patient_id) {
-
-    $q = $conn->query("
+    $q = $conn->prepare("
         SELECT d.*, u.full_name AS doctor_name
         FROM diagnosis d
         LEFT JOIN users u ON u.id = d.doctor_id
@@ -123,16 +31,30 @@ if ($patient_id) {
     ");
     $q->bind_param('i', $patient_id);
     $q->execute();
-    $q->bind_result($dummy);
+    $result = $q->get_result();
+    while ($r = $result->fetch_assoc()) $diagnoses[] = $r;
+    $q->close();
 
-    $q = $conn->query("SELECT * FROM vitals WHERE patient_id=$patient_id ORDER BY created_at DESC");
-    while ($r = $q->fetch_assoc()) $vitals[] = $r;
+    $q = $conn->prepare("SELECT * FROM vitals WHERE patient_id = ? ORDER BY created_at DESC");
+    $q->bind_param('i', $patient_id);
+    $q->execute();
+    $result = $q->get_result();
+    while ($r = $result->fetch_assoc()) $vitals[] = $r;
+    $q->close();
 
-    $q = $conn->query("SELECT * FROM appointments WHERE patient_id=$patient_id ORDER BY appointment_date DESC");
-    while ($r = $q->fetch_assoc()) $appointments[] = $r;
+    $q = $conn->prepare("SELECT * FROM appointments WHERE patient_id = ? ORDER BY appointment_date DESC");
+    $q->bind_param('i', $patient_id);
+    $q->execute();
+    $result = $q->get_result();
+    while ($r = $result->fetch_assoc()) $appointments[] = $r;
+    $q->close();
 
-    $q = $conn->query("SELECT * FROM lab_requests WHERE patient_id=$patient_id ORDER BY created_at DESC");
-    while ($r = $q->fetch_assoc()) $labs[] = $r;
+    $q = $conn->prepare("SELECT * FROM lab_requests WHERE patient_id = ? ORDER BY created_at DESC");
+    $q->bind_param('i', $patient_id);
+    $q->execute();
+    $result = $q->get_result();
+    while ($r = $result->fetch_assoc()) $labs[] = $r;
+    $q->close();
 }
 ?>
 
@@ -165,7 +87,7 @@ if ($patient_id) {
                 <h4>New Consultation</h4>
                 <form method="post">
 
-                    <input type="hidden" name="patient_id" value="<?= $patient['id'] ?>">
+                    <input type="hidden" name="patient_id" value="<?= $patient['id'] ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
                     <label>Main Complaint</label>
                     <textarea name="complaint" class="form-control" required></textarea>
