@@ -23,13 +23,30 @@ $hasVisit=$conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'") && 
 
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_radiology_result'])){
  require_module_access($conn, 'radiology', 'approve');
- if(!hash_equals($csrfToken,$_POST['csrf_token']??'')){ $message='Invalid security token.'; }
+ if(!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))){ $message='Invalid security token.'; }
  else{
-  $id=(int)($_POST['record_id']??0); $findings=trim($_POST['findings']??'');
+  $id=(int)($_POST['record_id']??0); $findings=trim((string)($_POST['findings']??''));
   if($id<=0 || $findings==='') $message='Enter the radiology findings before saving.';
   else{
-   $stmt=$conn->prepare("UPDATE patient_services SET results=?, status='Completed' WHERE id=? AND category='radiology'");
-   if($stmt){$stmt->bind_param('si',$findings,$id); if($stmt->execute() && $stmt->affected_rows>=0)$message='Radiology result saved and order completed.'; else $message='Unable to save the result.'; $stmt->close();}
+   $conn->begin_transaction();
+   try{
+    $check=$conn->prepare("SELECT id,status FROM patient_services WHERE id=? AND category='radiology' LIMIT 1 FOR UPDATE");
+    if(!$check) throw new Exception('Unable to validate the radiology request.');
+    $check->bind_param('i',$id); $check->execute(); $service=$check->get_result()->fetch_assoc(); $check->close();
+    if(!$service) throw new Exception('Radiology request not found.');
+    if(($service['status']??'')==='Cancelled') throw new Exception('Cancelled radiology requests cannot receive results.');
+    if(($service['status']??'')==='Completed') throw new Exception('This radiology result is already approved.');
+    $stmt=$conn->prepare("UPDATE patient_services SET results=?, status='Completed' WHERE id=? AND category='radiology' AND status<>'Cancelled'");
+    if(!$stmt) throw new Exception('Unable to prepare the radiology result update.');
+    $stmt->bind_param('si',$findings,$id);
+    if(!$stmt->execute()) throw new Exception('Unable to save the radiology result.');
+    $stmt->close();
+    $conn->commit();
+    $message='Radiology result saved and order completed.';
+   }catch(Throwable $e){
+    $conn->rollback();
+    $message='The radiology result could not be completed. Please verify the request and try again.';
+   }
   }
  }
 }
