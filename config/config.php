@@ -2,10 +2,10 @@
 // config/config.php
 // Centralize session initialization before any audit/auth-dependent work.
 require_once __DIR__ . '/../includes/session.php';
-$db_host = 'localhost';
-$db_user = 'root';
-$db_pass = ''; // set if required
-$db_name = 'hms_db';
+$db_host = getenv('HMS_DB_HOST') ?: 'localhost';
+$db_user = getenv('HMS_DB_USER') ?: 'root';
+$db_pass = getenv('HMS_DB_PASS') ?: '';
+$db_name = getenv('HMS_DB_NAME') ?: 'hms_db';
 
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 if ($conn->connect_error) {
