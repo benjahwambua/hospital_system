@@ -1,8 +1,13 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
+$canViewClinical = can_access_module($conn, 'clinical');
+$canViewAdmin = can_access_module($conn, 'administration');
+$canViewFinance = can_access_module($conn, 'finance');
+if (!$canViewClinical && !$canViewAdmin) { http_response_code(403); exit('Forbidden: You do not have permission to view medical reports.'); }
 
 $patient_id = max(0, (int)($_GET['id'] ?? 0));
 if ($patient_id <= 0) { http_response_code(400); exit('Invalid patient ID.'); }
@@ -492,6 +497,7 @@ foreach ($encounters as $e) {
         </div>
     </div>
 
+    <?php if ($canViewFinance || $canViewAdmin): ?>
     <div class="section">
         <div class="section-head">Billing, Services & Payments</div>
         <div class="section-body">
@@ -521,6 +527,8 @@ foreach ($encounters as $e) {
             <?php endif; ?>
         </div>
     </div>
+
+    <?php endif; ?>
 
     <div class="signature">
         <div class="signbox">Authorized Medical Officer<br><small>Signature / Date</small></div>
