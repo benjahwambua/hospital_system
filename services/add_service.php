@@ -85,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Service created successfully.';
         } catch (Throwable $e) {
             $conn->rollback();
-            $error = $e->getMessage();
+            $error = 'Unable to complete the requested operation. No changes were saved.';
+            error_log('HMS operation error: '.$e->getMessage());
         }
     }
 }
