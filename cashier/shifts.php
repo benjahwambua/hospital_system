@@ -3,6 +3,8 @@ require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/session.php';
 require_once __DIR__.'/../helpers/billing.php';
 require_once __DIR__.'/../helpers/cashier.php';
+require_once __DIR__.'/../includes/permissions.php';
+require_module_access($conn,'finance','edit');
 require_login();
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -11,9 +13,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && !verify_csrf_token($_POST['csrf_token
     exit('Invalid security token.');
 }
 
-$role=strtolower(trim((string)($_SESSION['role']??'')));
-$isSuper=!empty($_SESSION['is_super']) && (int)$_SESSION['is_super']===1;
-if(!$isSuper && !in_array($role,['admin','cashier'],true)){ http_response_code(403); die('Access denied.'); }
+
 
 $cashierId=(int)($_SESSION['user_id']??0);
 $message='';
