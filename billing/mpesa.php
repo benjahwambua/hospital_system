@@ -6,7 +6,6 @@ require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
 
 require_module_access($conn, 'finance', 'create');
-require_role(['admin','cashier']);
 
 $mpesa_message = '';
 $mpesa_error = '';
