@@ -170,6 +170,16 @@ function isParentActive($paths) {
         </div>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'insurance')): ?>
+        <div class="has-submenu <?= isParentActive(['insurance/']) ?>">
+            <a href="#" class="menu-toggle"><i class="fas fa-id-card icon-main"></i> Insurance &amp; SHA <i class="fas fa-chevron-down caret"></i></a>
+            <div class="submenu">
+                <a href="/hospital_system/insurance/index.php" class="<?= isActive('insurance/index.php') ?>"><i class="fas fa-th-large"></i> Insurance Dashboard</a>
+                <a href="/hospital_system/insurance/coverage.php" class="<?= isActive('insurance/coverage.php') ?>"><i class="fas fa-id-card"></i> Patient Coverage</a>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if (can_access_module($conn, 'procurement')): ?>
         <div class="has-submenu <?= isParentActive(['procurement/dashboard.php','procurement/']) ?>">
             <a href="#" class="menu-toggle"><i class="fas fa-boxes icon-main"></i> Procurement <i class="fas fa-chevron-down caret"></i></a>

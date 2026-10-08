@@ -37,7 +37,8 @@ INSERT IGNORE INTO access_modules (module_key,module_name,description,sort_order
 ('finance','Finance','Cashier, collections and receivables',70),
 ('procurement','Procurement','Suppliers, purchase orders and receiving',80),
 ('finance_admin','Finance & Billing Administration','Billing, accounting and reconciliation',90),
-('administration','Administration','Users, settings and system administration',100);
+('administration','Administration','Users, settings and system administration',100),
+('insurance','Insurance & SHA','Payer coverage, eligibility, preauthorization and claims',95);
 
 -- Existing users retain their current role-based access until
 -- the Super User assigns explicit module permissions.
