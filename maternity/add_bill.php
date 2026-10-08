@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_once __DIR__ . '/../helpers/billing.php';require_login();require_module_access($conn,'finance','create');require_role(['admin','cashier','accountant']);
+require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_once __DIR__ . '/../helpers/billing.php';require_login();require_module_access($conn,'finance','create');
 $id=max(0,(int)($_GET['id']??$_POST['maternity_id']??0));if(!$id){header('Location:index.php');exit;}
 $s=$conn->prepare("SELECT m.patient_id,p.full_name,m.anc_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
 if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32));$csrfToken=$_SESSION['csrf_token'];$error='';

@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_once __DIR__ . '/../includes/auth.php';
-require_role(['admin', 'doctor', 'nurse', 'receptionist']);
+require_module_access($conn, 'clinical', 'view');
 
 $canDischarge = can_module_action($conn, 'clinical', 'approve');
 if (empty($_SESSION['csrf_token'])) {

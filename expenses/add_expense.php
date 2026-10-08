@@ -5,7 +5,7 @@ require_once __DIR__ . '/../helpers/billing.php';
 require_login(); 
 require_once __DIR__ . '/../includes/auth.php'; 
 require_module_access($conn, 'finance_admin', 'create');
-require_role(['admin','accountant']);
+
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 $csrfToken = $_SESSION['csrf_token'];

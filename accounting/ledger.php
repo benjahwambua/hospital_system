@@ -5,11 +5,6 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'finance_admin', 'view');
 
-if (file_exists(__DIR__ . '/../includes/auth.php')) {
-    if (function_exists('require_role')) {
-        require_role(['admin', 'accountant', 'super_user']);
-    }
-}
 
 function ledger_parse_date(?string $value, string $fallback): string
 {

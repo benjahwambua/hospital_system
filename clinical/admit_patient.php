@@ -8,7 +8,7 @@ require_once __DIR__.'/../helpers/billing.php';
 require_once __DIR__.'/../includes/auth.php';
 require_login();
 require_module_access($conn,'clinical','create');
-require_role(['admin','doctor','nurse','receptionist']);
+
 
 $csrfToken=csrf_token();$message='';
 $preWard=trim((string)($_GET['ward']??''));$preBed=(int)($_GET['bed']??0);

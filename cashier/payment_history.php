@@ -6,13 +6,6 @@ require_once __DIR__ . '/../helpers/cashier.php';
 require_login();
 require_module_access($conn, 'finance', 'view');
 
-$role = strtolower(trim((string)($_SESSION['role'] ?? '')));
-$isSuper = !empty($_SESSION['is_super']) && (int)$_SESSION['is_super'] === 1;
-if (!$isSuper && !in_array($role, ['admin', 'cashier'], true)) {
-    http_response_code(403);
-    die('Access denied. Only the cashier or administrator can access payment history.');
-}
-
 $from = $_GET['from'] ?? date('Y-m-d');
 $to = $_GET['to'] ?? date('Y-m-d');
 $method = trim((string)($_GET['method'] ?? 'All'));

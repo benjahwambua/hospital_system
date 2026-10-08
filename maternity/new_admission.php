@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'maternity', 'create');
-require_role(['admin','doctor','nurse']);
+
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];$error='';
 $selectedPatient=(int)($_POST['patient_id']??$_GET['patient_id']??0);$selectedWard=trim((string)($_POST['ward']??$_GET['ward']??''));$selectedBed=(int)($_POST['bed_number']??$_GET['bed']??0);$selectedDoctor=trim((string)($_POST['attending_doctor']??''));$selectedNote=trim((string)($_POST['note']??''));
