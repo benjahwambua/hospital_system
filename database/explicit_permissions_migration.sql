@@ -22,6 +22,7 @@ WHERE COALESCE(u.is_super, 0) = 0
     OR (am.module_key = 'finance' AND LOWER(COALESCE(u.role,'')) IN ('admin','cashier','accountant'))
     OR (am.module_key = 'procurement' AND LOWER(COALESCE(u.role,'')) IN ('admin','procurement','storekeeper','stores'))
     OR (am.module_key = 'finance_admin' AND LOWER(COALESCE(u.role,'')) IN ('admin','accountant'))
+    OR (am.module_key = 'insurance' AND LOWER(COALESCE(u.role,'')) IN ('admin','accountant','cashier'))
     OR (am.module_key = 'staff_leave' AND LOWER(COALESCE(u.role,'')) IN ('admin','doctor','nurse','receptionist','reception','lab','lab_tech','radiologist','pharmacist','cashier','accountant','procurement','storekeeper','stores'))
   )
 ON DUPLICATE KEY UPDATE
