@@ -7,7 +7,12 @@ require_once __DIR__.'/../helpers/cashier.php';
 require_once __DIR__.'/../config/mpesa.php';
 
 require_login();
-require_module_access($conn, 'finance', 'view');
+// Viewing an invoice requires View; recording a payment requires Create.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_module_access($conn, 'finance', 'create');
+} else {
+    require_module_access($conn, 'finance', 'view');
+}
 
 
 if (empty($_SESSION['csrf_token'])) {
