@@ -153,6 +153,11 @@ function isParentActive($paths) {
         </div>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'nursing')): ?>
+        <div class="menu-title">Inpatient Care</div>
+        <a href="/hospital_system/nursing/index.php" class="<?= isActive('nursing/index.php') ?>"><i class="fas fa-user-nurse icon-main"></i> Nursing Station</a>
+        <?php endif; ?>
+
         <?php if (can_access_module($conn, 'finance_admin')): ?>
         <div class="menu-title">Finance & Billing Administration</div>
         <div class="has-submenu <?= isParentActive(['finance/', 'accounting/', 'billing/', 'expenses/', 'reports/sales_report.php']) ?>">
