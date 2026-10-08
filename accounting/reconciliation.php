@@ -4,7 +4,7 @@ require_once __DIR__.'/../includes/session.php';
 require_once __DIR__.'/../includes/auth.php';
 require_login();
 require_module_access($conn, 'finance_admin', 'view');
-require_role(['admin','accountant']);
+
 
 $invoiceIssues=[]; $accountingIssues=[]; $summary=['invoice_items'=>0,'invoice_mismatches'=>0,'payment_mismatches'=>0,'unbalanced_refs'=>0];
 
