@@ -35,7 +35,7 @@ function ledger_trace_link(array $row): ?array
 
     if ($invoiceId > 0) {
         return [
-            'url' => '/hospital_system/pharmacy/view_invoice.php?id=' . $invoiceId,
+            'url' => '/hospital_system/billing/view_invoice.php?id=' . $invoiceId,
             'label' => 'Invoice #' . $invoiceId,
         ];
     }
@@ -49,7 +49,7 @@ function ledger_trace_link(array $row): ?array
         }
         if (preg_match('/^(?:INV|INVOICE)\s*#?\s*(\d+)$/i', $referenceId, $m) || ctype_digit($referenceId)) {
             return [
-                'url' => '/hospital_system/pharmacy/view_invoice.php?id=' . (int)$referenceId,
+                'url' => '/hospital_system/billing/view_invoice.php?id=' . (int)$referenceId,
                 'label' => 'Invoice #' . (int)$referenceId,
             ];
         }
@@ -57,7 +57,7 @@ function ledger_trace_link(array $row): ?array
 
     if (preg_match('/Invoice\s*#?\s*(\d+)/i', $note, $m)) {
         return [
-            'url' => '/hospital_system/pharmacy/view_invoice.php?id=' . (int)$m[1],
+            'url' => '/hospital_system/billing/view_invoice.php?id=' . (int)$m[1],
             'label' => 'Invoice #' . (int)$m[1],
         ];
     }
