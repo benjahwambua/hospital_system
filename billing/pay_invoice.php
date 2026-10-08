@@ -8,7 +8,7 @@ require_once __DIR__.'/../config/mpesa.php';
 
 require_login();
 require_module_access($conn, 'finance', 'view');
-require_role(['admin','cashier']);
+
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
