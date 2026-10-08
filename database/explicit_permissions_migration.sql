@@ -7,7 +7,8 @@
 INSERT INTO user_module_access
     (user_id, module_id, can_view, can_create, can_edit, can_delete, can_approve)
 SELECT
-    u.id, am.id, 1, 1, 1, 1, 1
+    u.id, am.id, 1, 1, 1, 1,
+    CASE WHEN am.module_key = 'staff_leave' THEN 0 ELSE 1 END
 FROM users u
 JOIN access_modules am ON am.active = 1
 WHERE COALESCE(u.is_super, 0) = 0
