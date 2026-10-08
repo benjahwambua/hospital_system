@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $s=$conn->prepare("INSERT INTO nursing_observations(admission_id,patient_id,observation_time,temperature,systolic_bp,diastolic_bp,pulse,respiration,spo2,pain_score,consciousness,intake_ml,output_ml,observation_notes,recorded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 if($s){
-                    $s->bind_param('iisdiidddisiisi',$admissionId,$admission['patient_id'],$obsTime,$temperature,$systolic,$diastolic,$pulse,$resp,$spo2,$pain,$consciousness,$intake,$output,$obsNotes,$userId);
+                    $s->bind_param('iisiiiidisiisi',$admissionId,$admission['patient_id'],$obsTime,$temperature,$systolic,$diastolic,$pulse,$resp,$spo2,$pain,$consciousness,$intake,$output,$obsNotes,$userId);
                     if($s->execute()){
                         if(function_exists('audit')) audit('nursing_observation_recorded',"admission_id={$admissionId},observation_id={$s->insert_id}");
                         $message='<div class="alert alert-success">Nursing observation recorded.</div>';
