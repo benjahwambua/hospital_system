@@ -4,8 +4,6 @@ require_once __DIR__.'/../includes/session.php';
 require_once __DIR__.'/../includes/auth.php';
 require_login();
 require_module_access($conn, 'finance_admin', 'create');
-require_role(['admin','accountant']);
-
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
