@@ -178,6 +178,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/insurance/coverage.php" class="<?= isActive('insurance/coverage.php') ?>"><i class="fas fa-id-card"></i> Patient Coverage</a>
                 <a href="/hospital_system/insurance/preauthorizations.php" class="<?= isActive('insurance/preauthorizations.php') ?>"><i class="fas fa-file-signature"></i> Preauthorizations</a>
                 <a href="/hospital_system/insurance/claims.php" class="<?= isActive('insurance/claims.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Claims</a>
+                <a href="/hospital_system/insurance/remittances.php" class="<?= isActive('insurance/remittances.php') ?>"><i class="fas fa-money-check-alt"></i> Remittances & Reconciliation</a>
             </div>
         </div>
         <?php endif; ?>
