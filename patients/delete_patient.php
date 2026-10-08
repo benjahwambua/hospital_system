@@ -20,5 +20,5 @@ if ($id > 0) {
     $stmt->execute();
     $stmt->close();
 }
-header('Location: /hospital_system/patients/view_patients.php');
+header('Location: /hospital_system/patients/patient_list.php');
 exit;
