@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../helpers/billing.php';
 require_login();
 require_module_access($conn, 'front_desk', 'edit');
-require_role(['admin','receptionist']);
+
 
 $id = max(0, (int)($_GET['id'] ?? $_POST['id'] ?? 0));
 if ($id <= 0) { header('Location: /hospital_system/patients/patient_list.php'); exit; }
