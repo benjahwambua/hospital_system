@@ -307,6 +307,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $toId = (int)($_POST['to_location_id'] ?? 0);
                 $qty = filter_var($_POST['movement_quantity'] ?? 0, FILTER_VALIDATE_FLOAT);
                 $notes = trim((string)($_POST['movement_notes'] ?? ''));
+                $movementBatch = trim((string)($_POST['movement_batch_number'] ?? ''));
+                $movementExpiry = trim((string)($_POST['movement_expiry_date'] ?? ''));
+                if ($movementExpiry !== '' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $movementExpiry)) throw new RuntimeException('Enter a valid batch expiry date.');
+                $batchValue = $movementBatch === '' ? null : $movementBatch;
+                $expiryValue = $movementExpiry === '' ? null : $movementExpiry;
                 if ($itemId <= 0 || $fromId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item, source location and positive quantity.');
                 if ($action === 'transfer_stock' && ($toId <= 0 || $toId === $fromId)) throw new RuntimeException('Choose a different destination location.');
                 if ($action === 'adjust_stock' && !in_array((string)($_POST['adjustment_direction'] ?? ''), ['in','out'], true)) throw new RuntimeException('Choose adjustment in or out.');
@@ -317,23 +322,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sourceBalance = stores_balance($conn, $itemId, $fromId);
                 if ($action !== 'return_stock' && $action !== 'adjust_stock' && $sourceBalance < $qty) throw new RuntimeException('Insufficient source stock. Available: ' . $sourceBalance);
                 if ($action === 'adjust_stock' && ($_POST['adjustment_direction'] ?? '') === 'out' && $sourceBalance < $qty) throw new RuntimeException('Adjustment would create negative stock.');
-                $ref = $action === 'transfer_stock' ? 'Transfer' : ($action === 'return_stock' ? 'Department Return' : 'Stock Adjustment');
-                $outType = $action === 'transfer_stock' ? 'Transfer Out' : ($action === 'return_stock' ? 'Return' : (($_POST['adjustment_direction'] ?? '') === 'in' ? 'Adjustment In' : 'Adjustment Out'));
-                if ($action === 'return_stock') {
-                    $outType = 'Return';
-                    $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,notes,created_by) VALUES (?,?,'Return',?,'Department Return',?,?)");
-                    $insert->bind_param('iidsi', $itemId, $fromId, $qty, $notes, $uid);
-                } else {
-                    $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,notes,created_by) VALUES (?,?,?,?,?,?,?)");
-                    $insert->bind_param('iisdssi', $itemId, $fromId, $outType, $qty, $ref, $notes, $uid);
-                }
-                if (!$insert->execute()) throw new RuntimeException('Unable to record stock movement.');
-                $sourceMovement = $insert->insert_id; $insert->close();
+                $sourceMovement = 0;
                 if ($action === 'transfer_stock') {
-                    $dest = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,'Transfer In',?,'Transfer',?,?,?)");
-                    $dest->bind_param('iidisi', $itemId, $toId, $qty, $sourceMovement, $notes, $uid);
-                    if (!$dest->execute()) throw new RuntimeException('Unable to record destination transfer.');
-                    $dest->close();
+                    $lots = stores_batch_balances($conn, $itemId, $fromId);
+                    $eligible = []; $available = 0.0; $today = date('Y-m-d');
+                    foreach ($lots as $lot) {
+                        $expiryDate = (string)($lot['expiry_date'] ?? '');
+                        if ($expiryDate !== '' && $expiryDate < $today) continue;
+                        $lotBalance = (float)$lot['balance'];
+                        if ($lotBalance <= 0) continue;
+                        $eligible[] = $lot; $available += $lotBalance;
+                    }
+                    if ($available + 0.0005 < $qty) throw new RuntimeException('Insufficient non-expired stock at the source location. Available: ' . $available);
+                    $toMove = (float)$qty;
+                    foreach ($eligible as $lot) {
+                        if ($toMove <= 0.0005) break;
+                        $moveQty = min($toMove, (float)$lot['balance']);
+                        $lotBatch = $lot['batch_number'] !== null && $lot['batch_number'] !== '' ? $lot['batch_number'] : null;
+                        $lotExpiry = $lot['expiry_date'] !== null && $lot['expiry_date'] !== '' ? $lot['expiry_date'] : null;
+                        $out = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Transfer Out',?,'Transfer',?,?,?,?)");
+                        $out->bind_param('iidsssi', $itemId, $fromId, $moveQty, $lotBatch, $lotExpiry, $notes, $uid);
+                        if (!$out->execute()) throw new RuntimeException('Unable to record lot-specific transfer out.');
+                        $sourceMovement = (int)$out->insert_id; $out->close();
+                        $dest = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Transfer In',?,'Transfer',?,?,?,?,?)");
+                        $dest->bind_param('iidisssi', $itemId, $toId, $moveQty, $sourceMovement, $lotBatch, $lotExpiry, $notes, $uid);
+                        if (!$dest->execute()) throw new RuntimeException('Unable to record destination lot transfer.');
+                        $dest->close(); $toMove -= $moveQty;
+                    }
+                    if ($toMove > 0.0005) throw new RuntimeException('Lot allocation did not cover the transfer quantity.');
+                } elseif ($action === 'return_stock') {
+                    $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Return',?,'Department Return',?,?,?,?)");
+                    $insert->bind_param('iidsssi', $itemId, $fromId, $qty, $batchValue, $expiryValue, $notes, $uid);
+                    if (!$insert->execute()) throw new RuntimeException('Unable to record stock return.');
+                    $sourceMovement = (int)$insert->insert_id; $insert->close();
+                } else {
+                    $outType = (($_POST['adjustment_direction'] ?? '') === 'in' ? 'Adjustment In' : 'Adjustment Out');
+                    if ($outType === 'Adjustment Out' && $batchValue !== null) {
+                        $lotBalance = 0.0;
+                        foreach (stores_batch_balances($conn, $itemId, $fromId) as $lot) {
+                            if ((string)($lot['batch_number'] ?? '') === $movementBatch && ($movementExpiry === '' || (string)($lot['expiry_date'] ?? '') === $movementExpiry)) $lotBalance += (float)$lot['balance'];
+                        }
+                        if ($lotBalance + 0.0005 < $qty) throw new RuntimeException('The selected batch does not have enough recorded stock for this adjustment.');
+                    }
+                    $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,?,?,?,?,?, ?,?)");
+                    $ref = 'Stock Adjustment';
+                    $insert->bind_param('iisdssssi', $itemId, $fromId, $outType, $qty, $ref, $batchValue, $expiryValue, $notes, $uid);
+                    if (!$insert->execute()) throw new RuntimeException('Unable to record stock adjustment.');
+                    $sourceMovement = (int)$insert->insert_id; $insert->close();
                 }
                 $conn->commit();
                 stores_audit('central_stores_' . $action, "item_id=$itemId;qty=$qty;from=$fromId;to=$toId;movement_id=$sourceMovement");
@@ -400,6 +435,8 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 <div class="col-md-6"><label class="form-label">Destination (transfers only)</label><select class="form-select" name="to_location_id"><option value="">Select destination</option><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div>
 <div class="col-md-4"><label class="form-label">Quantity</label><input class="form-control" type="number" min=".001" step=".001" name="movement_quantity" required></div>
 <div class="col-md-4"><label class="form-label">Adjustment direction</label><select class="form-select" name="adjustment_direction"><option value="in">Increase</option><option value="out">Decrease</option></select></div>
+<div class="col-md-4"><label class="form-label">Batch / Lot (optional)</label><input class="form-control" name="movement_batch_number" maxlength="100"></div>
+<div class="col-md-4"><label class="form-label">Expiry (optional)</label><input class="form-control" type="date" name="movement_expiry_date"></div>
 <div class="col-md-8"><label class="form-label">Reason / Reference</label><input class="form-control" name="movement_notes" maxlength="500" required></div>
 <div class="col-12"><button class="btn btn-primary btn-sm">Record Movement</button></div>
 </form>
