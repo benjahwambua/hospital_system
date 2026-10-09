@@ -10,6 +10,9 @@ $canApprove = can_module_action($conn, 'nursing', 'approve');
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 $csrf = $_SESSION['csrf_token'];
 $message = '';
+$nursingStaff = [];
+$staffResult = $conn->query("SELECT id,full_name,role FROM users WHERE LOWER(role) IN ('nurse','doctor','admin') ORDER BY full_name");
+if ($staffResult) while ($staffRow = $staffResult->fetch_assoc()) $nursingStaff[] = $staffRow;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedAction = (string)($_POST['action'] ?? '');
@@ -127,8 +130,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $parsedDue = DateTime::createFromFormat('Y-m-d\\TH:i', $dueRaw);
                 if ($parsedDue) $dueAt = $parsedDue->format('Y-m-d H:i:s');
             }
-            if ($title === '' || !in_array($priority, $allowedPriorities, true) || ($dueRaw !== '' && $dueAt === null)) {
-                $message = '<div class="alert alert-danger">Enter a task title, valid priority and valid due time.</div>';
+            $assigneeValid = $assignedTo === 0;
+            if ($assignedTo > 0) {
+                $assigneeCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND LOWER(role) IN ('nurse','doctor','admin') LIMIT 1");
+                if ($assigneeCheck) {
+                    $assigneeCheck->bind_param('i', $assignedTo);
+                    $assigneeCheck->execute();
+                    $assigneeValid = (bool)$assigneeCheck->get_result()->fetch_assoc();
+                    $assigneeCheck->close();
+                }
+            }
+            if ($title === '' || !in_array($priority, $allowedPriorities, true) || ($dueRaw !== '' && $dueAt === null) || !$assigneeValid) {
+                $message = '<div class="alert alert-danger">Enter a task title, valid priority/due time and a valid nursing staff assignee.</div>';
             } else {
                 $s = $conn->prepare("INSERT INTO nursing_tasks(admission_id,patient_id,task_title,task_details,priority,due_at,assigned_to,created_by) VALUES(?,?,?,?,?,?,NULLIF(?,0),?)");
                 if ($s) {
@@ -298,13 +311,14 @@ include __DIR__ . '/../includes/sidebar.php';
               <div class="form-group col-md-3"><label>Priority</label><select name="priority" class="form-control"><option>Routine</option><option>High</option><option>Urgent</option></select></div>
               <div class="form-group col-md-3"><label>Due</label><input type="datetime-local" name="due_at" class="form-control"></div>
             </div>
+            <div class="form-group"><label>Assign To</label><select name="assigned_to" class="form-control"><option value="0">Unassigned</option><?php foreach($nursingStaff as $staff): ?><option value="<?=(int)$staff['id']?>"><?=htmlspecialchars($staff['full_name'])?> · <?=htmlspecialchars($staff['role'])?></option><?php endforeach; ?></select><small class="text-muted">Eligible accounts: nurse, doctor or admin. Staff master/roster integration remains future work.</small></div>
             <div class="form-group"><label>Instructions</label><textarea name="task_details" class="form-control" rows="2"></textarea></div>
             <button class="btn btn-primary"><i class="fas fa-plus mr-1"></i>Assign Task</button>
           </form>
           <?php endif; ?>
           <div class="table-responsive"><table class="n-table"><thead><tr><th>Task</th><th>Priority / Due</th><th>Status</th><th>Action</th></tr></thead><tbody>
           <?php $ts=$conn->prepare("SELECT * FROM nursing_tasks WHERE admission_id=? ORDER BY FIELD(priority,'Urgent','High','Routine'),due_at IS NULL,due_at,created_at DESC"); if($ts){$ts->bind_param('i',$selected['id']);$ts->execute();$tr=$ts->get_result();while($t=$tr->fetch_assoc()): ?>
-            <tr><td><strong><?=htmlspecialchars($t['task_title'])?></strong><div><?=nl2br(htmlspecialchars($t['task_details']??''))?></div><?php if(!empty($t['completion_notes'])): ?><small class="text-muted">Completion: <?=htmlspecialchars($t['completion_notes'])?></small><?php endif; ?></td><td><?=htmlspecialchars($t['priority'])?><br><small><?=htmlspecialchars($t['due_at']??'No due time')?></small></td><td><span class="badge-soft"><?=htmlspecialchars($t['status'])?></span></td><td><?php if($canCreate && in_array($t['status'],['Open','In Progress'],true)): ?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="task_complete"><input type="hidden" name="admission_id" value="<?= (int)$selected['id'] ?>"><input type="hidden" name="task_id" value="<?= (int)$t['id'] ?>"><input name="completion_notes" class="form-control mb-1" placeholder="Outcome (optional)"><button class="btn btn-sm btn-outline-success">Complete</button></form><?php else: ?>—<?php endif; ?></td></tr>
+            <tr><td><strong><?=htmlspecialchars($t['task_title'])?></strong><div><?=nl2br(htmlspecialchars($t['task_details']??''))?></div><?php if(!empty($t['completion_notes'])): ?><small class="text-muted">Completion: <?=htmlspecialchars($t['completion_notes'])?></small><?php endif; ?></td><td><?=htmlspecialchars($t['priority'])?><br><small><?=htmlspecialchars($t['due_at']??'No due time')?></small><?php if(!empty($t['assigned_to'])): $assignedStaffName=''; foreach($nursingStaff as $staff) if((int)$staff['id']===(int)$t['assigned_to']) $assignedStaffName=$staff['full_name']; ?><small class="d-block">Assigned: <?=htmlspecialchars($assignedStaffName!==''?$assignedStaffName:'User #'.(int)$t['assigned_to'])?></small><?php else: ?><small class="d-block text-muted">Unassigned</small><?php endif; ?></td><td><span class="badge-soft"><?=htmlspecialchars($t['status'])?></span><?php if(in_array($t['status'],['Open','In Progress'],true) && !empty($t['due_at']) && strtotime($t['due_at']) < time()): ?><span class="badge badge-danger ml-1">OVERDUE</span><?php endif; ?></td><td><?php if($canCreate && in_array($t['status'],['Open','In Progress'],true)): ?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="task_complete"><input type="hidden" name="admission_id" value="<?= (int)$selected['id'] ?>"><input type="hidden" name="task_id" value="<?= (int)$t['id'] ?>"><input name="completion_notes" class="form-control mb-1" placeholder="Outcome (optional)"><button class="btn btn-sm btn-outline-success">Complete</button></form><?php else: ?>—<?php endif; ?></td></tr>
           <?php endwhile; $ts->close(); } ?></tbody></table></div>
         </div>
       </div>
