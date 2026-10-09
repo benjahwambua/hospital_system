@@ -46,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_mar'])) {
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
-<div class="container-fluid py-4">
- <div class="d-flex justify-content-between align-items-center mb-3"><div><h1 class="h3 mb-1">Medication Administration Record</h1><p class="text-muted mb-0">Record administration outcomes against existing prescriptions and completed pharmacy dispenses.</p></div><a class="btn btn-outline-secondary" href="index.php<?= $admissionId ? '?admission_id='.(int)$admissionId : '' ?>">Back to Nursing</a></div>
+<div class="container-fluid hms-module-page"><div class="hms-module-shell">
+ <section class="hms-module-hero"><div><div class="hms-module-kicker">Nursing · Inpatient Care</div><h1>Medication Administration Record</h1><p>Record administration outcomes against existing prescriptions and completed pharmacy dispenses.</p></div><a class="btn btn-outline-secondary" href="index.php<?= $admissionId ? '?admission_id='.(int)$admissionId : '' ?>">Back to Nursing</a></section>
  <?= $message ?>
  <?php if(!$admission): ?>
  <div class="alert alert-warning">Open this page from an active inpatient nursing record. An active admission is required.</div>
@@ -77,5 +77,5 @@ include __DIR__ . '/../includes/sidebar.php';
  } ?>
  </tbody></table></div></div>
  <?php endif; ?>
-</div>
+</div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

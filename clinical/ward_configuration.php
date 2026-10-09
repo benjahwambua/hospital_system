@@ -96,11 +96,11 @@ if ($q) while ($row = $q->fetch_assoc()) $beds[] = $row;
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
-<div class="main-content"><div class="container-fluid pt-4 pb-5" style="max-width:1400px">
-  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-    <div><div class="text-uppercase text-muted small font-weight-bold">Clinical · Inpatient Care</div><h1 class="h3 font-weight-bold">Ward &amp; Bed Configuration</h1><p class="text-muted mb-0">Maintain the live ward register and active bed capacity. Occupied beds cannot be deactivated.</p></div>
+<div class="main-content"><div class="container-fluid hms-module-page"><div class="hms-module-shell">
+  <section class="hms-module-hero">
+    <div><div class="hms-module-kicker">Clinical · Inpatient Care</div><h1>Ward &amp; Bed Configuration</h1><p>Maintain the live ward register and active bed capacity. Occupied beds cannot be deactivated.</p></div>
     <a class="btn btn-outline-primary" href="ward_management.php"><i class="fas fa-arrow-left mr-2"></i>Back to Ward / IPD</a>
-  </div>
+  </section>
   <?php if (!empty($_SESSION['msg_success'])): ?><div class="alert alert-success"><?=htmlspecialchars($_SESSION['msg_success'])?></div><?php unset($_SESSION['msg_success']); endif; ?>
   <?=$message?>
   <?php if (!$canEdit): ?><div class="alert alert-info">You have view-only access to ward configuration.</div><?php endif; ?>
@@ -132,5 +132,5 @@ include __DIR__ . '/../includes/sidebar.php';
     <thead><tr><th>Ward / Bed</th><th>Label</th><th>Occupancy</th><th>Status</th><th>Action</th></tr></thead><tbody>
     <?php foreach ($beds as $bed): ?><tr><td><?=htmlspecialchars($bed['ward_name'])?> · Bed <?=(int)$bed['bed_number']?></td><td><?=htmlspecialchars($bed['label'] ?? '')?></td><td><?=((int)$bed['is_occupied']===1?'<span class="badge badge-danger">Occupied</span>':'<span class="badge badge-success">Free</span>')?></td><td><?=((int)$bed['is_active']===1?'Active':'Inactive')?></td><td><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="action" value="toggle_bed"><input type="hidden" name="bed_id" value="<?=(int)$bed['id']?>"><button class="btn btn-sm btn-outline-secondary" <?=(!$canEdit || (int)$bed['is_occupied']===1?'disabled':'')?>><?=((int)$bed['is_active']===1?'Deactivate':'Activate')?></button></form></td></tr><?php endforeach; ?>
     </tbody></table></div></div></div>
-</div></div>
+</div></div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -93,3 +93,7 @@ The Nursing Station now displays the recorded acknowledgement timestamp and ackn
 ## Nursing progress rate reconciliation (2026-10-09)
 
 Nursing is now estimated at 83% engineering completion after the merged handover shift validation, care-plan overdue review indicator, acknowledgement timestamp/user display and initial MAR implementation. The rate remains below completion because medication scheduling and clinical safety controls, staffing/roster integration, notifications, target database migration rollout and UAT are outstanding. This is not a production-readiness certification.
+
+## Shared dashboard-aligned styling (2026-10-09)
+
+Added shared `hms-module-*` workspace styles to `assets/css/style.css`, based on the Hospital Command Centre dashboard's blue-to-teal hero, rounded panels, responsive spacing and restrained table styling. Applied the visual standard to the Insurance & SHA landing page, patient coverage, claims, preauthorizations and remittances, plus ward/bed configuration, inpatient daily charges and the nursing MAR. This is a presentation consistency change only; it does not change workflow permissions or data semantics. PHP Syntax Audit and visual review in a running browser are still required; no functional tests or UAT were run.

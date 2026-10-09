@@ -47,8 +47,8 @@ if($tablesReady){
 }
 include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sidebar.php';
 ?>
-<div class="main-content"><div class="container-fluid" style="background:#f4f7fb;min-height:calc(100vh - 70px);padding:28px 0 50px"><div style="max-width:1450px;margin:auto">
-<div class="card shadow-sm mb-4" style="border:0;border-radius:18px;background:linear-gradient(135deg,#063b73,#0b75ae);color:#fff"><div class="card-body p-4"><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;opacity:.72">Insurance &amp; SHA</div><h2 class="mb-1" style="font-weight:800">Patient Coverage</h2><p class="mb-0" style="opacity:.82">Register payer coverage and control eligibility before claims are raised.</p></div></div>
+<div class="main-content"><div class="container-fluid hms-module-page"><div class="hms-module-shell">
+<section class="hms-module-hero"><div><div class="hms-module-kicker">Insurance &amp; SHA</div><h1>Patient Coverage</h1><p>Register payer coverage and control eligibility before claims are raised.</p></div></section>
 <?php if(!$tablesReady): ?><div class="alert alert-warning">Run <strong>database/insurance_migration.sql</strong> before using patient coverage.</div><?php else: ?>
 <?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; if($success): ?><div class="alert alert-success"><?=htmlspecialchars($success)?></div><?php endif; ?>
 <div class="card shadow-sm mb-4"><div class="card-body"><h5 style="font-weight:800">Add Coverage</h5><form method="post" class="row">
