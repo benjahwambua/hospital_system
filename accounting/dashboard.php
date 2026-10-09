@@ -26,7 +26,8 @@ include __DIR__ . '/../includes/sidebar.php';
 .finance-dashboard .metric-card .metric-title{font-size:.85rem;letter-spacing:.08em;color:#6b7280;text-transform:uppercase;margin-bottom:.6rem}
 .finance-dashboard .metric-card .metric-value{font-size:1.8rem;font-weight:800;color:#111827}
 .finance-dashboard .chart-card{border-radius:20px;border:1px solid rgba(15,23,42,.08);box-shadow:0 16px 40px rgba(15,23,42,.06)}
-@media(max-width:600px){.finance-dashboard .finance-hero{padding:24px 20px;border-radius:17px}.finance-dashboard .metric-card .metric-value{font-size:1.35rem}}\n</style>
+@media(max-width:600px){.finance-dashboard .finance-hero{padding:24px 20px;border-radius:17px}.finance-dashboard .metric-card .metric-value{font-size:1.35rem}}
+</style>
 <div class="main finance-dashboard">
     <div class="finance-hero mb-4"><div><div class="finance-kicker">Finance &amp; Accounting</div><h1>Finance Dashboard</h1><p>Monitor collections, expenses, profitability and outstanding invoices.</p></div></div>
     <div class="row gx-4 gy-4">
