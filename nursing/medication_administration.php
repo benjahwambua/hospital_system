@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_mar'])) {
         $uid=(int)($_SESSION['user_id']??0);
         $when=$status==='Given'?date('Y-m-d H:i:s'):null;
         $s=$conn->prepare("INSERT INTO nursing_medication_administrations(admission_id,patient_id,prescription_id,pharmacy_queue_id,medicine_id,administered_at,status,dose_given,route,administration_notes,recorded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
-        if($s){$s->bind_param('iiiiiissssi',$admissionId,$admission['patient_id'],$med['prescription_id'],$med['id'],$med['medicine_id'],$when,$status,$dose,$route,$notes,$uid);
+        if($s){$s->bind_param('iiiiisssssi',$admissionId,$admission['patient_id'],$med['prescription_id'],$med['id'],$med['medicine_id'],$when,$status,$dose,$route,$notes,$uid);
           if($s->execute()){if(function_exists('audit'))audit('nursing_medication_administration_recorded',"admission_id={$admissionId},prescription_id=".(int)$med['prescription_id'].",queue_id=".(int)$med['id'].",status={$status}");$message='<div class="alert alert-success">Medication administration outcome recorded.</div>';}
           else $message='<div class="alert alert-danger">Unable to save. Check whether this dispense event has already been recorded.</div>';
           $s->close();
