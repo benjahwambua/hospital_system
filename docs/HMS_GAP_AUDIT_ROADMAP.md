@@ -52,7 +52,7 @@ Highest-priority gaps:
 | Maternity | Strong | ANC, labour, PNC, deliveries and admissions exist |
 | Inpatient admission | Adequate | Admission and active stay records exist; transfer is now transactional and auditable |
 | Ward/bed management | Adequate | Occupancy and discharge, configurable ward/bed master, active-bed capacity, transfer history and manual duplicate-protected daily ward charges linked to canonical invoices exist; discharge readiness and end-to-end financial reconciliation require UAT |
-| Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, and structured shift handover with separate-user acknowledgement; medication administration, staff-linked assignment, overdue escalation and UAT remain |
+| Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, and structured shift handover with separate-user acknowledgement; medication administration, formal staff master/roster integration, overdue escalation and UAT remain |
 | Emergency / casualty | Missing | ED lifecycle and triage workflow needed |
 | Theatre / surgery | Missing | Theatre scheduling and peri-operative workflow needed |
 | Referrals | Partial | Orders/referrals area exists; dedicated lifecycle is not established |
@@ -217,3 +217,8 @@ The current feature branch adds an auditable inpatient bed-transfer workflow and
 ## Nursing shift handover implementation note (2026-10-09)
 
 `database/nursing_shift_handover_migration.sql` creates an admission-linked handover register with outgoing/incoming shifts, care summary, outstanding follow-up, creator, pending/acknowledged status and acknowledgement audit fields. The Nursing Station supports handover submission and acknowledgement by a different user with Nursing Approve permission. Both actions are CSRF-protected and audited. The migration is not applied and functional/UAT checks remain deferred until the agreed module scope is built.
+
+
+## Nursing task assignment expansion (2026-10-09)
+
+Task assignment now selects from eligible nurse, doctor and admin accounts and validates the assignee on submission. Open/in-progress tasks with past due times display an overdue flag. The current users table is used until a dedicated staff master and roster are implemented. No functional/UAT checks have been performed.
