@@ -11,7 +11,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Insurance & SHA | 85% | Coverage, verification, preauthorization, claims, submission, remittances and reconciliation workspace implemented | Eligibility/tariff depth, denials/appeals, claim controls and UAT |
 | Inpatient / Ward | 65% | Admission, bed allocation, occupancy and discharge exist | Ward/bed master, transfers, richer occupancy, daily charges and discharge controls |
 | Nursing | 55% | Dedicated nursing station, observations, notes, care-plan/handover note types and inpatient linkage added in current work | Medication administration, tasking, formal care plans, shift workflow and UAT |
-| Central Stores | 45% | Item register, locations, receipt entry, movement ledger, requisition approval/issue, transfers, returns and authorized adjustments | Multi-line requisitions, formal GRN/PO linkage, stock counts/variance controls, batch-level balances, valuation, automated regression tests and UAT |
+| Central Stores | 45% | Item register, locations, receipt entry, movement ledger, multi-item requisitions (up to four lines), requisition approval/issue, transfers, returns and authorized adjustments | Formal GRN/PO linkage, stock counts/variance controls, batch-level balances, valuation, automated regression tests and UAT |
 | Emergency / Casualty | 0% | Not implemented as a dedicated lifecycle | Triage, emergency encounter, acuity, treatment, disposition and billing |
 | Theatre / Surgery | 0% | Not implemented | Theatre scheduling, pre-op, intra-op, implants, anesthesia, recovery and billing |
 | Referral management | 30% | Orders/referrals foundation exists | Referral lifecycle, receiving facility/provider, status, attachments and closure |
