@@ -77,3 +77,7 @@ Ward/IPD discharge now requires explicit confirmation that inpatient financial s
 ## Nursing medication administration record (2026-10-09)
 
 PR #53 adds `nursing/medication_administration.php`, a nursing-station link, and `database/nursing_medication_administration_migration.sql`. It records a nursing outcome against a completed pharmacy dispense and existing prescription, including outcome, dose, route, notes, user and time. It does not schedule doses, validate allergies/interactions, create prescriptions, or deduct stock. The first PHP Syntax Audit found a parse error in the history table; the rendering block was corrected, the subsequent full PHP Syntax Audit passed, and PR #53 was merged. The migration has **not** been applied to any database because no live/local database connection is available through this session. No functional tests or UAT have been run.
+
+## Nursing handover and care-plan review controls (2026-10-09)
+
+The Nursing Station now rejects shift handovers where the outgoing and incoming shifts are identical, and clearly flags active care plans whose configured review time has passed. These are workflow guardrails, not automated clinical escalation; review notifications, staff roster/coverage and UAT remain outstanding. No functional tests have been run.
