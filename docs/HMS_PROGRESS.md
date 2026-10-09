@@ -41,7 +41,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 ## Active priority sequence
 
 1. Finish **Inpatient/Ward + Nursing**.
-2. Continue **Central Stores**: stock counts/variance approval, batch/expiry visibility and department integration.
+2. Continue **Central Stores**: batch/expiry visibility, valuation, department integration and end-to-end verification.
 3. Complete the remaining **Insurance/SHA controls**: denials, appeals, tariffs and stronger eligibility/claim validation.
 4. Build **Emergency/Casualty**.
 5. Build **Theatre/Surgery**.
