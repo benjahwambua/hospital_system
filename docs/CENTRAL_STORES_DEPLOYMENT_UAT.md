@@ -82,6 +82,12 @@ Use a non-production database or a dedicated test item/location for write tests.
 Record Pass/Fail, tester, timestamp and evidence for each test. Use test data in a non-production environment.
 
 - [ ] A user without Central Stores View permission cannot access the page or its data.
+- [ ] The consolidated inventory catalogue lists active Central Stores items, Pharmacy medicines, and active Laboratory inventory items when their source tables exist.
+- [ ] Each catalogue row identifies its source ledger; the view does not add Pharmacy/Laboratory quantities into the Central Stores movement balance.
+- [ ] Central Stores catalogue quantities match the existing main-store register for the same item and location; department/ward balances are not accidentally included in the main-store quantity.
+- [ ] Pharmacy and Laboratory catalogue rows show the source-ledger quantity, unit, batch and expiry values accurately.
+- [ ] Low-stock, out-of-stock, expired and soon-to-expire flags are checked against controlled test data and the source module's threshold rules.
+- [ ] Search and source filters work together, and the no-match message appears when the filters return no records.
 - [ ] A user with View only can inspect records but cannot create, edit, approve or post movements.
 - [ ] A permitted user can create a physical count and capture separate lines for the same item when the batch/expiry lot differs.
 - [ ] Count snapshot values are tied to the correct item, location and lot.
@@ -98,6 +104,10 @@ Record Pass/Fail, tester, timestamp and evidence for each test. Use test data in
 - [ ] Relevant audit entries and reports reflect the test actions accurately.
 
 A syntax-lint pass is not a substitute for this UAT.
+
+## 5A. Consolidated inventory catalogue boundary
+
+The Central Stores page may present a read-only catalogue of existing Central Stores, Pharmacy and Laboratory stock. The catalogue is an operational visibility layer, not a merged inventory ledger. Never use a catalogue row alone as proof that a quantity is physically held in the main store. Reconcile the source ledger, location, item identity, unit and lot before any future cross-department transfer or opening-balance migration. Do not create duplicate master items or opening movements merely to make source items appear in the catalogue.
 
 ## 6. Legacy count handling
 
