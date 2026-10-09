@@ -235,6 +235,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 while ($row = $rs->fetch_assoc()) $lineItems[] = $row;
                 $items->close();
                 if (!$lineItems) throw new RuntimeException('Requisition has no line items.');
+                // Acquire item locks in a stable order before location locks to reduce deadlock risk.
+                usort($lineItems, static fn($a, $b) => (int)$a['item_id'] <=> (int)$b['item_id']);
+                foreach ($lineItems as $lockLine) {
+                    $lockItemId = (int)$lockLine['item_id'];
+                    $lockItem = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
+                    $lockItem->bind_param('i', $lockItemId); $lockItem->execute(); $lockItemRow = $lockItem->get_result()->fetch_assoc(); $lockItem->close();
+                    if (!$lockItemRow) throw new RuntimeException('A requested stock item is no longer active.');
+                }
                 $main = $conn->query("SELECT id FROM stores_locations WHERE location_code='MAIN' AND active=1 LIMIT 1")->fetch_assoc();
                 if (!$main) throw new RuntimeException('Main store location is missing.');
                 $mainId = (int)$main['id'];
@@ -431,14 +439,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $itemCheck = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
                 $itemCheck->bind_param('i', $itemId); $itemCheck->execute(); $validItem = $itemCheck->get_result()->fetch_assoc(); $itemCheck->close();
                 if (!$validItem) throw new RuntimeException('Stock item is not active.');
-                $sourceLocationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
-                $sourceLocationCheck->bind_param('i', $fromId); $sourceLocationCheck->execute(); $validSourceLocation = $sourceLocationCheck->get_result()->fetch_assoc(); $sourceLocationCheck->close();
-                if (!$validSourceLocation) throw new RuntimeException('Select an active source/return location.');
-                if ($action === 'transfer_stock') {
-                    $destinationLocationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
-                    $destinationLocationCheck->bind_param('i', $toId); $destinationLocationCheck->execute(); $validDestinationLocation = $destinationLocationCheck->get_result()->fetch_assoc(); $destinationLocationCheck->close();
-                    if (!$validDestinationLocation) throw new RuntimeException('Select an active destination location.');
+                $locationIds = [$fromId];
+                if ($action === 'transfer_stock') $locationIds[] = $toId;
+                $locationIds = array_values(array_unique($locationIds));
+                sort($locationIds, SORT_NUMERIC);
+                $activeLocationIds = [];
+                foreach ($locationIds as $lockLocationId) {
+                    $locationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                    $locationCheck->bind_param('i', $lockLocationId); $locationCheck->execute(); $locationRow = $locationCheck->get_result()->fetch_assoc(); $locationCheck->close();
+                    if ($locationRow) $activeLocationIds[(int)$locationRow['id']] = true;
                 }
+                if (!isset($activeLocationIds[$fromId])) throw new RuntimeException('Select an active source/return location.');
+                if ($action === 'transfer_stock' && !isset($activeLocationIds[$toId])) throw new RuntimeException('Select an active destination location.');
                 $sourceBalance = stores_balance($conn, $itemId, $fromId);
                 if ($action !== 'return_stock' && $action !== 'adjust_stock' && $sourceBalance < $qty) throw new RuntimeException('Insufficient source stock. Available: ' . $sourceBalance);
                 if ($action === 'adjust_stock' && ($_POST['adjustment_direction'] ?? '') === 'out' && $sourceBalance < $qty) throw new RuntimeException('Adjustment would create negative stock.');
