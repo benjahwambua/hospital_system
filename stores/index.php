@@ -247,9 +247,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$main) throw new RuntimeException('Main store location is missing.');
                 $mainId = (int)$main['id'];
                 $destinationId = (int)$req['destination_location_id'];
-                $destinationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
-                $destinationCheck->bind_param('i', $destinationId); $destinationCheck->execute(); $validDestination = $destinationCheck->get_result()->fetch_assoc(); $destinationCheck->close();
-                if (!$validDestination) throw new RuntimeException('The requisition destination is inactive or missing. Reactivate it or cancel the requisition before issuing stock.');
+                $issueLocationIds = array_values(array_unique([$mainId, $destinationId]));
+                sort($issueLocationIds, SORT_NUMERIC);
+                $activeIssueLocations = [];
+                foreach ($issueLocationIds as $lockLocationId) {
+                    $locationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                    $locationCheck->bind_param('i', $lockLocationId); $locationCheck->execute(); $locationRow = $locationCheck->get_result()->fetch_assoc(); $locationCheck->close();
+                    if ($locationRow) $activeIssueLocations[(int)$locationRow['id']] = true;
+                }
+                if (!isset($activeIssueLocations[$mainId])) throw new RuntimeException('Main store location is inactive or missing.');
+                if (!isset($activeIssueLocations[$destinationId])) throw new RuntimeException('The requisition destination is inactive or missing. Reactivate it or cancel the requisition before issuing stock.');
                 foreach ($lineItems as $line) {
                     $remaining = (float)$line['quantity_requested'] - (float)$line['quantity_issued'];
                     if ($remaining <= 0) continue;
