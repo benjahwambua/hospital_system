@@ -133,6 +133,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $conn->commit();
                 stores_audit('central_stores_requisition_issued', "requisition_id=$reqId");
                 $message = 'Requisition issued and stock ledger updated.';
+            } elseif ($action === 'transfer_stock' || $action === 'return_stock' || $action === 'adjust_stock') {
+                require_module_access($conn, 'central_stores', $action === 'adjust_stock' ? 'approve' : 'create');
+                $itemId = (int)($_POST['movement_item_id'] ?? 0);
+                $fromId = (int)($_POST['from_location_id'] ?? 0);
+                $toId = (int)($_POST['to_location_id'] ?? 0);
+                $qty = filter_var($_POST['movement_quantity'] ?? 0, FILTER_VALIDATE_FLOAT);
+                $notes = trim((string)($_POST['movement_notes'] ?? ''));
+                if ($itemId <= 0 || $fromId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item, source location and positive quantity.');
+                if ($action === 'transfer_stock' && ($toId <= 0 || $toId === $fromId)) throw new RuntimeException('Choose a different destination location.');
+                if ($action === 'adjust_stock' && !in_array((string)($_POST['adjustment_direction'] ?? ''), ['in','out'], true)) throw new RuntimeException('Choose adjustment in or out.');
+                $conn->begin_transaction();
+                $itemCheck = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
+                $itemCheck->bind_param('i', $itemId); $itemCheck->execute(); $validItem = $itemCheck->get_result()->fetch_assoc(); $itemCheck->close();
+                if (!$validItem) throw new RuntimeException('Stock item is not active.');
+                $sourceBalance = stores_balance($conn, $itemId, $fromId);
+                if ($action !== 'return_stock' && $action !== 'adjust_stock' && $sourceBalance < $qty) throw new RuntimeException('Insufficient source stock. Available: ' . $sourceBalance);
+                if ($action === 'adjust_stock' && ($_POST['adjustment_direction'] ?? '') === 'out' && $sourceBalance < $qty) throw new RuntimeException('Adjustment would create negative stock.');
+                $ref = $action === 'transfer_stock' ? 'Transfer' : ($action === 'return_stock' ? 'Department Return' : 'Stock Adjustment');
+                $outType = $action === 'transfer_stock' ? 'Transfer Out' : ($action === 'return_stock' ? 'Return' : (($_POST['adjustment_direction'] ?? '') === 'in' ? 'Adjustment In' : 'Adjustment Out'));
+                if ($action === 'return_stock') {
+                    $outType = 'Return';
+                    $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,notes,created_by) VALUES (?,?,'Return',?,?,?)");
+                    $insert->bind_param('iiss i', $itemId, $fromId, $qty, $ref, $notes);
+                } else {
+                    $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,notes,created_by) VALUES (?,?,?,?,?,?,?)");
+                    $insert->bind_param('iisdssi', $itemId, $fromId, $outType, $qty, $ref, $notes, $uid);
+                }
+                if (!$insert->execute()) throw new RuntimeException('Unable to record stock movement.');
+                $sourceMovement = $insert->insert_id; $insert->close();
+                if ($action === 'transfer_stock') {
+                    $dest = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,'Transfer In',?,'Transfer',?,?,?)");
+                    $dest->bind_param('iidisi', $itemId, $toId, $qty, $sourceMovement, $notes, $uid);
+                    if (!$dest->execute()) throw new RuntimeException('Unable to record destination transfer.');
+                    $dest->close();
+                }
+                $conn->commit();
+                stores_audit('central_stores_' . $action, "item_id=$itemId;qty=$qty;from=$fromId;to=$toId;movement_id=$sourceMovement");
+                $message = $action === 'transfer_stock' ? 'Stock transfer recorded.' : ($action === 'return_stock' ? 'Department return recorded.' : 'Stock adjustment recorded.');
             } else {
                 throw new RuntimeException('Unsupported action.');
             }
