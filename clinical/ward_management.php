@@ -266,7 +266,7 @@ if ($wardQuery) {
 
 // Recent occupancy movements remain visible for traceability.
 $recentTransfers = [];
-$historyQuery = $conn->query("SELECT t.id,t.admission_id,t.patient_id,t.from_ward,t.from_bed,t.to_ward,t.to_bed,t.transfer_reason,t.transferred_at,p.full_name,p.patient_number FROM inpatient_bed_transfers t LEFT JOIN patients p ON p.id=t.patient_id ORDER BY t.transferred_at DESC,t.id DESC LIMIT 25");
+$historyQuery = $conn->query("SELECT t.id,t.admission_id,t.patient_id,t.from_ward,t.from_bed,t.to_ward,t.to_bed,t.transfer_reason,t.transferred_by,t.transferred_at,p.full_name,p.patient_number FROM inpatient_bed_transfers t LEFT JOIN patients p ON p.id=t.patient_id ORDER BY t.transferred_at DESC,t.id DESC LIMIT 25");
 if ($historyQuery) {
     while ($historyRow = $historyQuery->fetch_assoc()) $recentTransfers[] = $historyRow;
 }
@@ -469,7 +469,7 @@ include __DIR__ . '/../includes/sidebar.php';
           <p class="text-muted mb-0">No bed transfers have been recorded yet.</p>
         <?php else: ?>
           <div class="table-responsive"><table class="table table-sm table-hover">
-            <thead><tr><th>When</th><th>Patient</th><th>From</th><th>To</th><th>Reason</th><th>Transfer record</th></tr></thead>
+            <thead><tr><th>When</th><th>Patient</th><th>From</th><th>To</th><th>Reason</th><th>Recorded by (user ID)</th></tr></thead>
             <tbody><?php foreach ($recentTransfers as $movement): ?>
               <tr>
                 <td><?=htmlspecialchars($movement['transferred_at'] ?? '')?></td>
