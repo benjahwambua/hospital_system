@@ -534,9 +534,24 @@ $locationRows=[]; if ($locations) while($row=$locations->fetch_assoc()) $locatio
 $reqRows=[]; if($reqs) while($row=$reqs->fetch_assoc()) $reqRows[]=$row;
 $mainLocation = null; foreach($locationRows as $loc) if($loc['location_code']==='MAIN') $mainLocation=$loc;
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Central Stores | Hospitalis</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"><style>
-body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-serif}.stores-wrap{margin-left:260px;padding:28px;max-width:1800px}.hero{background:linear-gradient(120deg,#063b73,#087bb8);color:white;border-radius:18px;padding:25px 28px;margin-bottom:22px;box-shadow:0 12px 28px #0a46751c}.hero small{letter-spacing:1.5px;text-transform:uppercase;color:#b9e5ff;font-weight:800}.metric{background:#fff;border:1px solid #e5ebf3;border-radius:14px;padding:17px;box-shadow:0 4px 16px #102c4c08}.metric strong{font-size:25px;display:block}.panel{background:#fff;border:1px solid #e5ebf3;border-radius:14px;margin-bottom:18px;overflow:hidden}.panel-head{padding:15px 18px;border-bottom:1px solid #edf0f5;font-weight:800}.panel-body{padding:18px}.form-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:800;color:#66758b}.table th{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#68768a;background:#f8fafc}.table td,.table th{vertical-align:middle}.pill{border-radius:20px;padding:5px 9px;background:#eaf4ff;color:#075b9d;font-size:11px;font-weight:800}@media(max-width:900px){.stores-wrap{margin-left:0;padding:14px}}
-</style></head><body>
+<?php include __DIR__.'/../includes/header.php'; ?>
+<style>
+@import url('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css');
+body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-serif}
+.stores-wrap{margin:0 auto;padding:0;max-width:1800px;width:100%}
+.hero{background:linear-gradient(120deg,#063b73,#087bb8);color:white;border-radius:18px;padding:25px 28px;margin-bottom:22px;box-shadow:0 12px 28px #0a46751c}
+.hero small{letter-spacing:1.5px;text-transform:uppercase;color:#b9e5ff;font-weight:800}
+.metric{background:#fff;border:1px solid #e5ebf3;border-radius:14px;padding:17px;box-shadow:0 4px 16px #102c4c08}
+.metric strong{font-size:25px;display:block}
+.panel{background:#fff;border:1px solid #e5ebf3;border-radius:14px;margin-bottom:18px;overflow:hidden}
+.panel-head{padding:15px 18px;border-bottom:1px solid #edf0f5;font-weight:800}
+.panel-body{padding:18px}
+.form-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:800;color:#66758b}
+.table th{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#68768a;background:#f8fafc}
+.table td,.table th{vertical-align:middle}
+.pill{border-radius:20px;padding:5px 9px;background:#eaf4ff;color:#075b9d;font-size:11px;font-weight:800}
+@media(max-width:900px){.stores-wrap{padding:0}}
+</style>
 <?php include __DIR__.'/../includes/sidebar.php'; ?>
 <div class="stores-wrap"><section class="hero"><small>Inventory control</small><h1 class="h3 fw-bold mt-2 mb-2">Central Stores</h1><p class="mb-0">A single stock ledger for receipts, departmental requisitions and controlled issues.</p></section>
 <?php if($message!==''):?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif;?><?php if($error!==''):?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif;?>
@@ -593,4 +608,5 @@ $issueClass=$issueBalance < -0.0005?'text-danger fw-bold':(($issueLabel==='Expir
 <?php endwhile; endif;?>
 </tbody></table></div></div></div>
 <div class="panel"><div class="panel-head">Requisition Queue</div><div class="panel-body"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Requisition</th><th>Department / Destination</th><th>Status</th><th>Action</th></tr></thead><tbody><?php foreach($reqRows as $rq):?><tr><td><strong><?=htmlspecialchars($rq['requisition_number'])?></strong><br><small><?=htmlspecialchars($rq['created_at'])?></small></td><td><?=htmlspecialchars($rq['requesting_department'])?><br><small class="text-secondary"><?=htmlspecialchars($rq['location_name']??'—')?></small></td><td><span class="pill"><?=htmlspecialchars($rq['status'])?></span></td><td><?php if($canApprove && $rq['status']==='Submitted'):?><form method="post" class="d-flex gap-1 mb-1"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="approve_requisition"><input type="hidden" name="requisition_id" value="<?=$rq['id']?>"><button class="btn btn-success btn-sm" name="decision" value="Approved">Approve</button><button class="btn btn-outline-danger btn-sm" name="decision" value="Rejected">Reject</button></form><?php endif;?><?php if($canApprove && in_array($rq['status'],['Approved','Partially Issued'],true)):?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="issue_requisition"><input type="hidden" name="requisition_id" value="<?=$rq['id']?>"><button class="btn btn-primary btn-sm">Issue Stock</button></form><?php endif;?></td></tr><?php endforeach;?><?php if(!$reqRows):?><tr><td colspan="4" class="text-center text-secondary py-3">No requisitions yet.</td></tr><?php endif;?></tbody></table></div></div></div>
-</div></div></div></body></html>
+</div></div></div>
+<?php include __DIR__.'/../includes/footer.php'; ?>
