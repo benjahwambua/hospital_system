@@ -41,7 +41,7 @@ function stores_batch_balances(mysqli $conn, int $itemId, int $locationId): arra
 }
 function stores_lot_balance(mysqli $conn, int $itemId, int $locationId, ?string $batch, ?string $expiry): float {
     $sql = "SELECT COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) AS balance
-            FROM stores_movements WHERE item_id=? AND location_id=? AND batch_number <=> ? AND expiry_date <=> ?";
+            FROM stores_movements WHERE item_id=? AND location_id=? AND COALESCE(batch_number,'') = COALESCE(?, '') AND expiry_date <=> ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('iiss', $itemId, $locationId, $batch, $expiry);
     $stmt->execute();
@@ -97,7 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $itemId = (int)($_POST['item_id'] ?? 0);
                 $locationId = (int)($_POST['location_id'] ?? 0);
                 $qty = filter_var($_POST['quantity'] ?? 0, FILTER_VALIDATE_FLOAT);
-                $batch = trim((string)($_POST['batch_number'] ?? ''));
+                $batchRaw = trim((string)($_POST['batch_number'] ?? ''));
+                $batch = $batchRaw === '' ? null : $batchRaw;
                 $expiry = trim((string)($_POST['expiry_date'] ?? ''));
                 $notes = trim((string)($_POST['notes'] ?? ''));
                 if ($itemId <= 0 || $locationId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item and location and enter a quantity greater than zero.');
