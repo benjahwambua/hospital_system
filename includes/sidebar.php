@@ -28,7 +28,7 @@ function isParentActive($paths) {
 
 <style>
 :root{--sidebar-bg:#063b73;--sidebar-bg-2:#052f5c;--sidebar-hover:rgba(255,255,255,.09);--sidebar-active:#fff;--sidebar-text:#dbeafe;--sidebar-muted:#8fb4dc;--sidebar-accent:#36c5f0}
-.sidebar{width:260px;background:linear-gradient(180deg,var(--sidebar-bg),var(--sidebar-bg-2));color:var(--sidebar-text);height:100vh;position:fixed;left:0;top:0;overflow-y:auto;box-shadow:5px 0 24px rgba(15,42,74,.16);z-index:1000;padding-bottom:24px}
+.sidebar{width:260px;background:linear-gradient(180deg,var(--sidebar-bg),var(--sidebar-bg-2));color:var(--sidebar-text);height:calc(100vh - var(--header-height,75px));position:fixed;left:0;top:var(--header-height,75px);overflow-y:auto;box-shadow:5px 0 24px rgba(15,42,74,.16);z-index:1000;padding-bottom:24px}
 .sidebar::-webkit-scrollbar{width:5px}.sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:10px}
 .brand{padding:22px 18px;text-align:center;font-weight:800;font-size:1.08rem;letter-spacing:1.2px;color:#fff;background:rgba(0,0,0,.13);border-bottom:1px solid rgba(255,255,255,.08)}
 .brand i{color:var(--sidebar-accent);margin-right:7px}
@@ -43,12 +43,12 @@ function isParentActive($paths) {
 .submenu{max-height:0;overflow:hidden;transition:max-height .25s ease;background:rgba(0,0,0,.09);margin:0 3px;border-radius:0 0 10px 10px}.has-submenu.open .submenu{max-height:620px;padding:4px 3px 6px;margin-bottom:5px}
 .submenu a{display:flex;align-items:center;gap:9px;margin:1px 0;padding:8px 10px 8px 34px;border-radius:7px;color:#c9def2;text-decoration:none;font-size:12px;font-weight:500;transition:.2s}.submenu a i{width:16px;text-align:center;font-size:12px;color:#91b9dc}.submenu a:hover{background:rgba(255,255,255,.07);color:#fff;transform:translateX(2px)}.submenu a.active{background:rgba(255,255,255,.96);color:#063b73;font-weight:700}.submenu a.active i{color:#063b73}
 .logout-link{margin-top:8px!important;background:rgba(255,92,92,.08)!important;color:#ffb0b0!important;border:1px solid rgba(255,120,120,.18)}.logout-link:hover{background:#d9534f!important;color:#fff!important}
-@media(max-width:768px){.sidebar{width:230px}.submenu a{padding-left:30px}}
+@media(max-width:768px){.sidebar{width:230px;height:calc(100vh - var(--header-height,75px));top:var(--header-height,75px)}.submenu a{padding-left:30px}}
 </style>
 
 <aside class="sidebar" role="navigation">
     <div class="brand">
-        <i class="fas fa-hospital-alt"></i> Hospitalis
+        <i class="fas fa-hospital-alt"></i> Emaqure Medical Centre
     </div>
 
     <div class="user-profile">
