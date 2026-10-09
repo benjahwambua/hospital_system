@@ -63,7 +63,7 @@ function isParentActive($paths) {
 
     <nav>
         <a href="/hospital_system/dashboard.php" class="<?= isActive('dashboard.php') ?>">
-            <i class="fas fa-th-large icon-main"></i> Dashboard
+            <i class="fas fa-th-large icon-main"></i> Hospital Command Centre
         </a>
         <?php if (can_access_module($conn, 'front_desk')): ?>
         <div class="menu-title">Front Desk</div>
@@ -94,7 +94,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'laboratory')): ?>
         <div class="has-submenu <?= isParentActive(['lab/dashboard.php','lab_requests.php', 'lab_results.php', 'lab/inventory/']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-microscope icon-main"></i> Laboratory
                 <i class="fas fa-chevron-down caret"></i>
             </a>
