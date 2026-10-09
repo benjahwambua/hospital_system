@@ -84,7 +84,8 @@ function isParentActive($paths) {
             </a>
             <div class="submenu">
                 <a href="/hospital_system/clinical/index.php" class="<?= isActive('clinical/index.php') ?>"><i class="fas fa-th-large"></i> Clinical Dashboard</a>
-                <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient List</a>
+                <a href="/hospital_system/patients/patient_dashboard.php" class="<?= isActive('patients/patient_dashboard.php') ?>"><i class="fas fa-columns"></i> Patient Dashboard</a>
+                <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patients/patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient List</a>
                 <a href="/hospital_system/patients/appointments.php" class="<?= isActive('patients/appointments.php') ?>"><i class="fas fa-calendar-check"></i> Patient Appointments</a>
                 <a href="/hospital_system/appointments/appointments.php" class="<?= isActive('appointments/appointments.php') ?>"><i class="fas fa-calendar-alt"></i> Appointment Management</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
@@ -110,7 +111,11 @@ function isParentActive($paths) {
                 <a href="/hospital_system/lab/lab_results.php" class="<?= isActive('lab_results.php') ?>"><i class="fas fa-poll-h"></i> Lab Results</a>
                 <a href="/hospital_system/lab/lab_receipt.php" class="<?= isActive('lab/lab_receipt.php') ?>"><i class="fas fa-receipt"></i> Lab Receipt</a>
                 <a href="/hospital_system/lab/inventory/index.php" class="<?= isActive('lab/inventory/') ?>"><i class="fas fa-boxes"></i> Lab Inventory</a>
-                <?php if (can_module_action($conn, 'laboratory', 'edit')): ?><a href="/hospital_system/lab/inventory/test_materials.php" class="<?= isActive('lab/inventory/test_materials.php') ?>"><i class="fas fa-flask"></i> Test Materials</a><?php endif; ?>
+                <a href="/hospital_system/lab/inventory/stock_movements.php" class="<?= isActive('lab/inventory/stock_movements.php') ?>"><i class="fas fa-exchange-alt"></i> Inventory Movement History</a>
+                <?php if (can_module_action($conn, 'laboratory', 'edit')): ?>
+                    <a href="/hospital_system/lab/inventory/add_item.php" class="<?= isActive('lab/inventory/add_item.php') ?>"><i class="fas fa-plus-square"></i> Add Inventory Item</a>
+                    <a href="/hospital_system/lab/inventory/test_materials.php" class="<?= isActive('lab/inventory/test_materials.php') ?>"><i class="fas fa-flask"></i> Test Materials</a>
+                <?php endif; ?>
             </div>
         </div>
         <?php endif; ?>
@@ -141,6 +146,9 @@ function isParentActive($paths) {
                 <a href="/hospital_system/pharmacy/sell_medicine.php" class="<?= isActive('sell_medicine.php') ?>"><i class="fas fa-file-prescription"></i> Sell Medicine</a>
                 <a href="/hospital_system/pharmacy/view_stock.php" class="<?= isActive('view_stock.php') ?>"><i class="fas fa-capsules"></i> View Stock</a>
                 <a href="/hospital_system/pharmacy/manage_stock.php" class="<?= isActive('manage_stock.php') ?>"><i class="fas fa-boxes"></i> Manage Stock</a>
+                <?php if (can_module_action($conn, 'pharmacy', 'edit')): ?>
+                    <a href="/hospital_system/pharmacy/add_medication.php" class="<?= isActive('pharmacy/add_medication.php') ?>"><i class="fas fa-capsules"></i> Medicine Catalogue</a>
+                <?php endif; ?>
                 <a href="/hospital_system/pharmacy/add_stock.php" class="<?= isActive('add_stock.php') ?>"><i class="fas fa-plus-square"></i> Receive / Add Stock</a>
                 <a href="/hospital_system/pharmacy/stock_movements.php" class="<?= isActive('pharmacy/stock_movements.php') ?>"><i class="fas fa-exchange-alt"></i> Stock Movement History</a>
                 <a href="/hospital_system/pharmacy/stock_take.php" class="<?= isActive('stock_take.php') ?>"><i class="fas fa-clipboard-list"></i> Stock Take</a>
