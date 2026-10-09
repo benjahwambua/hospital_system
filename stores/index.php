@@ -49,6 +49,36 @@ function stores_lot_balance(mysqli $conn, int $itemId, int $locationId, ?string 
     $stmt->close();
     return $balance;
 }
+function stores_known_lot(mysqli $conn, int $itemId, ?string $batch, ?string $expiry): bool {
+    if ($batch === null && $expiry === null) return false;
+    $sql = "SELECT COUNT(*) AS lot_count FROM (
+                SELECT COALESCE(batch_number,'') AS batch_key, COALESCE(expiry_date,'') AS expiry_key
+                FROM stores_movements WHERE item_id=?
+                GROUP BY COALESCE(batch_number,''), COALESCE(expiry_date,'')
+            ) lots WHERE batch_key=COALESCE(?, '') AND expiry_key=COALESCE(?, '')";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('iss', $itemId, $batch, $expiry);
+    $stmt->execute();
+    $found = (int)($stmt->get_result()->fetch_assoc()['lot_count'] ?? 0) > 0;
+    $stmt->close();
+    return $found;
+}
+function stores_lot_expiry_count(mysqli $conn, int $itemId, string $batch): int {
+    $stmt = $conn->prepare("SELECT COUNT(DISTINCT COALESCE(expiry_date,'')) AS expiry_count FROM stores_movements WHERE item_id=? AND batch_number=?");
+    $stmt->bind_param('is', $itemId, $batch);
+    $stmt->execute();
+    $count = (int)($stmt->get_result()->fetch_assoc()['expiry_count'] ?? 0);
+    $stmt->close();
+    return $count;
+}
+function stores_has_tracked_lots(mysqli $conn, int $itemId): bool {
+    $stmt = $conn->prepare("SELECT 1 FROM stores_movements WHERE item_id=? AND ((batch_number IS NOT NULL AND batch_number<>'') OR expiry_date IS NOT NULL) LIMIT 1");
+    $stmt->bind_param('i', $itemId);
+    $stmt->execute();
+    $found = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $found;
+}
 function stores_lot_balance_rows(mysqli $conn, int $itemId, int $locationId): array {
     $sql = "SELECT MAX(batch_number) AS batch_number, MAX(expiry_date) AS expiry_date,
                    COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) AS balance
@@ -360,7 +390,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($movementExpiry !== '' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $movementExpiry)) throw new RuntimeException('Enter a valid batch expiry date.');
                 $batchValue = $movementBatch === '' ? null : $movementBatch;
                 $expiryValue = $movementExpiry === '' ? null : $movementExpiry;
+                $explicitlyUntracked = (string)($_POST['movement_untracked'] ?? '') === '1';
+                if ($explicitlyUntracked) { $batchValue = null; $expiryValue = null; }
                 if ($itemId <= 0 || $fromId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item, source location and positive quantity.');
+                if ($batchValue === null && $expiryValue !== null && !stores_known_lot($conn, $itemId, null, $expiryValue)) throw new RuntimeException('That expiry is not recorded for this item. Select a known lot or explicitly mark the movement as untracked.');
+                if ($batchValue !== null && $expiryValue === null && stores_lot_expiry_count($conn, $itemId, $batchValue) > 1) throw new RuntimeException('This batch has multiple expiry dates. Select the exact expiry date to avoid combining different lots.');
                 if ($action === 'transfer_stock' && ($toId <= 0 || $toId === $fromId)) throw new RuntimeException('Choose a different destination location.');
                 if ($action === 'adjust_stock' && !in_array((string)($_POST['adjustment_direction'] ?? ''), ['in','out'], true)) throw new RuntimeException('Choose adjustment in or out.');
                 $conn->begin_transaction();
@@ -399,18 +433,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     if ($toMove > 0.0005) throw new RuntimeException('Lot allocation did not cover the transfer quantity.');
                 } elseif ($action === 'return_stock') {
+                    if (!$explicitlyUntracked) {
+                        if ($batchValue === null && $expiryValue === null && stores_has_tracked_lots($conn, $itemId)) {
+                            throw new RuntimeException('This item has batch-tracked history. Select the returned batch/expiry, or explicitly mark this as untracked legacy stock.');
+                        }
+                        if (($batchValue !== null || $expiryValue !== null) && !stores_known_lot($conn, $itemId, $batchValue, $expiryValue)) {
+                            throw new RuntimeException('The return must reference a batch/expiry already recorded for this item, or be explicitly marked as untracked.');
+                        }
+                    }
                     $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Return',?,'Department Return',?,?,?,?)");
                     $insert->bind_param('iidsssi', $itemId, $fromId, $qty, $batchValue, $expiryValue, $notes, $uid);
                     if (!$insert->execute()) throw new RuntimeException('Unable to record stock return.');
                     $sourceMovement = (int)$insert->insert_id; $insert->close();
                 } else {
                     $outType = (($_POST['adjustment_direction'] ?? '') === 'in' ? 'Adjustment In' : 'Adjustment Out');
-                    if ($outType === 'Adjustment Out' && $batchValue !== null) {
-                        $lotBalance = 0.0;
-                        foreach (stores_batch_balances($conn, $itemId, $fromId) as $lot) {
-                            if ((string)($lot['batch_number'] ?? '') === $movementBatch && ($movementExpiry === '' || (string)($lot['expiry_date'] ?? '') === $movementExpiry)) $lotBalance += (float)$lot['balance'];
+                    if ($outType === 'Adjustment Out') {
+                        if (!$explicitlyUntracked && $batchValue === null && $expiryValue === null && stores_has_tracked_lots($conn, $itemId)) {
+                            throw new RuntimeException('This item has batch-tracked history. Select the exact batch/expiry, or explicitly mark the adjustment as untracked legacy stock.');
                         }
-                        if ($lotBalance + 0.0005 < $qty) throw new RuntimeException('The selected batch does not have enough recorded stock for this adjustment.');
+                        if ($batchValue !== null || $expiryValue !== null) {
+                            if (!stores_known_lot($conn, $itemId, $batchValue, $expiryValue)) throw new RuntimeException('The selected batch/expiry is not recorded for this item.');
+                            $lotBalance = 0.0; $matchingLots = 0;
+                            foreach (stores_batch_balances($conn, $itemId, $fromId) as $lot) {
+                                $sameBatch = (string)($lot['batch_number'] ?? '') === (string)($batchValue ?? '');
+                                $sameExpiry = (string)($lot['expiry_date'] ?? '') === (string)($expiryValue ?? '');
+                                if ($sameBatch && $sameExpiry) { $lotBalance += (float)$lot['balance']; $matchingLots++; }
+                            }
+                            if ($matchingLots !== 1 || $lotBalance + 0.0005 < $qty) throw new RuntimeException('The exact selected lot does not have enough recorded stock at this location.');
+                        } else {
+                            $lotBalance = stores_lot_balance($conn, $itemId, $fromId, null, null);
+                            if ($lotBalance + 0.0005 < $qty) throw new RuntimeException('The untracked stock balance is insufficient for this adjustment.');
+                        }
                     }
                     $insert = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,?,?,?,?,?, ?,?)");
                     $ref = 'Stock Adjustment';
@@ -483,9 +536,10 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 <div class="col-md-6"><label class="form-label">Destination (transfers only)</label><select class="form-select" name="to_location_id"><option value="">Select destination</option><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div>
 <div class="col-md-4"><label class="form-label">Quantity</label><input class="form-control" type="number" min=".001" step=".001" name="movement_quantity" required></div>
 <div class="col-md-4"><label class="form-label">Adjustment direction</label><select class="form-select" name="adjustment_direction"><option value="in">Increase</option><option value="out">Decrease</option></select></div>
-<div class="col-md-4"><label class="form-label">Batch / Lot (optional)</label><input class="form-control" name="movement_batch_number" maxlength="100"></div>
-<div class="col-md-4"><label class="form-label">Expiry (optional)</label><input class="form-control" type="date" name="movement_expiry_date"></div>
-<div class="col-md-8"><label class="form-label">Reason / Reference</label><input class="form-control" name="movement_notes" maxlength="500" required></div>
+<div class="col-md-4"><label class="form-label">Batch / Lot</label><input class="form-control" name="movement_batch_number" maxlength="100"></div>
+<div class="col-md-4"><label class="form-label">Expiry</label><input class="form-control" type="date" name="movement_expiry_date"></div>
+<div class="col-md-4 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="movement_untracked" name="movement_untracked" value="1"><label class="form-check-label small" for="movement_untracked">Untracked / legacy stock</label></div></div>
+<div class="col-12"><label class="form-label">Reason / Reference</label><input class="form-control" name="movement_notes" maxlength="500" required></div>
 <div class="col-12"><button class="btn btn-primary btn-sm">Record Movement</button></div>
 </form>
 <?php else:?><p class="text-secondary mb-0">You do not have permission to record stock movements.</p><?php endif;?>
