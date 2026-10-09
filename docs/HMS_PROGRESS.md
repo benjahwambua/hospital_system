@@ -1,6 +1,6 @@
 # HMS Gap Closure Progress
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
 
 These percentages are **engineering completion estimates**, not UAT certification. A module only reaches 100% after its workflow is implemented, authorized, audited, reported, error-handled and verified in UAT.
 
@@ -11,7 +11,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Insurance & SHA | 85% | Coverage, verification, preauthorization, claims, submission, remittances and reconciliation workspace implemented | Eligibility/tariff depth, denials/appeals, claim controls and UAT |
 | Inpatient / Ward | 65% | Admission, bed allocation, occupancy and discharge exist | Ward/bed master, transfers, richer occupancy, daily charges and discharge controls |
 | Nursing | 55% | Dedicated nursing station, observations, notes, care-plan/handover note types and inpatient linkage added in current work | Medication administration, tasking, formal care plans, shift workflow and UAT |
-| Central Stores | 20% | Procurement receiving and departmental stock foundations exist | Item master, locations, batches, requisitions, issues, transfers, returns, counts, variance and reorder controls |
+| Central Stores | 35% | New item register, locations, movement ledger, receipt entry, department requisitions, approval and issue workflow added | Multi-line requisitions, formal GRN/PO linkage, transfers/returns/stock counts, batch-level balance tracking, valuation and UAT |
 | Emergency / Casualty | 0% | Not implemented as a dedicated lifecycle | Triage, emergency encounter, acuity, treatment, disposition and billing |
 | Theatre / Surgery | 0% | Not implemented | Theatre scheduling, pre-op, intra-op, implants, anesthesia, recovery and billing |
 | Referral management | 30% | Orders/referrals foundation exists | Referral lifecycle, receiving facility/provider, status, attachments and closure |
@@ -55,4 +55,4 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 
 The system has moved beyond a basic HMS prototype. The strongest areas are patient/reception, clinical departmental workflows, billing/cashier, procurement, permissions and the newly operational insurance revenue-cycle chain.
 
-The main production-readiness risk is now **incomplete enterprise workflows**, especially stores, inpatient/nursing depth, emergency, theatre, coding and control/analytics—not the absence of more menu items.
+The Nursing access-control migration was corrected on 2026-10-09; the live database migration and Nursing UAT are still outstanding. The first Central Stores workspace is implemented but not yet UAT-certified.\n\nThe main production-readiness risk is now **incomplete enterprise workflows**, especially stores, inpatient/nursing depth, emergency, theatre, coding and control/analytics—not the absence of more menu items.
