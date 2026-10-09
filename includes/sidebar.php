@@ -14,6 +14,8 @@ function isActive($path) {
     $uri = rtrim($uri, '/');
     $target = '/' . trim($path, '/');
     $base = '/hospital_system' . $target;
+    // The root dashboard must not match department pages that also end in dashboard.php.
+    if ($target === '/dashboard.php') return ($uri === $base) ? 'active' : '';
     return ($uri === $base || str_ends_with($uri, $target)) ? 'active' : '';
 }
 
@@ -46,7 +48,7 @@ function isParentActive($paths) {
 @media(max-width:768px){.sidebar{width:230px;height:calc(100vh - var(--header-height,75px));top:var(--header-height,75px)}.submenu a{padding-left:30px}}
 </style>
 
-<aside class="sidebar" role="navigation">
+<aside class="sidebar" role="navigation" aria-label="Main navigation">
     <div class="brand">
         <i class="fas fa-hospital-alt"></i> Emaqure Medical Centre
     </div>
@@ -61,7 +63,7 @@ function isParentActive($paths) {
 
     <nav>
         <a href="/hospital_system/dashboard.php" class="<?= isActive('dashboard.php') ?>">
-            <i class="fas fa-th-large icon-main"></i> Dashboard
+            <i class="fas fa-th-large icon-main"></i> Hospital Command Centre
         </a>
         <?php if (can_access_module($conn, 'front_desk')): ?>
         <div class="menu-title">Front Desk</div>
@@ -76,7 +78,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'clinical')): ?>
         <div class="has-submenu <?= isParentActive(['clinical/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-stethoscope icon-main"></i> Clinical
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -92,7 +94,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'laboratory')): ?>
         <div class="has-submenu <?= isParentActive(['lab/dashboard.php','lab_requests.php', 'lab_results.php', 'lab/inventory/']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-microscope icon-main"></i> Laboratory
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -108,7 +110,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'radiology')): ?>
         <div class="has-submenu <?= isParentActive(['radiology/dashboard.php','radiology_requests.php', 'radiology_results.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-x-ray icon-main"></i> Radiology
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -122,7 +124,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'pharmacy')): ?>
         <div class="has-submenu <?= isParentActive(['pharmacy/dashboard.php','dispensing_queue.php', 'sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-pills icon-main"></i> Pharmacy
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -137,7 +139,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'maternity')): ?>
         <div class="has-submenu <?= isParentActive(['maternity/index.php','maternity/add.php','maternity/antenatal.php','maternity/postnatal.php','maternity/deliveries.php','maternity/admissions.php','maternity/stats.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-baby icon-main"></i> Maternity
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -161,7 +163,7 @@ function isParentActive($paths) {
         <?php if (can_access_module($conn, 'finance_admin')): ?>
         <div class="menu-title">Finance & Billing Administration</div>
         <div class="has-submenu <?= isParentActive(['finance/', 'accounting/', 'billing/', 'expenses/', 'reports/sales_report.php']) ?>">
-            <a href="#" class="menu-toggle"><i class="fas fa-coins icon-main"></i> Finance & Billing <i class="fas fa-chevron-down caret"></i></a>
+            <a href="#" class="menu-toggle" aria-expanded="false"><i class="fas fa-coins icon-main"></i> Finance & Billing <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/finance/dashboard.php" class="<?= isActive('finance/dashboard.php') ?>"><i class="fas fa-th-large"></i> Finance Dashboard</a>
                                 <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
@@ -177,7 +179,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'insurance')): ?>
         <div class="has-submenu <?= isParentActive(['insurance/']) ?>">
-            <a href="#" class="menu-toggle"><i class="fas fa-id-card icon-main"></i> Insurance &amp; SHA <i class="fas fa-chevron-down caret"></i></a>
+            <a href="#" class="menu-toggle" aria-expanded="false"><i class="fas fa-id-card icon-main"></i> Insurance &amp; SHA <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/insurance/index.php" class="<?= isActive('insurance/index.php') ?>"><i class="fas fa-th-large"></i> Insurance Dashboard</a>
                 <a href="/hospital_system/insurance/coverage.php" class="<?= isActive('insurance/coverage.php') ?>"><i class="fas fa-id-card"></i> Patient Coverage</a>
@@ -191,7 +193,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'procurement')): ?>
         <div class="has-submenu <?= isParentActive(['procurement/dashboard.php','procurement/']) ?>">
-            <a href="#" class="menu-toggle"><i class="fas fa-boxes icon-main"></i> Procurement <i class="fas fa-chevron-down caret"></i></a>
+            <a href="#" class="menu-toggle" aria-expanded="false"><i class="fas fa-boxes icon-main"></i> Procurement <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/procurement/dashboard.php" class="<?= isActive('procurement/dashboard.php') ?>"><i class="fas fa-th-large"></i> Procurement Dashboard</a>
                 <a href="/hospital_system/procurement/manage_suppliers.php" class="<?= isActive('manage_suppliers.php') ?>"><i class="fas fa-truck"></i> Suppliers</a>
@@ -218,7 +220,7 @@ function isParentActive($paths) {
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
         <div class="has-submenu <?= isParentActive(['administration/dashboard.php','users/', 'settings/', 'services/', 'reports/reports.php']) ?>">
-            <a href="#" class="menu-toggle"><i class="fas fa-cogs icon-main"></i> Administration <i class="fas fa-chevron-down caret"></i></a>
+            <a href="#" class="menu-toggle" aria-expanded="false"><i class="fas fa-cogs icon-main"></i> Administration <i class="fas fa-chevron-down caret"></i></a>
             <div class="submenu">
                 <a href="/hospital_system/administration/dashboard.php" class="<?= isActive('administration/dashboard.php') ?>"><i class="fas fa-th-large"></i> Administration Dashboard</a>
                 <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
@@ -258,10 +260,13 @@ function isParentActive($paths) {
                 document.querySelectorAll(".has-submenu").forEach(item => {
                     if (item !== parent) {
                         item.classList.remove("open");
+                        const trigger = item.querySelector(".menu-toggle");
+                        if (trigger) trigger.setAttribute("aria-expanded", "false");
                     }
                 });
 
-                parent.classList.toggle("open");
+                const isOpen = parent.classList.toggle("open");
+                this.setAttribute("aria-expanded", isOpen ? "true" : "false");
             });
         });
     });
