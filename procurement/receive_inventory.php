@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 if($unitCost<=0) $unitCost=(float)$item['unit_price'];
 
                 $inventoryType=strtolower(trim((string)($item['inventory_type']??'pharmacy')));
-                if(!in_array($inventoryType,['pharmacy','lab'],true)) $inventoryType='pharmacy';
+                if(!in_array($inventoryType,['pharmacy','lab','stores'],true)) $inventoryType='pharmacy';
                 if($inventoryType==='pharmacy' && ($batchNo==='' || $expiryDate==='')) {
                     throw new Exception('Batch number and expiry date are required for pharmacy/medicine receipts.');
                 }
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     }
                     $m=$conn->prepare("INSERT INTO stock_movements (stock_id,movement_type,quantity_change,balance_after,note,user_id,created_at) VALUES (?,'in',?,?,?, ?,NOW())");
                     if($m){$note="GRN receipt for PO #$poId / Supplier Invoice $supplierInvoice";$uid=(int)$_SESSION['user_id'];$change=$qty;$m->bind_param('iiisi',$inventoryId,$change,$newBalance,$note,$uid);$m->execute();$m->close();}
-                } else {
+                } elseif ($inventoryType==='lab') {
                     $stock=null;
                     if($inventoryId>0){$s=$conn->prepare("SELECT id,quantity FROM lab_inventory WHERE id=? FOR UPDATE");$s->bind_param('i',$inventoryId);$s->execute();$stock=$s->get_result()->fetch_assoc();$s->close();}
                     if(!$stock){$s=$conn->prepare("SELECT id,quantity FROM lab_inventory WHERE item_name=? AND COALESCE(batch_no,'')=? AND COALESCE(expiry_date,'1000-01-01')=COALESCE(?, '1000-01-01') LIMIT 1 FOR UPDATE");$name=$item['item_name'];$s->bind_param('sss',$name,$batchNo,$expiryDate);$s->execute();$stock=$s->get_result()->fetch_assoc();$s->close();}
@@ -94,6 +94,24 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     else{$name=$item['item_name'];$cat='Laboratory Consumable';$unit='Piece';$reorder=0;$status='active';$u=$conn->prepare("INSERT INTO lab_inventory (item_name,category,unit,quantity,reorder_level,buying_price,status,batch_no,expiry_date) VALUES (?,?,?,?,?,?,?,?,?)");$u->bind_param('sssdddsss',$name,$cat,$unit,$qty,$reorder,$unitCost,$status,$batchNo,$expiryDate);if(!$u->execute())throw new Exception('Unable to create laboratory inventory item: '.$u->error);$inventoryId=(int)$u->insert_id;$u->close();$newBalance=$qty;}
                     $m=$conn->prepare("INSERT INTO lab_inventory_movements (inventory_id,movement_type,quantity,balance_after,reference_no,note,user_id) VALUES (?,'in',?,?,?, ?,?)");
                     if($m){$ref="PO-$poId-GRN";$note="Supplier Invoice $supplierInvoice";$uid=(int)$_SESSION['user_id'];$m->bind_param('idsssi',$inventoryId,$qty,$newBalance,$ref,$note,$uid);$m->execute();$m->close();}
+                } else {
+                    // Central Stores receipts enter the same movement ledger used for departmental stock control.
+                    $storeItem=$conn->prepare("SELECT id,item_name FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
+                    $storeItem->bind_param('i',$inventoryId); $storeItem->execute(); $storeRow=$storeItem->get_result()->fetch_assoc(); $storeItem->close();
+                    if(!$storeRow || strcasecmp(trim((string)$storeRow['item_name']),trim((string)$item['item_name']))!==0) throw new Exception('Central Stores item is no longer active or does not match the PO line.');
+                    $main=$conn->query("SELECT id FROM stores_locations WHERE location_code='MAIN' AND active=1 LIMIT 1");
+                    $mainRow=$main?$main->fetch_assoc():null;
+                    if(!$mainRow) throw new Exception('Central Stores Main location is not configured. Run the Central Stores migration first.');
+                    $mainId=(int)$mainRow['id'];
+                    $movementNote="PO #$poId / Supplier Invoice $supplierInvoice";
+                    $movement=$conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,'Purchase Order',?,?,?,?,?)");
+                    $uid=(int)$_SESSION['user_id'];
+                    $movement->bind_param('iidissssi',$inventoryId,$mainId,$qty,$poId,$batchNo,$expiryDate,$movementNote,$uid);
+                    if(!$movement->execute()) throw new Exception('Unable to post receipt to Central Stores: '.$movement->error);
+                    $newBalance=0;
+                    $balanceStmt=$conn->prepare("SELECT COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) balance FROM stores_movements WHERE item_id=? AND location_id=?");
+                    $balanceStmt->bind_param('ii',$inventoryId,$mainId); $balanceStmt->execute(); $newBalance=(float)$balanceStmt->get_result()->fetch_assoc()['balance']; $balanceStmt->close();
+                    $inventoryId=(int)$storeRow['id'];
                 }
 
                 $upd=$conn->prepare("UPDATE purchase_order_items SET received_qty=COALESCE(received_qty,0)+? , inventory_item_id=? WHERE id=?");
