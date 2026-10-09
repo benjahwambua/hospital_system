@@ -188,6 +188,7 @@ function isParentActive($paths) {
             <div class="submenu">
                 <a href="/hospital_system/finance/dashboard.php" class="<?= isActive('finance/dashboard.php') ?>"><i class="fas fa-th-large"></i> Finance Dashboard</a>
                                 <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
+                <a href="/hospital_system/invoices/create_invoice.php" class="<?= isActive('invoices/create_invoice.php') ?>"><i class="fas fa-file-alt"></i> Create Invoice</a>
                 <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
                 <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-pie"></i> Accounting Dashboard</a>
                 <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('accounting/ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
