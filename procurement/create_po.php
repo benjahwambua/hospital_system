@@ -127,8 +127,13 @@ $stockRes = $conn->query('SELECT id, drug_name AS item_name, buying_price, quant
 if ($stockRes) while ($row = $stockRes->fetch_assoc()) { $row['inventory_type']='pharmacy'; $stockItems[]=$row; }
 $labRes = $conn->query("SELECT id, item_name, buying_price, quantity FROM lab_inventory WHERE status='active' ORDER BY item_name ASC");
 if ($labRes) while ($row = $labRes->fetch_assoc()) { $row['inventory_type']='lab'; $stockItems[]=$row; }
-$storesRes = $conn->query("SELECT i.id,i.item_name,0 AS buying_price,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS quantity FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id AND m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name ASC");
-if ($storesRes) while ($row = $storesRes->fetch_assoc()) { $row['inventory_type']='stores'; $stockItems[]=$row; }
+$hasStoresItems = $conn->query("SHOW TABLES LIKE 'stores_items'");
+$hasStoresMovements = $conn->query("SHOW TABLES LIKE 'stores_movements'");
+$hasStoresLocations = $conn->query("SHOW TABLES LIKE 'stores_locations'");
+if ($hasStoresItems && $hasStoresItems->num_rows && $hasStoresMovements && $hasStoresMovements->num_rows && $hasStoresLocations && $hasStoresLocations->num_rows) {
+    $storesRes = $conn->query("SELECT i.id,i.item_name,0 AS buying_price,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS quantity FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id AND m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name ASC");
+    if ($storesRes) while ($row = $storesRes->fetch_assoc()) { $row['inventory_type']='stores'; $stockItems[]=$row; }
+}
 $stockRes = null;
 
 include __DIR__ . '/../includes/header.php';
