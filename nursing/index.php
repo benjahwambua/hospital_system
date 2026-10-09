@@ -262,6 +262,7 @@ include __DIR__ . '/../includes/sidebar.php';
       ?>
       <div class="n-card"><div class="n-head"><strong><?= $selected ? htmlspecialchars($selected['full_name']) : 'Record Nursing Care' ?></strong><?php if($selected): ?><span class="badge-soft"><?=htmlspecialchars($selected['ward_name'])?> · Bed <?= (int)$selected['bed_number'] ?></span><?php endif; ?></div>
       <div class="n-body">
+      <?php if($selected): ?><div class="mb-3"><a class="btn btn-outline-primary" href="medication_administration.php?admission_id=<?= (int)$selected['id'] ?>"><i class="fas fa-pills mr-1"></i>Medication Administration Record</a></div><?php endif; ?>
       <?php if(!$selected): ?><div class="text-muted">Select an active inpatient to begin recording nursing care.</div>
       <?php elseif(!$canCreate): ?><div class="alert alert-danger mb-0">You have view-only nursing access.</div>
       <?php else: ?>
