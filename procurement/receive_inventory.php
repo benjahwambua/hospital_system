@@ -56,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 }
                 $inventoryId=(int)($item['inventory_item_id']??0);
                 $newBalance=0;
+                $storesMovementId=0;
 
                 if($inventoryType==='pharmacy') {
                     // Stock is batch-specific. Never merge two different medicine batches.
@@ -106,8 +107,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     $movementNote="PO #$poId / Supplier Invoice $supplierInvoice";
                     $movement=$conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,'Purchase Order',?,?,?,?,?)");
                     $uid=(int)$_SESSION['user_id'];
-                    $movement->bind_param('iidissssi',$inventoryId,$mainId,$qty,$poId,$batchNo,$expiryDate,$movementNote,$uid);
+                    $batchValue=$batchNo===''?null:$batchNo;
+                    $expiryValue=$expiryDate===''?null:$expiryDate;
+                    $movement->bind_param('iidisssi',$inventoryId,$mainId,$qty,$poId,$batchValue,$expiryValue,$movementNote,$uid);
                     if(!$movement->execute()) throw new Exception('Unable to post receipt to Central Stores: '.$movement->error);
+                    $storesMovementId=(int)$movement->insert_id;
+                    $movement->close();
                     $newBalance=0;
                     $balanceStmt=$conn->prepare("SELECT COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) balance FROM stores_movements WHERE item_id=? AND location_id=?");
                     $balanceStmt->bind_param('ii',$inventoryId,$mainId); $balanceStmt->execute(); $newBalance=(float)$balanceStmt->get_result()->fetch_assoc()['balance']; $balanceStmt->close();
@@ -127,6 +132,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $grnNo='GRN-'.date('Ymd').'-'.str_pad((string)$printId,5,'0',STR_PAD_LEFT);
                 $grnUpdate=$conn->prepare("UPDATE inventory_receipts SET grn_no=? WHERE id=?");
                 $grnUpdate->bind_param('si',$grnNo,$printId); $grnUpdate->execute(); $grnUpdate->close();
+                if($storesMovementId>0){
+                    $linkMovement=$conn->prepare("UPDATE stores_movements SET reference_type='GRN',reference_id=?,notes=? WHERE id=?");
+                    $movementReference=$printId;
+                    $movementNote="GRN $grnNo / PO #$poId / Supplier Invoice $supplierInvoice";
+                    $linkMovement->bind_param('isi',$movementReference,$movementNote,$storesMovementId);
+                    if(!$linkMovement->execute()) throw new Exception('Unable to link Central Stores receipt to the GRN.');
+                    $linkMovement->close();
+                }
 
                 $pay=$conn->prepare("INSERT INTO supplier_payables (supplier_id,po_id,receipt_id,supplier_invoice_no,amount,paid_amount,balance,status,due_date,created_by) VALUES (?,?,?,?,?,0,?,'Unpaid',?,?)");
                 $pay->bind_param('iiisddsi',$poRow['supplier_id'],$poId,$printId,$supplierInvoice,$receiptTotal,$receiptTotal,$dueDate,$uid);
