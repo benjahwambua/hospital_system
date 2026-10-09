@@ -295,11 +295,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $toAllocate -= $issueQty;
                     }
                     if ($toAllocate > 0.0005) throw new RuntimeException('Lot allocation did not cover the requested quantity; no changes were committed.');
-                    $u = $conn->prepare("UPDATE stores_requisition_items SET quantity_issued=quantity_issued+? WHERE id=?");
-                    $u->bind_param('di', $remaining, $line['id']); $u->execute(); $u->close();
+                    $u = $conn->prepare("UPDATE stores_requisition_items SET quantity_issued=quantity_issued+? WHERE id=? AND requisition_id=?");
+                    if (!$u) throw new RuntimeException('Unable to prepare the requisition issue quantity update.');
+                    $lineId = (int)$line['id'];
+                    $u->bind_param('dii', $remaining, $lineId, $reqId);
+                    if (!$u->execute() || $u->affected_rows !== 1) {
+                        $u->close();
+                        throw new RuntimeException('Unable to update the issued quantity for a requisition line; no stock changes were committed.');
+                    }
+                    $u->close();
                 }
-                $u = $conn->prepare("UPDATE stores_requisitions SET status='Issued',issued_by=?,issued_at=NOW() WHERE id=?");
-                $u->bind_param('ii', $uid, $reqId); $u->execute(); $u->close();
+                $u = $conn->prepare("UPDATE stores_requisitions SET status='Issued',issued_by=?,issued_at=NOW() WHERE id=? AND status IN ('Approved','Partially Issued')");
+                if (!$u) throw new RuntimeException('Unable to prepare the requisition status update.');
+                $u->bind_param('ii', $uid, $reqId);
+                if (!$u->execute() || $u->affected_rows !== 1) {
+                    $u->close();
+                    throw new RuntimeException('Unable to finalize the requisition status; no stock changes were committed.');
+                }
+                $u->close();
                 $conn->commit();
                 stores_audit('central_stores_requisition_issued', "requisition_id=$reqId");
                 $message = 'Requisition issued and stock ledger updated.';
