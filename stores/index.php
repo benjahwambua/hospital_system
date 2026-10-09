@@ -67,19 +67,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_module_access($conn, 'central_stores', 'create');
                 $department = trim((string)($_POST['department'] ?? ''));
                 $dest = (int)($_POST['destination_location_id'] ?? 0);
-                $itemId = (int)($_POST['req_item_id'] ?? 0);
-                $qty = filter_var($_POST['req_quantity'] ?? 0, FILTER_VALIDATE_FLOAT);
+                $itemIds = $_POST['req_item_id'] ?? [];
+                $quantities = $_POST['req_quantity'] ?? [];
                 $notes = trim((string)($_POST['request_notes'] ?? ''));
-                if ($department === '' || $dest <= 0 || $itemId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Complete department, destination, item and positive requested quantity.');
+                if (!is_array($itemIds) || !is_array($quantities) || count($itemIds) < 1 || count($itemIds) !== count($quantities)) {
+                    throw new RuntimeException('Add at least one item with a matching quantity.');
+                }
+                $lines = [];
+                $seenItems = [];
+                foreach ($itemIds as $index => $postedItemId) {
+                    $postedQty = trim((string)($quantities[$index] ?? ''));
+                    if (trim((string)$postedItemId) === '' && $postedQty === '') continue;
+                    $lineItemId = filter_var($postedItemId, FILTER_VALIDATE_INT);
+                    $lineQty = filter_var($postedQty, FILTER_VALIDATE_FLOAT);
+                    if ($lineItemId === false || $lineItemId <= 0 || $lineQty === false || $lineQty <= 0) {
+                        throw new RuntimeException('Every requisition line must have a valid item and quantity greater than zero.');
+                    }
+                    if (isset($seenItems[$lineItemId])) {
+                        throw new RuntimeException('Select each item only once per requisition; combine quantities on the same line.');
+                    }
+                    $seenItems[$lineItemId] = true;
+                    $lines[] = [(int)$lineItemId, (float)$lineQty];
+                }
+                if (!$lines) throw new RuntimeException('Add at least one requested item and quantity.');
+                if ($department === '' || $dest <= 0) throw new RuntimeException('Complete the requesting department and destination.');
                 $conn->begin_transaction();
                 $number = 'REQ-' . date('Ymd-His') . '-' . random_int(100,999);
                 $s = $conn->prepare("INSERT INTO stores_requisitions (requisition_number,requesting_department,destination_location_id,requested_by,status,request_notes,submitted_at) VALUES (?,?,?,?,'Submitted',?,NOW())");
                 $s->bind_param('ssiis', $number, $department, $dest, $uid, $notes);
                 if (!$s->execute()) throw new RuntimeException('Unable to create requisition.');
                 $reqId = $s->insert_id; $s->close();
+                $itemCheck = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1");
                 $i = $conn->prepare("INSERT INTO stores_requisition_items (requisition_id,item_id,quantity_requested) VALUES (?,?,?)");
-                $i->bind_param('iid', $reqId, $itemId, $qty);
-                if (!$i->execute()) throw new RuntimeException('Unable to add requested item.');
+                foreach ($lines as [$lineItemId, $lineQty]) {
+                    $itemCheck->bind_param('i', $lineItemId);
+                    $itemCheck->execute();
+                    if (!$itemCheck->get_result()->fetch_assoc()) throw new RuntimeException('A selected stock item is no longer active.');
+                    $i->bind_param('iid', $reqId, $lineItemId, $lineQty);
+                    if (!$i->execute()) throw new RuntimeException('Unable to add a requested item.');
+                }
+                $itemCheck->close();
                 $i->close();
                 $conn->commit();
                 stores_audit('central_stores_requisition_submitted', "requisition_id=$reqId;number=$number");
@@ -217,7 +244,7 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 </form>
 <?php else:?><p class="text-secondary mb-0">You do not have permission to record stock movements.</p><?php endif;?>
 </div></div>
-<div class="panel"><div class="panel-head">Department Requisition</div><div class="panel-body"><?php if($canCreate):?><form method="post" class="row g-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_requisition"><div class="col-md-6"><label class="form-label">Requesting Department</label><input class="form-control" name="department" required placeholder="e.g. Ward A"></div><div class="col-md-6"><label class="form-label">Destination</label><select class="form-select" name="destination_location_id" required><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-md-8"><label class="form-label">Item</label><select class="form-select" name="req_item_id" required><option value="">Select item</option><?php foreach($itemRows as $it):?><option value="<?=$it['id']?>"><?=htmlspecialchars($it['item_code'].' — '.$it['item_name'])?></option><?php endforeach;?></select></div><div class="col-md-4"><label class="form-label">Quantity</label><input class="form-control" type="number" min=".001" step=".001" name="req_quantity" required></div><div class="col-12"><label class="form-label">Reason / Notes</label><input class="form-control" name="request_notes"></div><div class="col-12"><button class="btn btn-primary btn-sm">Submit Requisition</button></div></form><?php endif;?></div></div>
+<div class="panel"><div class="panel-head">Department Requisition</div><div class="panel-body"><?php if($canCreate):?><form method="post" class="row g-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_requisition"><div class="col-md-6"><label class="form-label">Requesting Department</label><input class="form-control" name="department" required placeholder="e.g. Ward A"></div><div class="col-md-6"><label class="form-label">Destination</label><select class="form-select" name="destination_location_id" required><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-12"><label class="form-label">Requested Items</label><div class="row g-2"><?php for($line=0;$line<4;$line++):?><div class="col-md-8"><select class="form-select" name="req_item_id[]" <?=$line===0?'required':''?>><option value=""><?=$line===0?'Select item (required)':'Add another item (optional)'?></option><?php foreach($itemRows as $it):?><option value="<?=$it['id']?>"><?=htmlspecialchars($it['item_code'].' — '.$it['item_name'])?></option><?php endforeach;?></select></div><div class="col-md-4"><input class="form-control" type="number" min=".001" step=".001" name="req_quantity[]" placeholder="Quantity <?=$line+1?>" <?=$line===0?'required':''?>></div><?php endfor;?></div><small class="text-secondary">Add up to four different items in one requisition. Leave unused lines blank.</small></div><div class="col-12"><label class="form-label">Reason / Notes</label><input class="form-control" name="request_notes"></div><div class="col-12"><button class="btn btn-primary btn-sm">Submit Requisition</button></div></form><?php endif;?></div></div>
 <div class="panel"><div class="panel-head">Recent Stock Ledger</div><div class="panel-body"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Item</th><th>Location</th><th>Movement</th><th>Qty</th><th>Reference / Notes</th><th>Recorded By</th></tr></thead><tbody>
 <?php $ledger=$conn->query("SELECT m.*,i.item_code,i.item_name,l.location_name,u.full_name FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id LEFT JOIN users u ON u.id=m.created_by ORDER BY m.created_at DESC,m.id DESC LIMIT 100"); if($ledger): while($mv=$ledger->fetch_assoc()):?>
 <tr><td><?=htmlspecialchars($mv['created_at'])?></td><td><?=htmlspecialchars($mv['item_code'].' — '.$mv['item_name'])?></td><td><?=htmlspecialchars($mv['location_name'])?></td><td><span class="pill"><?=htmlspecialchars($mv['movement_type'])?></span></td><td><?=number_format((float)$mv['quantity'],3)?></td><td><?=htmlspecialchars(trim(($mv['reference_type']??'').' '.($mv['reference_id']??'').' '.($mv['notes']??'')))?></td><td><?=htmlspecialchars($mv['full_name']??'System')?></td></tr>
