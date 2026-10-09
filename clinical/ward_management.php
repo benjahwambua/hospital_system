@@ -106,10 +106,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
         $diagnosis = trim((string)($_POST['discharge_diagnosis'] ?? ''));
         $notes = trim((string)($_POST['discharge_notes'] ?? ''));
         $followUp = trim((string)($_POST['follow_up'] ?? ''));
+        $financialReviewed = (string)($_POST['discharge_financial_reviewed'] ?? '') === '1';
+        $medicationReconciled = (string)($_POST['discharge_medication_reconciled'] ?? '') === '1';
         $userId = (int)($_SESSION['user_id'] ?? 0);
 
-        if ($dischargeId <= 0 || $diagnosis === '' || $notes === '') {
-            $message = "<div class='alert alert-danger'>Discharge diagnosis and condition/clinical notes are required.</div>";
+        if ($dischargeId <= 0 || $diagnosis === '' || $notes === '' || !$financialReviewed || !$medicationReconciled) {
+            $message = "<div class='alert alert-danger'>Discharge requires diagnosis, clinical notes, financial review and medication reconciliation confirmations.</div>";
         } else {
             $stmt = $conn->prepare("SELECT a.*, p.full_name, p.patient_number FROM admissions a JOIN patients p ON p.id=a.patient_id WHERE a.id=? LIMIT 1");
             if ($stmt) {
@@ -163,6 +165,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
                         $types .= 's';
                         $values[] = $followUp;
                     }
+                    if (isset($cols['discharge_financial_reviewed'])) $set[] = 'discharge_financial_reviewed=1';
+                    if (isset($cols['discharge_medication_reconciled'])) $set[] = 'discharge_medication_reconciled=1';
+                    if (isset($cols['discharge_checklist_by'])) { $set[] = 'discharge_checklist_by=?'; $types .= 'i'; $values[] = $userId; }
+                    if (isset($cols['discharge_checklist_at'])) $set[] = 'discharge_checklist_at=NOW()';
 
                     $sql = "UPDATE admissions SET " . implode(',', $set) . " WHERE id=? AND status='Admitted'";
                     $types .= 'i';
@@ -387,9 +393,15 @@ include __DIR__ . '/../includes/sidebar.php';
               <label class="discharge-label">Condition at Discharge / Clinical Notes</label>
               <textarea name="discharge_notes" class="form-control" rows="4" required><?=htmlspecialchars($_POST['discharge_notes'] ?? '')?></textarea>
             </div>
-            <div class="form-group mb-0">
+            <div class="form-group mb-3">
               <label class="discharge-label">Follow-up & Patient Instructions</label>
               <textarea name="follow_up" class="form-control" rows="3"><?=htmlspecialchars($_POST['follow_up'] ?? '')?></textarea>
+            </div>
+            <div class="border rounded p-3 mb-3 bg-light">
+              <strong class="d-block mb-2">Discharge readiness confirmations</strong>
+              <div class="custom-control custom-checkbox mb-2"><input class="custom-control-input" type="checkbox" id="discharge_financial_reviewed" name="discharge_financial_reviewed" value="1" required <?=!empty($_POST['discharge_financial_reviewed']) ? 'checked' : ''?>><label class="custom-control-label" for="discharge_financial_reviewed">I have reviewed outstanding inpatient charges and billing status.</label></div>
+              <div class="custom-control custom-checkbox"><input class="custom-control-input" type="checkbox" id="discharge_medication_reconciled" name="discharge_medication_reconciled" value="1" required <?=!empty($_POST['discharge_medication_reconciled']) ? 'checked' : ''?>><label class="custom-control-label" for="discharge_medication_reconciled">I have reviewed medication reconciliation and discharge instructions.</label></div>
+              <small class="text-muted d-block mt-2">These are accountable confirmations, not automated proof that invoices or medication orders are reconciled.</small>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-4 pt-3" style="border-top:1px solid #edf0f5;">
               <a href="ward_management.php" class="btn btn-light border">Cancel</a>

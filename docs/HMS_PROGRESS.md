@@ -68,3 +68,8 @@ A deployment/UAT runbook is available at `docs/CENTRAL_STORES_DEPLOYMENT_UAT.md`
 The feature branch adds `database/inpatient_nursing_expansion_migration.sql` for bed-transfer history, assigned nursing tasks and structured care plans. Ward/IPD now supports a permission-gated, CSRF-protected transfer action that checks the destination bed, updates the active admission in a transaction, records the old/new ward and bed, and writes an audit event. The Nursing Station adds task creation, priority/due-time capture, task completion notes and structured care-plan capture linked to an active admission.
 
 These are implementation estimates only. Apply the new migration after `database/clinical_ipd_migration.sql` and `database/nursing_migration.sql` in a backed-up test database before enabling the features. No database execution or clinical UAT has been performed. Medication administration remains deliberately unimplemented until it can be linked safely to an actual prescription/medication order and its dispense/administration records.
+
+
+## Inpatient discharge readiness expansion (2026-10-09)
+
+Ward/IPD discharge now requires explicit confirmation that inpatient financial status has been reviewed and medication reconciliation/discharge instructions have been reviewed, in addition to the existing required diagnosis and clinical notes. The migration `database/inpatient_discharge_readiness_migration.sql` stores both confirmation flags plus the confirming user and timestamp on the admission. These are accountable user confirmations only; they do not automatically reconcile invoices, prescriptions, or pharmacy dispensing. Apply after `database/clinical_ipd_migration.sql` in a backed-up environment. No functional/UAT testing has been performed.
