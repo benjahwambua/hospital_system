@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 if(!$pay->execute()) throw new Exception('Unable to create supplier payable: '.$pay->error); $pay->close();
 
                 $hasRef=false;$cr=$conn->query("SHOW COLUMNS FROM accounting_entries LIKE 'reference_id'");$hasRef=($cr&&$cr->num_rows>0);
-                $inventoryAccount=$inventoryType==='lab'?'Laboratory Inventory':'Pharmacy Inventory';
+                $inventoryAccount=$inventoryType==='lab'?'Laboratory Inventory':($inventoryType==='stores'?'Central Stores Inventory':'Pharmacy Inventory');
                 $note="GRN $grnNo - PO #$poId - $supplierInvoice";
                 if($hasRef){
                     $refInventory="GRN-$printId-INV"; $refPayable="GRN-$printId-AP";
