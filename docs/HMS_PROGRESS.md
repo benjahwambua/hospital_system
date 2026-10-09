@@ -56,3 +56,8 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 The system has moved beyond a basic HMS prototype. The strongest areas are patient/reception, clinical departmental workflows, billing/cashier, procurement, permissions and the newly operational insurance revenue-cycle chain.
 
 The Nursing access-control migration was corrected on 2026-10-09; the live database migration and Nursing UAT are still outstanding. Central Stores now supports multi-item requisitions, procurement GRN receipt posting, independent physical-count approval, lot-level count snapshots and variance postings, FEFO requisition issues, lot-aware transfers, signed batch/expiry on-hand balances, and stricter return/adjustment controls that require known lot identity or an explicit untracked-stock declaration. The stores dashboard now surfaces negative lot balances, expired on-hand stock, and positive untracked balances in a reconciliation queue. Apply `database/central_stores_lot_counts_migration.sql` before deploying the matching stores page. Live migrations, legacy lot reconciliation, and end-to-end stock reconciliation UAT remain outstanding.
+
+
+## Central Stores release readiness note (2026-10-09)
+
+A deployment/UAT runbook is available at `docs/CENTRAL_STORES_DEPLOYMENT_UAT.md`. It documents backup and restore rehearsal, schema/index preflight, one-time migration sequencing, post-migration checks, a permissions and stock-control UAT checklist, legacy-count treatment, and rollback safeguards. This is documentation only: it does not mean the migration has been applied or UAT has passed. Central Stores remains at 70% engineering completion pending database deployment, lot reconciliation, integration, and witnessed UAT.
