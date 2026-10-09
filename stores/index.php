@@ -71,6 +71,14 @@ function stores_lot_expiry_count(mysqli $conn, int $itemId, string $batch): int 
     $stmt->close();
     return $count;
 }
+function stores_batch_has_expiry(mysqli $conn, int $itemId, string $batch): bool {
+    $stmt = $conn->prepare("SELECT 1 FROM stores_movements WHERE item_id=? AND batch_number=? AND expiry_date IS NOT NULL LIMIT 1");
+    $stmt->bind_param('is', $itemId, $batch);
+    $stmt->execute();
+    $found = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $found;
+}
 function stores_has_tracked_lots(mysqli $conn, int $itemId): bool {
     $stmt = $conn->prepare("SELECT 1 FROM stores_movements WHERE item_id=? AND ((batch_number IS NOT NULL AND batch_number<>'') OR expiry_date IS NOT NULL) LIMIT 1");
     $stmt->bind_param('i', $itemId);
@@ -394,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($explicitlyUntracked) { $batchValue = null; $expiryValue = null; }
                 if ($itemId <= 0 || $fromId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item, source location and positive quantity.');
                 if ($batchValue === null && $expiryValue !== null && !stores_known_lot($conn, $itemId, null, $expiryValue)) throw new RuntimeException('That expiry is not recorded for this item. Select a known lot or explicitly mark the movement as untracked.');
-                if ($batchValue !== null && $expiryValue === null && stores_lot_expiry_count($conn, $itemId, $batchValue) > 1) throw new RuntimeException('This batch has multiple expiry dates. Select the exact expiry date to avoid combining different lots.');
+                if ($batchValue !== null && $expiryValue === null && (stores_lot_expiry_count($conn, $itemId, $batchValue) > 1 || stores_batch_has_expiry($conn, $itemId, $batchValue))) throw new RuntimeException('This batch has a recorded expiry date or multiple expiry variants. Select the exact expiry date to avoid combining different lots.');
                 if ($action === 'transfer_stock' && ($toId <= 0 || $toId === $fromId)) throw new RuntimeException('Choose a different destination location.');
                 if ($action === 'adjust_stock' && !in_array((string)($_POST['adjustment_direction'] ?? ''), ['in','out'], true)) throw new RuntimeException('Choose adjustment in or out.');
                 $conn->begin_transaction();
