@@ -560,21 +560,24 @@ $systemInventorySql = "
     SELECT 'Central Stores' AS source, i.item_code AS code, i.item_name AS item_name,
            COALESCE(i.category,'General') AS category, i.unit AS unit,
            COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS quantity,
+           i.reorder_level AS reorder_level,
            GROUP_CONCAT(DISTINCT NULLIF(m.batch_number,'') ORDER BY m.batch_number SEPARATOR ', ') AS batches,
            MAX(m.expiry_date) AS expiry_date, i.active AS active
-    FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id
+    FROM stores_items i
+    LEFT JOIN stores_locations main_location ON main_location.location_code='MAIN'
+    LEFT JOIN stores_movements m ON m.item_id=i.id AND m.location_id=main_location.id
     WHERE i.active=1 GROUP BY i.id
 ";
 $systemInventoryParts = [$systemInventorySql];
 if ($hasPharmacyStock) {
     $systemInventoryParts[] = "SELECT 'Pharmacy' AS source, CONCAT('PH-',p.id) AS code, p.drug_name AS item_name,
-        'Medicine' AS category, p.unit AS unit, p.quantity AS quantity, p.batch_no AS batches,
-        p.expiry_date AS expiry_date, 1 AS active FROM pharmacy_stock p";
+        'Medicine' AS category, p.unit AS unit, p.quantity AS quantity, 15 AS reorder_level,
+        p.batch_no AS batches, p.expiry_date AS expiry_date, 1 AS active FROM pharmacy_stock p";
 }
 if ($hasLabInventory) {
     $systemInventoryParts[] = "SELECT 'Laboratory' AS source, CONCAT('LAB-',l.id) AS code, l.item_name AS item_name,
         COALESCE(l.category,'Laboratory Consumable') AS category, l.unit AS unit, l.quantity AS quantity,
-        l.batch_no AS batches, l.expiry_date AS expiry_date, 1 AS active
+        l.reorder_level AS reorder_level, l.batch_no AS batches, l.expiry_date AS expiry_date, 1 AS active
         FROM lab_inventory l WHERE l.status='active'";
 }
 $systemInventoryResult = $conn->query(implode(" UNION ALL ", $systemInventoryParts) . " ORDER BY item_name, source");
@@ -657,10 +660,10 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 <div class="col-md-3"><select class="form-select" id="systemInventorySource" aria-label="Filter inventory source"><option value="">All inventory sources</option><option>Central Stores</option><option>Pharmacy</option><option>Laboratory</option></select></div>
 <div class="col-md-5 d-flex flex-wrap gap-2 align-items-center"><span class="pill">Central Stores: <?=$inventorySourceCounts['Central Stores']?></span><span class="pill">Pharmacy: <?=$inventorySourceCounts['Pharmacy']?></span><span class="pill">Laboratory: <?=$inventorySourceCounts['Laboratory']?></span></div>
 </div>
-<div class="table-responsive"><table class="table table-sm" id="systemInventoryTable"><thead><tr><th>Item / Medicine</th><th>Source</th><th>Category</th><th>Unit</th><th>On Hand</th><th>Batch / Lot</th><th>Expiry</th></tr></thead><tbody>
-<?php foreach($systemInventoryRows as $inventoryRow):?><tr data-source="<?=htmlspecialchars($inventoryRow['source'])?>" data-search="<?=htmlspecialchars(strtolower($inventoryRow['item_name'].' '.$inventoryRow['code'].' '.$inventoryRow['category'].' '.$inventoryRow['batches']))?>"><td><strong><?=htmlspecialchars($inventoryRow['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($inventoryRow['code'])?></small></td><td><span class="pill"><?=htmlspecialchars($inventoryRow['source'])?></span></td><td><?=htmlspecialchars($inventoryRow['category'])?></td><td><?=htmlspecialchars($inventoryRow['unit'])?></td><td class="<?=((float)$inventoryRow['quantity']<=0?'text-danger fw-bold':'')?>"><?=number_format((float)$inventoryRow['quantity'],3)?></td><td><?=htmlspecialchars($inventoryRow['batches']!==''?$inventoryRow['batches']:'—')?></td><td><?=htmlspecialchars($inventoryRow['expiry_date']!==''?$inventoryRow['expiry_date']:'—')?></td></tr><?php endforeach;?>
-<?php if(!$systemInventoryRows):?><tr><td colspan="7" class="text-center text-secondary py-3">No inventory records were found in the available stock tables.</td></tr><?php endif;?>
-<tr id="systemInventoryNoMatches" hidden><td colspan="7" class="text-center text-secondary py-3">No items match your search.</td></tr>
+<div class="table-responsive"><table class="table table-sm" id="systemInventoryTable"><thead><tr><th>Item / Medicine</th><th>Source</th><th>Category</th><th>Unit</th><th>On Hand</th><th>Batch / Lot</th><th>Expiry</th><th>Stock Status</th></tr></thead><tbody>
+<?php foreach($systemInventoryRows as $inventoryRow): $qty=(float)$inventoryRow['quantity']; $reorder=(float)$inventoryRow['reorder_level']; $expiryText=$inventoryRow['expiry_date']; $expiryStatus='—'; if($expiryText!==''){ $expiryTimestamp=strtotime($expiryText); if($expiryTimestamp!==false){ $daysToExpiry=(int)floor(($expiryTimestamp-strtotime(date('Y-m-d')))/86400); $expiryStatus=$daysToExpiry<0?'Expired':($daysToExpiry<=30?'Expires soon':'In date'); } } $stockStatus=$qty<=0?'Out of stock':($reorder>0 && $qty<=$reorder?'Low stock':'In stock'); ?><tr data-source="<?=htmlspecialchars($inventoryRow['source'])?>" data-search="<?=htmlspecialchars(strtolower($inventoryRow['item_name'].' '.$inventoryRow['code'].' '.$inventoryRow['category'].' '.$inventoryRow['batches'].' '.$stockStatus.' '.$expiryStatus))?>"><td><strong><?=htmlspecialchars($inventoryRow['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($inventoryRow['code'])?></small></td><td><span class="pill"><?=htmlspecialchars($inventoryRow['source'])?></span></td><td><?=htmlspecialchars($inventoryRow['category'])?></td><td><?=htmlspecialchars($inventoryRow['unit'])?></td><td class="<?=($qty<=0?'text-danger fw-bold':($stockStatus==='Low stock'?'text-warning fw-bold':''))?>"><?=number_format($qty,3)?></td><td><?=htmlspecialchars($inventoryRow['batches']!==''?$inventoryRow['batches']:'—')?></td><td><?=htmlspecialchars($expiryText!==''?$expiryText:'—')?><br><small class="<?=($expiryStatus==='Expired'?'text-danger':($expiryStatus==='Expires soon'?'text-warning':''))?>"><?=htmlspecialchars($expiryStatus)?></small></td><td><span class="pill <?=($stockStatus==='Out of stock'?'text-danger':($stockStatus==='Low stock'?'text-warning':''))?>"><?=htmlspecialchars($stockStatus)?></span></td></tr><?php endforeach;?>
+<?php if(!$systemInventoryRows):?><tr><td colspan="8" class="text-center text-secondary py-3">No inventory records were found in the available stock tables.</td></tr><?php endif;?>
+<tr id="systemInventoryNoMatches" hidden><td colspan="8" class="text-center text-secondary py-3">No items match your search.</td></tr>
 </tbody></table></div></div></div>
 <script>
 (function(){
