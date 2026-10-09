@@ -1,7 +1,20 @@
 <?php
 require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/includes/permissions.php';
 require_login();
+
+// The Command Centre adapts its operational view to the signed-in user's module access.
+$canFrontDesk = can_access_module($conn, 'front_desk');
+$canClinical = can_access_module($conn, 'clinical');
+$canLaboratory = can_access_module($conn, 'laboratory');
+$canRadiology = can_access_module($conn, 'radiology');
+$canPharmacy = can_access_module($conn, 'pharmacy');
+$canFinance = can_access_module($conn, 'finance');
+$canProcurement = can_access_module($conn, 'procurement');
+$canPatientOverview = $canFrontDesk || $canClinical;
+$canDiagnosticOverview = $canLaboratory || $canRadiology;
+$canServiceOverview = $canClinical || $canLaboratory || $canRadiology || $canPharmacy;
 
 $currentUserId=(int)($_SESSION['user_id']??0);
 $isSuper=false;
@@ -13,18 +26,18 @@ function dash_count(mysqli $c,string $sql):int{$q=$c->query($sql);return $q?(int
 function dash_amount(mysqli $c,string $sql):float{$q=$c->query($sql);return $q?(float)($q->fetch_assoc()['total']??0):0.0;}
 
 $patients=dash_count($conn,"SELECT COUNT(*) total FROM patients");
-$todayVisits=dash_count($conn,"SELECT COUNT(*) total FROM visits WHERE visit_date=CURDATE() AND status<>'Cancelled'");
+$todayVisits=dash_count($conn,"SELECT COUNT(*) total FROM visits WHERE visit_date=CURDATE() AND COALESCE(status,'')<>'Cancelled'");
 $appointments=dash_count($conn,"SELECT COUNT(*) total FROM appointments WHERE DATE(appointment_date)=CURDATE() AND COALESCE(status,'') NOT IN ('Cancelled','Closed','Completed')");
 $labPending=dash_count($conn,"SELECT COUNT(*) total FROM patient_services WHERE category='lab' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
 $radPending=dash_count($conn,"SELECT COUNT(*) total FROM patient_services WHERE category='radiology' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
 $rxPending=dash_count($conn,"SELECT COUNT(*) total FROM pharmacy_queue WHERE status='pending'");
 $admitted=dash_count($conn,"SELECT COUNT(*) total FROM admissions WHERE status='Admitted'");
 $lowStock=dash_count($conn,"SELECT COUNT(*) total FROM pharmacy_stock WHERE quantity<15");
-$revenue=$isSuper?dash_amount($conn,"SELECT COALESCE(SUM(p.amount),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE DATE(r.created_at)=CURDATE() AND r.status='Approved'),0) total FROM payments p WHERE DATE(p.created_at)=CURDATE()"):0;
+$revenue=$isSuper?dash_amount($conn,"SELECT COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.created_at>=CURDATE() AND p.created_at<CURDATE()+INTERVAL 1 DAY),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.created_at>=CURDATE() AND r.created_at<CURDATE()+INTERVAL 1 DAY AND r.status='Approved'),0) total"):0;
 
 $chartLabels=[];$chartData=[];
 if($isSuper){
-    $q=$conn->query("SELECT DATE_FORMAT(DATE(created_at),'%d %b') day, SUM(amount) total FROM payments WHERE created_at>=DATE_SUB(CURDATE(),INTERVAL 6 DAY) GROUP BY DATE(created_at) ORDER BY DATE(created_at)");
+    $q=$conn->query("SELECT DATE_FORMAT(d.day,'%d %b') day, COALESCE(p.total,0)-COALESCE(r.total,0) total FROM (SELECT DATE_SUB(CURDATE(),INTERVAL 6 DAY) day UNION ALL SELECT DATE_SUB(CURDATE(),INTERVAL 5 DAY) UNION ALL SELECT DATE_SUB(CURDATE(),INTERVAL 4 DAY) UNION ALL SELECT DATE_SUB(CURDATE(),INTERVAL 3 DAY) UNION ALL SELECT DATE_SUB(CURDATE(),INTERVAL 2 DAY) UNION ALL SELECT DATE_SUB(CURDATE(),INTERVAL 1 DAY) UNION ALL SELECT CURDATE()) d LEFT JOIN (SELECT DATE(created_at) day,SUM(amount) total FROM payments WHERE created_at>=DATE_SUB(CURDATE(),INTERVAL 6 DAY) AND created_at<CURDATE()+INTERVAL 1 DAY GROUP BY DATE(created_at)) p ON p.day=d.day LEFT JOIN (SELECT DATE(created_at) day,SUM(amount) total FROM payment_refunds WHERE status='Approved' AND created_at>=DATE_SUB(CURDATE(),INTERVAL 6 DAY) AND created_at<CURDATE()+INTERVAL 1 DAY GROUP BY DATE(created_at)) r ON r.day=d.day ORDER BY d.day");
     if($q)while($r=$q->fetch_assoc()){ $chartLabels[]=$r['day'];$chartData[]=(float)$r['total']; }
 }
 $serviceLabels=[];$serviceData=[];
@@ -53,35 +66,36 @@ include __DIR__ . '/includes/sidebar.php';
   <section class="exec-hero"><div class="exec-hero-inner"><div><div class="exec-kicker">Emaqure Medical Centre</div><h1>Hospital Command Centre</h1><p>A clear view of today's patient flow, clinical work and hospital operations.</p></div><div class="exec-time"><strong><?= date('l, d M Y') ?></strong><?= date('H:i') ?> EAT</div></div></section>
 
   <section class="exec-metrics">
-    <a class="exec-card" href="patients/patient_list.php"><div class="exec-card-top"><small>Total Patients</small><span class="exec-icon"><i class="fas fa-users"></i></span></div><div class="exec-value"><?= number_format($patients) ?></div><div class="exec-sub">Registered patients</div></a>
-    <a class="exec-card" href="patients/appointments.php"><div class="exec-card-top"><small>Today's Visits</small><span class="exec-icon"><i class="fas fa-user-md"></i></span></div><div class="exec-value"><?= number_format($todayVisits) ?></div><div class="exec-sub"><?= $appointments ?> appointments still open</div></a>
-    <a class="exec-card" href="clinical/index.php"><div class="exec-card-top"><small>Admitted</small><span class="exec-icon"><i class="fas fa-bed"></i></span></div><div class="exec-value"><?= number_format($admitted) ?></div><div class="exec-sub">Current admissions</div></a>
-    <a class="exec-card" href="lab/lab_results.php"><div class="exec-card-top"><small>Diagnostic Queue</small><span class="exec-icon"><i class="fas fa-vials"></i></span></div><div class="exec-value"><?= number_format($labPending+$radPending) ?></div><div class="exec-sub"><?= $labPending ?> lab · <?= $radPending ?> radiology</div></a>
+    <?php if($canPatientOverview): ?><a class="exec-card" href="patients/patient_list.php"><div class="exec-card-top"><small>Total Patients</small><span class="exec-icon"><i class="fas fa-users"></i></span></div><div class="exec-value"><?= number_format($patients) ?></div><div class="exec-sub">Registered patients</div></a><?php endif; ?>
+    <?php if($canFrontDesk || $canClinical): ?><a class="exec-card" href="patients/appointments.php"><div class="exec-card-top"><small>Today's Visits</small><span class="exec-icon"><i class="fas fa-user-md"></i></span></div><div class="exec-value"><?= number_format($todayVisits) ?></div><div class="exec-sub"><?= $appointments ?> appointments still open</div></a><?php endif; ?>
+    <?php if($canClinical): ?><a class="exec-card" href="clinical/index.php"><div class="exec-card-top"><small>Admitted</small><span class="exec-icon"><i class="fas fa-bed"></i></span></div><div class="exec-value"><?= number_format($admitted) ?></div><div class="exec-sub">Current admissions</div></a><?php endif; ?>
+    <?php if($canDiagnosticOverview): ?><a class="exec-card" href="lab/lab_results.php"><div class="exec-card-top"><small>Diagnostic Queue</small><span class="exec-icon"><i class="fas fa-vials"></i></span></div><div class="exec-value"><?= number_format($labPending+$radPending) ?></div><div class="exec-sub"><?= $labPending ?> lab · <?= $radPending ?> radiology</div></a><?php endif; ?>
   </section>
 
   <section class="exec-grid">
     <div class="exec-panel"><div class="exec-head"><strong>Quick Access</strong><small>Common hospital actions</small></div><div class="exec-body"><div class="quick-grid">
-      <a class="quick" href="patients/reception_register.php"><i class="fas fa-user-plus"></i><div><strong>Register Patient</strong><span>Front Desk</span></div></a>
-      <a class="quick" href="patients/appointments.php"><i class="fas fa-calendar-check"></i><div><strong>Appointments</strong><span>Today's schedule</span></div></a>
-      <a class="quick" href="clinical/index.php"><i class="fas fa-stethoscope"></i><div><strong>Clinical</strong><span>Patient care</span></div></a>
-      <a class="quick" href="lab/dashboard.php"><i class="fas fa-microscope"></i><div><strong>Laboratory</strong><span>Requests & results</span></div></a>
-      <a class="quick" href="pharmacy/dashboard.php"><i class="fas fa-pills"></i><div><strong>Pharmacy</strong><span>Dispensing & stock</span></div></a>
-      <a class="quick" href="cashier/index.php"><i class="fas fa-cash-register"></i><div><strong>Cashier</strong><span>Patient collections</span></div></a>
-      <a class="quick" href="stores/index.php"><i class="fas fa-boxes"></i><div><strong>Central Stores</strong><span>Stock &amp; requisitions</span></div></a>
+      <?php if($canFrontDesk): ?><a class="quick" href="patients/reception_register.php"><i class="fas fa-user-plus"></i><div><strong>Register Patient</strong><span>Front Desk</span></div></a><?php endif; ?>
+      <?php if($canFrontDesk || $canClinical): ?><a class="quick" href="patients/appointments.php"><i class="fas fa-calendar-check"></i><div><strong>Appointments</strong><span>Today's schedule</span></div></a><?php endif; ?>
+      <?php if($canClinical): ?><a class="quick" href="clinical/index.php"><i class="fas fa-stethoscope"></i><div><strong>Clinical</strong><span>Patient care</span></div></a><?php endif; ?>
+      <?php if($canLaboratory): ?><a class="quick" href="lab/dashboard.php"><i class="fas fa-microscope"></i><div><strong>Laboratory</strong><span>Requests & results</span></div></a><?php endif; ?>
+      <?php if($canPharmacy): ?><a class="quick" href="pharmacy/dashboard.php"><i class="fas fa-pills"></i><div><strong>Pharmacy</strong><span>Dispensing & stock</span></div></a><?php endif; ?>
+      <?php if($canFinance): ?><a class="quick" href="cashier/index.php"><i class="fas fa-cash-register"></i><div><strong>Cashier</strong><span>Patient collections</span></div></a><?php endif; ?>
+      <?php if($canProcurement): ?><a class="quick" href="stores/index.php"><i class="fas fa-boxes"></i><div><strong>Central Stores</strong><span>Stock &amp; requisitions</span></div></a><?php endif; ?>
     </div></div></div>
     <div class="exec-panel"><div class="exec-head"><strong>Operational Pulse</strong><small>Live queue counts</small></div><div class="exec-body"><div class="alert-list">
-      <a href="lab/lab_results.php" class="alert-row text-decoration-none"><span class="label">Pending laboratory</span><strong><?= $labPending ?></strong></a>
-      <a href="radiology/radiology_results.php" class="alert-row text-decoration-none"><span class="label">Pending radiology</span><strong><?= $radPending ?></strong></a>
-      <a href="pharmacy/dispensing_queue.php" class="alert-row text-decoration-none"><span class="label">Pending pharmacy</span><strong><?= $rxPending ?></strong></a>
-      <a href="pharmacy/view_stock.php" class="alert-row danger text-decoration-none"><span class="label">Low pharmacy stock</span><strong><?= $lowStock ?></strong></a>
+      <?php if($canLaboratory): ?><a href="lab/lab_results.php" class="alert-row text-decoration-none"><span class="label">Pending laboratory</span><strong><?= $labPending ?></strong></a><?php endif; ?>
+      <?php if($canRadiology): ?><a href="radiology/radiology_results.php" class="alert-row text-decoration-none"><span class="label">Pending radiology</span><strong><?= $radPending ?></strong></a><?php endif; ?>
+      <?php if($canPharmacy): ?><a href="pharmacy/dispensing_queue.php" class="alert-row text-decoration-none"><span class="label">Pending pharmacy</span><strong><?= $rxPending ?></strong></a><?php endif; ?>
+      <?php if($canPharmacy): ?><a href="pharmacy/view_stock.php" class="alert-row danger text-decoration-none"><span class="label">Low pharmacy stock</span><strong><?= $lowStock ?></strong></a><?php endif; ?>
     </div></div></div>
   </section>
 
   <section class="bottom-grid">
-    <div class="exec-panel"><div class="exec-head"><strong>Low Stock Watch</strong><a href="pharmacy/view_stock.php" class="small">View stock</a></div><div class="exec-body">
+    <?php if($canPharmacy): ?><div class="exec-panel"><div class="exec-head"><strong>Low Stock Watch</strong><a href="pharmacy/view_stock.php" class="small">View stock</a></div><div class="exec-body">
       <?php if($lowItems && $lowItems->num_rows): while($item=$lowItems->fetch_assoc()): ?><div class="stock-row"><span class="stock-name"><?= htmlspecialchars($item['drug_name']) ?></span><span class="stock-qty"><?= (int)$item['quantity'] ?> left</span></div><?php endwhile; else: ?><div class="empty-state">No low-stock medicines.</div><?php endif; ?>
-    </div></div>
-    <div class="exec-panel"><div class="exec-head"><strong>Service Activity</strong><small>Current records</small></div><div class="exec-body"><canvas id="serviceChart" height="220" role="img" aria-label="Service activity by category"></canvas></div></div>
+    </div></div><?php endif; ?>
+    <?php if($canServiceOverview): ?><div class="exec-panel"><div class="exec-head"><strong>Service Activity</strong><small>Current records</small></div><div class="exec-body"><canvas id="serviceChart" height="220" role="img" aria-label="Service activity by category"></canvas></div></div>
+    <?php endif; ?>
   </section>
 
   <?php if($isSuper): ?>
