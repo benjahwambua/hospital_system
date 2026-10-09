@@ -11,8 +11,13 @@ $admissionId = max(0, (int)($_GET['admission_id'] ?? $_POST['admission_id'] ?? 0
 $message = '';
 $admission = null;
 if ($admissionId > 0) {
-  $s = $conn->prepare("SELECT a.id,a.patient_id,a.ward_name,a.bed_number,p.full_name,p.patient_number FROM admissions a JOIN patients p ON p.id=a.patient_id WHERE a.id=? AND a.status='Admitted' LIMIT 1");
+  $s = $conn->prepare("SELECT a.id,a.patient_id,a.ward_name,a.bed_number,p.full_name,p.patient_number,p.allergies AS legacy_allergies FROM admissions a JOIN patients p ON p.id=a.patient_id WHERE a.id=? AND a.status='Admitted' LIMIT 1");
   if ($s) { $s->bind_param('i',$admissionId); $s->execute(); $admission=$s->get_result()->fetch_assoc(); $s->close(); }
+}
+$structuredAllergies=[];
+if($admission){
+  $a=$conn->prepare("SELECT allergy FROM patient_allergies WHERE patient_id=? AND allergy IS NOT NULL AND TRIM(allergy)<>'' ORDER BY id DESC");
+  if($a){$a->bind_param('i',$admission['patient_id']);$a->execute();$ar=$a->get_result();while($allergyRow=$ar->fetch_assoc())$structuredAllergies[]=trim((string)$allergyRow['allergy']);$a->close();}
 }
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_mar'])) {
   if (!$canCreate) $message='<div class="alert alert-danger">You do not have permission to record medication administration.</div>';
@@ -24,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_mar'])) {
     $dose=trim((string)($_POST['dose_given']??''));
     $route=trim((string)($_POST['route']??''));
     $notes=trim((string)($_POST['administration_notes']??''));
+    $allergyReviewStatus=(string)($_POST['allergy_review_status']??'');
     $scheduledInput=trim((string)($_POST['scheduled_at']??''));
     $scheduledAt=null;
     if($scheduledInput!==''){
@@ -37,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_mar'])) {
     }
     $allowed=['Given','Omitted','Refused','Held','Not Available'];
     if($message===''){
-      if (!in_array($status,$allowed,true) || ($status==='Given' && ($dose==='' || $route===''))) $message='<div class="alert alert-danger">Choose a valid outcome. Dose and route are required when recording a dose as given.</div>';
+      if(!in_array($allergyReviewStatus,['Reviewed','Unable to verify'],true)) $message='<div class="alert alert-danger">Record whether the allergy information was reviewed or could not be verified before saving the medication outcome.</div>';
+      elseif (!in_array($status,$allowed,true) || ($status==='Given' && ($dose==='' || $route===''))) $message='<div class="alert alert-danger">Choose a valid outcome. Dose and route are required when recording a dose as given.</div>';
     }
     if($message===''){
       $s=$conn->prepare("SELECT q.id,q.patient_id,q.prescription_id,q.medicine_id,q.quantity,s.drug_name,pr.frequency FROM pharmacy_queue q JOIN pharmacy_stock s ON s.id=q.medicine_id JOIN prescriptions pr ON pr.id=q.prescription_id WHERE q.id=? AND q.patient_id=? AND q.status='completed' LIMIT 1");
@@ -54,9 +61,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_mar'])) {
       if($med && $message===''){
         $uid=(int)($_SESSION['user_id']??0);
         $when=$status==='Given'?date('Y-m-d H:i:s'):null;
-        $s=$conn->prepare("INSERT INTO nursing_medication_administrations(admission_id,patient_id,prescription_id,pharmacy_queue_id,medicine_id,scheduled_at,administered_at,status,dose_given,route,administration_notes,recorded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)");
-        if($s){$s->bind_param('iiiiissssssi',$admissionId,$admission['patient_id'],$med['prescription_id'],$med['id'],$med['medicine_id'],$scheduledAt,$when,$status,$dose,$route,$notes,$uid);
-          if($s->execute()){if(function_exists('audit'))audit('nursing_medication_administration_recorded',"admission_id={$admissionId},prescription_id=".(int)$med['prescription_id'].",queue_id=".(int)$med['id'].",scheduled_at=".($scheduledAt??'unscheduled').",status={$status}");$message='<div class="alert alert-success">Medication administration outcome recorded.</div>';}
+        $allergyReviewedAt=date('Y-m-d H:i:s');
+        $s=$conn->prepare("INSERT INTO nursing_medication_administrations(admission_id,patient_id,prescription_id,pharmacy_queue_id,medicine_id,scheduled_at,administered_at,status,dose_given,route,administration_notes,allergy_review_status,allergy_reviewed_at,recorded_by,allergy_reviewed_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        if($s){$s->bind_param('iiiiissssssssii',$admissionId,$admission['patient_id'],$med['prescription_id'],$med['id'],$med['medicine_id'],$scheduledAt,$when,$status,$dose,$route,$notes,$allergyReviewStatus,$allergyReviewedAt,$uid,$uid);
+          if($s->execute()){if(function_exists('audit'))audit('nursing_medication_administration_recorded',"admission_id={$admissionId},prescription_id=".(int)$med['prescription_id'].",queue_id=".(int)$med['id'].",scheduled_at=".($scheduledAt??'unscheduled').",allergy_review={$allergyReviewStatus},status={$status}");$message='<div class="alert alert-success">Medication administration outcome recorded.</div>';}
           else $message=$s->errno===1062?'<div class="alert alert-warning">This prescription dose slot has already been recorded. Refresh the record list before retrying.</div>':'<div class="alert alert-danger">Unable to save the medication outcome. Please review the record list before retrying.</div>';
           $s->close();
         }
@@ -74,14 +82,20 @@ include __DIR__ . '/../includes/sidebar.php';
  <div class="alert alert-warning">Open this page from an active inpatient nursing record. An active admission is required.</div>
  <?php else: ?>
  <div class="card mb-4"><div class="card-body"><strong><?=htmlspecialchars($admission['full_name'])?></strong> · <?=htmlspecialchars($admission['patient_number'])?><div class="text-muted"><?=htmlspecialchars($admission['ward_name'])?> · Bed <?= (int)$admission['bed_number'] ?> · Admission #<?= (int)$admission['id'] ?></div></div></div>
+  <div class="alert <?=($structuredAllergies || trim((string)($admission['legacy_allergies']??''))!=='')?'alert-danger':'alert-warning'?> mb-4"><h5 class="font-weight-bold mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Medication allergy review</h5>
+  <?php if($structuredAllergies): ?><div class="font-weight-bold mb-1">Structured allergy records</div><ul class="mb-2"><?php foreach($structuredAllergies as $allergy): ?><li><?=htmlspecialchars($allergy)?></li><?php endforeach; ?></ul><?php endif; ?>
+  <?php if(trim((string)($admission['legacy_allergies']??''))!==''): ?><div class="font-weight-bold mb-1">Patient allergy notes</div><div class="mb-2"><?=nl2br(htmlspecialchars((string)$admission['legacy_allergies']))?></div><?php endif; ?>
+  <?php if(!$structuredAllergies && trim((string)($admission['legacy_allergies']??''))===''): ?><div>No allergy information is currently recorded. A blank record does not confirm that the patient has no known allergies; verify with the patient or appropriate representative.</div><?php endif; ?>
+  <small>Review this information against the current clinical record and local medication-safety policy. This screen does not automatically detect drug interactions or determine whether a medicine is safe.</small></div>
  <?php if($canCreate): ?><div class="card mb-4"><div class="card-header"><strong>Record medication outcome</strong></div><div class="card-body"><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="admission_id" value="<?=(int)$admissionId?>">
  <div class="form-group"><label>Completed pharmacy dispense</label><select class="form-control" name="pharmacy_queue_id" required><option value="">Select dispensed medicine</option>
  <?php $s=$conn->prepare("SELECT q.id,q.prescription_id,q.quantity,q.completed_at,s.drug_name,pr.frequency FROM pharmacy_queue q JOIN pharmacy_stock s ON s.id=q.medicine_id JOIN prescriptions pr ON pr.id=q.prescription_id WHERE q.patient_id=? AND q.status='completed' ORDER BY q.completed_at DESC"); if($s){$s->bind_param('i',$admission['patient_id']);$s->execute();$rs=$s->get_result();while($row=$rs->fetch_assoc()): ?><option value="<?=(int)$row['id']?>"><?=htmlspecialchars($row['drug_name'])?> · Rx #<?=(int)$row['prescription_id']?> · Qty <?=(int)$row['quantity']?> · <?=htmlspecialchars($row['completed_at']??'Dispensed')?></option><?php endwhile;$s->close();} ?>
  </select><small class="text-muted">Only completed dispenses linked to this patient’s existing prescription are selectable.</small></div>
- <div class="form-group"><label>Scheduled dose time <span class="text-muted font-weight-normal">(optional)</span></label><input type="datetime-local" class="form-control" name="scheduled_at"><small class="form-text text-muted">Enter the prescribed dose time when the medication order has a defined schedule. This field records a dose slot; it does not create or change a prescription.</small></div>
+ <div class="form-group"><label>Allergy review outcome <span class="text-danger">*</span></label><select class="form-control" name="allergy_review_status" required><option value="">Confirm review status</option><option value="Reviewed">Allergy information reviewed</option><option value="Unable to verify">Unable to verify allergy status</option></select><small class="form-text text-muted">Required for every MAR outcome. The selection and reviewing user/time are recorded; this is not an automated allergy or interaction check.</small></div>
+  <div class="form-group"><label>Scheduled dose time <span class="text-muted font-weight-normal">(optional)</span></label><input type="datetime-local" class="form-control" name="scheduled_at"><small class="form-text text-muted">Enter the prescribed dose time when the medication order has a defined schedule. This field records a dose slot; it does not create or change a prescription.</small></div>
  <div class="form-row"><div class="form-group col-md-4"><label>Outcome</label><select class="form-control" name="status" required><option value="Given">Given</option><option value="Omitted">Omitted</option><option value="Refused">Refused</option><option value="Held">Held</option><option value="Not Available">Not Available</option></select></div><div class="form-group col-md-4"><label>Dose given</label><input class="form-control" name="dose_given" maxlength="120" placeholder="Dose actually administered"></div><div class="form-group col-md-4"><label>Route</label><input class="form-control" name="route" maxlength="80" placeholder="e.g. oral, IV"></div></div>
  <div class="form-group"><label>Notes / reason if not given</label><textarea class="form-control" name="administration_notes" rows="2"></textarea></div><button class="btn btn-primary" name="save_mar" value="1">Save administration record</button></form></div></div><?php endif; ?>
- <div class="card"><div class="card-header"><strong>Recorded medication outcomes</strong></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Medicine / Rx</th><th>Scheduled dose</th><th>Outcome</th><th>Dose / Route</th><th>Administered / Recorded</th><th>Notes</th></tr></thead><tbody>
+ <div class="card"><div class="card-header"><strong>Recorded medication outcomes</strong></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Medicine / Rx</th><th>Scheduled dose</th><th>Outcome</th><th>Dose / Route</th><th>Allergy review</th><th>Administered / Recorded</th><th>Notes</th></tr></thead><tbody>
  <?php
  $s=$conn->prepare("SELECT m.*,s.drug_name FROM nursing_medication_administrations m JOIN pharmacy_stock s ON s.id=m.medicine_id WHERE m.admission_id=? ORDER BY m.created_at DESC");
  if($s){
@@ -90,10 +104,10 @@ include __DIR__ . '/../includes/sidebar.php';
    $rs=$s->get_result();
    if($rs->num_rows>0){
      while($row=$rs->fetch_assoc()){
-       echo '<tr><td>'.htmlspecialchars($row['drug_name']).'<br><small>Prescription #'.(int)$row['prescription_id'].'</small></td><td>'.htmlspecialchars($row['scheduled_at']??'Not scheduled').'</td><td>'.htmlspecialchars($row['status']).'</td><td>'.htmlspecialchars($row['dose_given']??'—').' / '.htmlspecialchars($row['route']??'—').'</td><td>'.htmlspecialchars($row['administered_at']??$row['created_at']).'</td><td>'.nl2br(htmlspecialchars($row['administration_notes']??'')).'</td></tr>';
+       echo '<tr><td>'.htmlspecialchars($row['drug_name']).'<br><small>Prescription #'.(int)$row['prescription_id'].'</small></td><td>'.htmlspecialchars($row['scheduled_at']??'Not scheduled').'</td><td>'.htmlspecialchars($row['status']).'</td><td>'.htmlspecialchars($row['dose_given']??'—').' / '.htmlspecialchars($row['route']??'—').'</td><td>'.htmlspecialchars($row['allergy_review_status']??'Not recorded').'<br><small>'.htmlspecialchars($row['allergy_reviewed_at']??'—').' · User #'.(int)($row['allergy_reviewed_by']??0).'</small></td><td>'.htmlspecialchars($row['administered_at']??$row['created_at']).'</td><td>'.nl2br(htmlspecialchars($row['administration_notes']??'')).'</td></tr>';
      }
    } else {
-     echo '<tr><td colspan="6" class="text-center text-muted py-3">No medication administration outcomes recorded.</td></tr>';
+     echo '<tr><td colspan="7" class="text-center text-muted py-3">No medication administration outcomes recorded.</td></tr>';
    }
    $s->close();
  } ?>
