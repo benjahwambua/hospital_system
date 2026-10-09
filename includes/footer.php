@@ -7,7 +7,11 @@
         --sidebar-width: 250px; 
     }
     .site-footer {
-        margin-left: var(--sidebar-width); 
+        margin-left: 0;
+        left: 260px;
+        right: 0;
+        width: auto;
+        box-sizing: border-box; 
         background-color: var(--sidebar-blue);
         color: rgba(255, 255, 255, 0.8);
         padding: 20px 40px;
@@ -24,7 +28,7 @@
     .support-pill-dark { background:rgba(0,0,0,.2); border:1px solid rgba(255,255,255,.2); padding:6px 16px; border-radius:50px; color:#fff; font-weight:700; font-size:12px; }
     .dev-link-white { color:#fff; font-weight:700; text-decoration:none; transition:.2s; border-bottom:1px solid rgba(255,255,255,.4); }
     .dev-link-white:hover { color:#b3d7ff; border-bottom-color:#fff; }
-    @media(max-width:768px){.site-footer{margin-left:0;padding:20px;text-align:center}.footer-flex{flex-direction:column;gap:15px}}
+    @media(max-width:768px){.site-footer{left:0;right:0;margin-left:0;padding:20px;text-align:center}.footer-flex{flex-direction:column;gap:15px}}
 </style>
 <footer class="site-footer">
     <div class="footer-flex">
