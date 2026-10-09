@@ -63,7 +63,7 @@ Highest-priority gaps:
 | Claims | Partial | Schema exists; end-to-end workflow missing |
 | Preauthorization | Partial | Schema exists; operational workflow missing |
 | Remittance/reconciliation | Partial | Schema exists; payer remittance workflow missing |
-| Central stores | Partial | Item/location master, multi-item requisitions, GRN receipts, independent lot-level physical counts/variance approval, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balance reporting exist. Return/adjustment controls now require a known lot or an explicit untracked-stock declaration, and stock decreases validate the exact lot balance. Legacy untracked stock reconciliation, valuation, wider integration and UAT remain |
+| Central stores | Partial | Item/location master, multi-item requisitions, GRN receipts, independent lot-level physical counts/variance approval, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balance reporting exist. Return/adjustment controls now require a known lot or an explicit untracked-stock declaration, stock decreases validate the exact lot balance, and a dashboard queue flags negative lots, expired stock on hand and positive untracked balances. Reconcile those exceptions, complete valuation, wider integration and UAT remain |
 | Stock requisitions | Partial | Department requisitions support up to four items per request with approval and issue; partial issue controls, counts and department-level integration remain |
 | Batch/expiry control | Partial | Pharmacy/lab support exists; needs unified model |
 | Procurement | Strong | PO, receiving, suppliers and payables exist |
