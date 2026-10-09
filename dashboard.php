@@ -67,6 +67,7 @@ include __DIR__ . '/includes/sidebar.php';
       <a class="quick" href="lab/dashboard.php"><i class="fas fa-microscope"></i><div><strong>Laboratory</strong><span>Requests & results</span></div></a>
       <a class="quick" href="pharmacy/dashboard.php"><i class="fas fa-pills"></i><div><strong>Pharmacy</strong><span>Dispensing & stock</span></div></a>
       <a class="quick" href="cashier/index.php"><i class="fas fa-cash-register"></i><div><strong>Cashier</strong><span>Patient collections</span></div></a>
+      <a class="quick" href="stores/index.php"><i class="fas fa-boxes"></i><div><strong>Central Stores</strong><span>Stock &amp; requisitions</span></div></a>
     </div></div></div>
     <div class="exec-panel"><div class="exec-head"><strong>Operational Pulse</strong><small>Live queue counts</small></div><div class="exec-body"><div class="alert-list">
       <a href="lab/lab_results.php" class="alert-row text-decoration-none"><span class="label">Pending laboratory</span><strong><?= $labPending ?></strong></a>
