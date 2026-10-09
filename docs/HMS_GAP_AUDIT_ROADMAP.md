@@ -63,7 +63,7 @@ Highest-priority gaps:
 | Claims | Partial | Schema exists; end-to-end workflow missing |
 | Preauthorization | Partial | Schema exists; operational workflow missing |
 | Remittance/reconciliation | Partial | Schema exists; payer remittance workflow missing |
-| Central stores | Partial | Item/location master, multi-item requisitions, GRN receipts, independent lot-level physical counts/variance approval, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balance reporting exist. Consistent lot metadata on returns/adjustments, legacy untracked stock reconciliation, valuation, wider integration and UAT remain |
+| Central stores | Partial | Item/location master, multi-item requisitions, GRN receipts, independent lot-level physical counts/variance approval, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balance reporting exist. Return/adjustment controls now require a known lot or an explicit untracked-stock declaration, and stock decreases validate the exact lot balance. Legacy untracked stock reconciliation, valuation, wider integration and UAT remain |
 | Stock requisitions | Partial | Department requisitions support up to four items per request with approval and issue; partial issue controls, counts and department-level integration remain |
 | Batch/expiry control | Partial | Pharmacy/lab support exists; needs unified model |
 | Procurement | Strong | PO, receiving, suppliers and payables exist |
@@ -132,7 +132,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 ### Phase 1 — Hospital enterprise core
 
 1. **Insurance & SHA** — payers, plans, patient coverage, eligibility, tariffs, preauthorization, claims, denials, appeals, remittances and payer reconciliation.
-2. **Central Stores** — enforce lot metadata on returns and adjustments; reconcile legacy untracked stock and batch-level valuation from GRN receipt through departmental issue; verify controls in UAT.
+2. **Central Stores** — reconcile legacy untracked stock and historical lot gaps; complete batch-level valuation from GRN receipt through departmental issue; verify returns, adjustments, counts and FEFO issue controls in UAT.
 3. **Inpatient/Ward expansion** — ward master, bed master, occupancy, transfers, admission lifecycle, daily charges and discharge.
 4. **Nursing** — nursing notes, observations, care plans, handover, medication administration, intake/output and tasks.
 
