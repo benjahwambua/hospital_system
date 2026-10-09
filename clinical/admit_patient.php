@@ -12,7 +12,9 @@ require_module_access($conn,'clinical','create');
 
 $csrfToken=csrf_token();$message='';
 $preWard=trim((string)($_GET['ward']??''));$preBed=(int)($_GET['bed']??0);
-$wards=['General Ward (Male)','General Ward (Female)','Maternity Ward','Pediatric Ward','ICU'];
+$wards=[];
+$wardQuery=$conn->query("SELECT name FROM inpatient_wards WHERE is_active=1 ORDER BY name");
+if($wardQuery)while($wardRow=$wardQuery->fetch_assoc())$wards[]=$wardRow['name'];
 
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!verify_csrf_token($_POST['csrf_token']??null))$message="<div class='alert alert-danger'>Invalid security token. Please refresh and try again.</div>";
@@ -20,7 +22,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $patientId=(int)($_POST['patient_id']??0);$ward=trim((string)($_POST['ward_name']??''));$bed=(int)($_POST['bed_number']??0);
   $admitDate=trim((string)($_POST['admit_date']??''));$reason=trim((string)($_POST['reason']??''));$doctor=trim((string)($_POST['attending_doctor']??''));$userId=(int)($_SESSION['user_id']??0);
   $parsedDate=DateTime::createFromFormat('Y-m-d\TH:i',$admitDate);
-  if($patientId<=0||!in_array($ward,$wards,true)||$bed<1||$bed>6||$reason===''||$doctor===''||!$parsedDate)$message="<div class='alert alert-danger'>Complete all required admission details.</div>";
+  $validBed=false;
+  if($ward!==''&&$bed>0){
+   $check=$conn->prepare("SELECT b.id FROM inpatient_wards w JOIN inpatient_beds b ON b.ward_id=w.id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1");
+   if($check){$check->bind_param('si',$ward,$bed);$check->execute();$validBed=(bool)$check->get_result()->fetch_assoc();$check->close();}
+  }
+  if($patientId<=0||!in_array($ward,$wards,true)||!$validBed||$reason===''||$doctor===''||!$parsedDate)$message="<div class='alert alert-danger'>Complete all required admission details and select an active bed from the ward register.</div>";
   else{
    $conn->begin_transaction();
    try{
@@ -53,7 +60,7 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
 <div class="col-lg-5 mb-3"><label class="admit-label">Attending Clinician</label><input name="attending_doctor" class="form-control admit-field" value="<?=htmlspecialchars($_POST['attending_doctor']??'')?>" placeholder="Physician / clinician name" required></div></div></div>
 <div class="admit-section"><h3><i class="fas fa-bed"></i>Ward & Bed Allocation</h3><div class="row">
 <div class="col-md-6 mb-3"><label class="admit-label">Ward</label><select name="ward_name" class="form-control admit-field" required><?php foreach($wards as $w):?><option value="<?=htmlspecialchars($w)?>" <?=($preWard===$w?'selected':'')?>><?=htmlspecialchars($w)?></option><?php endforeach;?></select></div>
-<div class="col-md-3 mb-3"><label class="admit-label">Bed Number</label><input type="number" min="1" max="6" name="bed_number" class="form-control admit-field" value="<?=htmlspecialchars((string)$preBed)?>" required></div>
+<div class="col-md-3 mb-3"><label class="admit-label">Bed Number</label><input type="number" min="1" max="999" name="bed_number" class="form-control admit-field" value="<?=htmlspecialchars((string)$preBed)?>" required></div>
 <div class="col-md-3 mb-3"><label class="admit-label">Admission Date & Time</label><input type="datetime-local" name="admit_date" class="form-control admit-field" value="<?=htmlspecialchars($_POST['admit_date']??date('Y-m-d\TH:i'))?>" required></div></div></div>
 <div class="admit-section"><h3><i class="fas fa-notes-medical"></i>Clinical Information</h3><label class="admit-label">Reason for Admission / Initial Diagnosis</label><textarea name="reason" class="form-control admit-field" rows="5" placeholder="Document the clinical reason for admission, presenting diagnosis or indication..." required><?=htmlspecialchars($_POST['reason']??'')?></textarea></div>
 <div class="admit-footer"><div class="small text-muted"><i class="fas fa-user-circle mr-1"></i> Recorded by <strong><?=htmlspecialchars($_SESSION['full_name']??'System User')?></strong></div><div><a href="ward_management.php" class="btn btn-light border mr-2">Cancel</a><button class="btn btn-primary px-4"><i class="fas fa-check-circle mr-1"></i> Admit Patient</button></div></div>

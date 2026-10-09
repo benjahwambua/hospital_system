@@ -51,7 +51,7 @@ Highest-priority gaps:
 | Pharmacy inventory | Adequate | Stock movement exists; needs enterprise integration |
 | Maternity | Strong | ANC, labour, PNC, deliveries and admissions exist |
 | Inpatient admission | Adequate | Admission and active stay records exist; transfer is now transactional and auditable |
-| Ward/bed management | Adequate | Occupancy and discharge exist; bed transfers are implemented with destination checks and history logging; configurable ward/bed master and occupancy history UI remain |
+| Ward/bed management | Adequate | Occupancy and discharge, configurable ward/bed master, active-bed capacity and recent transfer history UI exist; transfer and admission integration still require full UAT |
 | Nursing | Partial | Nursing station supports observations, notes, assigned tasks/completion and structured care plans; medication administration, staff-linked assignment, care-plan review and UAT remain |
 | Emergency / casualty | Missing | ED lifecycle and triage workflow needed |
 | Theatre / surgery | Missing | Theatre scheduling and peri-operative workflow needed |
@@ -212,3 +212,4 @@ This document is the master reference for future HMS development.
 ## Inpatient / Nursing implementation note (2026-10-09)
 
 The current feature branch adds an auditable inpatient bed-transfer workflow and Nursing Station task/care-plan records. Database migration: `database/inpatient_nursing_expansion_migration.sql`. Apply it after the existing IPD and Nursing migrations in a backed-up test environment. These changes have not been validated against a live database; do not treat the percentage estimates as UAT completion. Medication administration should be built only after confirming prescription/order and dispense schemas so it cannot become an unsafe parallel medication record.
+\n\n## Ward configuration implementation note (2026-10-09)\n\n`database/inpatient_ward_bed_master_migration.sql` adds an idempotent ward/bed master and seeds the existing five ward labels with six beds each without overwriting existing bed records. `clinical/ward_management.php` uses active master records to render capacity and exposes the latest 25 bed transfers. `clinical/ward_configuration.php` provides permission-gated ward/bed creation and safe bed activation/deactivation, refusing to deactivate an occupied bed. The migration is not applied and the new workflow has not undergone functional/UAT testing. Before production, back up the database, apply migrations in documented order, and reconcile any active admission whose ward/bed does not match the seeded master.\n

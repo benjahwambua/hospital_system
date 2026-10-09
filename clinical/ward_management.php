@@ -26,9 +26,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'trans
         $toWard = trim((string)($_POST['to_ward'] ?? ''));
         $toBed = (int)($_POST['to_bed'] ?? 0);
         $reason = trim((string)($_POST['transfer_reason'] ?? ''));
-        $allowedWards = ['General Ward (Male)','General Ward (Female)','Maternity Ward','Pediatric Ward','ICU'];
-        if ($transferId <= 0 || !in_array($toWard, $allowedWards, true) || $toBed < 1 || $toBed > 6 || $reason === '') {
-            $message = "<div class='alert alert-danger'>Select a valid destination ward and bed, and provide a transfer reason.</div>";
+        $destinationValid = false;
+        if ($toWard !== '' && $toBed > 0) {
+            $check = $conn->prepare("SELECT b.id FROM inpatient_wards w JOIN inpatient_beds b ON b.ward_id=w.id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1");
+            if ($check) {
+                $check->bind_param('si', $toWard, $toBed);
+                $check->execute();
+                $destinationValid = (bool)$check->get_result()->fetch_assoc();
+                $check->close();
+            }
+        }
+        if ($transferId <= 0 || !$destinationValid || $reason === '') {
+            $message = "<div class='alert alert-danger'>Select an active destination ward and bed, and provide a transfer reason.</div>";
         } else {
             $conn->begin_transaction();
             try {
@@ -232,14 +241,35 @@ if ($dischargeId > 0 && !$dischargeAdmission) {
     }
 }
 
-// Hospital configuration
-$hospital_wards = [
-    'General Ward (Male)'   => 6,
-    'General Ward (Female)' => 6,
-    'Maternity Ward'        => 6,
-    'Pediatric Ward'        => 6,
-    'ICU'                   => 6
-];
+// Ward and bed master is the source of truth for active capacity.
+$hospital_wards = [];
+$bed_catalog = [];
+$wardQuery = $conn->query("SELECT id,name FROM inpatient_wards WHERE is_active=1 ORDER BY name");
+if ($wardQuery) {
+    while ($wardRow = $wardQuery->fetch_assoc()) {
+        $wardName = (string)$wardRow['name'];
+        $hospital_wards[$wardName] = 0;
+        $bedStmt = $conn->prepare("SELECT bed_number,label FROM inpatient_beds WHERE ward_id=? AND is_active=1 ORDER BY bed_number");
+        if ($bedStmt) {
+            $wardId = (int)$wardRow['id'];
+            $bedStmt->bind_param('i', $wardId);
+            $bedStmt->execute();
+            $bedRows = $bedStmt->get_result();
+            while ($bedRow = $bedRows->fetch_assoc()) {
+                $bed_catalog[$wardName][] = $bedRow;
+                $hospital_wards[$wardName]++;
+            }
+            $bedStmt->close();
+        }
+    }
+}
+
+// Recent occupancy movements remain visible for traceability.
+$recentTransfers = [];
+$historyQuery = $conn->query("SELECT t.id,t.admission_id,t.patient_id,t.from_ward,t.from_bed,t.to_ward,t.to_bed,t.transfer_reason,t.transferred_by,t.transferred_at,p.full_name,p.patient_number FROM inpatient_bed_transfers t LEFT JOIN patients p ON p.id=t.patient_id ORDER BY t.transferred_at DESC,t.id DESC LIMIT 25");
+if ($historyQuery) {
+    while ($historyRow = $historyQuery->fetch_assoc()) $recentTransfers[] = $historyRow;
+}
 
 // Active admissions determine occupied beds.
 $sql = "SELECT a.id, a.patient_id, a.ward_name, a.bed_number, p.full_name AS patient_name,
@@ -304,10 +334,9 @@ include __DIR__ . '/../includes/sidebar.php';
         <h1 class="h3 mb-1 text-gray-800 font-weight-bold">Ward / IPD Management</h1>
         <p class="text-muted mb-0">Manage admissions, beds, ongoing inpatient stays and discharge from one workspace.</p>
       </div>
-      <div class="mt-3 mt-sm-0">
-        <a href="admit_patient.php" class="btn btn-primary shadow-sm">
-          <i class="fas fa-plus mr-2"></i>New Admission
-        </a>
+      <div class="mt-3 mt-sm-0 d-flex flex-wrap" style="gap:8px;">
+        <a href="ward_configuration.php" class="btn btn-outline-primary shadow-sm"><i class="fas fa-sliders-h mr-2"></i>Ward &amp; Bed Setup</a>
+        <a href="admit_patient.php" class="btn btn-primary shadow-sm"><i class="fas fa-plus mr-2"></i>New Admission</a>
       </div>
     </div>
 
@@ -328,7 +357,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <input type="hidden" name="transfer_id" value="<?= (int)$transferId ?>">
             <div class="row">
               <div class="col-md-5 form-group"><label class="discharge-label">Destination Ward</label><select name="to_ward" class="form-control" required><?php foreach ($hospital_wards as $wardName => $totalBeds): ?><option value="<?=htmlspecialchars($wardName)?>" <?=($transferAdmission['ward_name']===$wardName?'disabled':'')?>><?=htmlspecialchars($wardName)?></option><?php endforeach; ?></select></div>
-              <div class="col-md-2 form-group"><label class="discharge-label">Bed</label><input type="number" min="1" max="6" name="to_bed" class="form-control" required></div>
+              <div class="col-md-2 form-group"><label class="discharge-label">Bed number</label><input type="number" min="1" name="to_bed" class="form-control" required><small class="text-muted">Choose an active bed in the selected ward.</small></div>
               <div class="col-md-5 form-group"><label class="discharge-label">Reason for Transfer</label><input name="transfer_reason" class="form-control" maxlength="500" required placeholder="Clinical need / bed management reason"></div>
             </div>
             <div class="d-flex justify-content-between mt-3"><a href="ward_management.php" class="btn btn-light border">Cancel</a><button class="btn btn-primary" onclick="return confirm('Confirm transfer to the selected ward and bed?');"><i class="fas fa-exchange-alt mr-1"></i>Confirm Transfer</button></div>
@@ -392,7 +421,8 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         <div class="card-body bg-light py-4">
           <div class="bed-grid">
-            <?php for ($i=1; $i<=$totalBeds; $i++): ?>
+            <?php foreach (($bed_catalog[$wardName] ?? []) as $bedRow): ?>
+              <?php $i = (int)$bedRow['bed_number']; ?>
               <?php
                 $isOccupied = isset($currentWardOccupied[$i]);
                 $bedClass = $isOccupied ? 'bed-occupied' : 'bed-available';
@@ -423,11 +453,37 @@ include __DIR__ . '/../includes/sidebar.php';
                 <i class="fas fa-bed bed-icon"></i>
                 <span class="bed-number">BED <?=$i?></span>
               </a>
-            <?php endfor; ?>
+            <?php endforeach; ?>
           </div>
         </div>
       </div>
     <?php endforeach; ?>
+
+    <div class="card shadow mb-4">
+      <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h5 class="m-0 font-weight-bold"><i class="fas fa-history text-primary mr-2"></i>Recent Bed Transfer History</h5>
+        <span class="badge badge-light">Latest 25</span>
+      </div>
+      <div class="card-body">
+        <?php if (!$recentTransfers): ?>
+          <p class="text-muted mb-0">No bed transfers have been recorded yet.</p>
+        <?php else: ?>
+          <div class="table-responsive"><table class="table table-sm table-hover">
+            <thead><tr><th>When</th><th>Patient</th><th>From</th><th>To</th><th>Reason</th><th>Recorded by (user ID)</th></tr></thead>
+            <tbody><?php foreach ($recentTransfers as $movement): ?>
+              <tr>
+                <td><?=htmlspecialchars($movement['transferred_at'] ?? '')?></td>
+                <td><?=htmlspecialchars($movement['full_name'] ?? ('Patient #'.(int)$movement['patient_id']))?><small class="d-block text-muted"><?=htmlspecialchars($movement['patient_number'] ?? '')?></small></td>
+                <td><?=htmlspecialchars($movement['from_ward'])?> · Bed <?= (int)$movement['from_bed'] ?></td>
+                <td><?=htmlspecialchars($movement['to_ward'])?> · Bed <?= (int)$movement['to_bed'] ?></td>
+                <td><?=htmlspecialchars($movement['transfer_reason'])?></td>
+                <td><?= (int)$movement['id'] ?></td>
+              </tr>
+            <?php endforeach; ?></tbody>
+          </table></div>
+        <?php endif; ?>
+      </div>
+    </div>
 
   </div>
 </div>
