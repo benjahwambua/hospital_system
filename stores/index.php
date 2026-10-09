@@ -89,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $seenItems[$lineItemId] = true;
                     $lines[] = [(int)$lineItemId, (float)$lineQty];
                 }
+                if (!$lines) throw new RuntimeException('Add at least one requested item and quantity.');
                 if ($department === '' || $dest <= 0) throw new RuntimeException('Complete the requesting department and destination.');
                 $conn->begin_transaction();
                 $number = 'REQ-' . date('Ymd-His') . '-' . random_int(100,999);
