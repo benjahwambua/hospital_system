@@ -334,18 +334,18 @@ include __DIR__ . '/../includes/sidebar.php';
 <div class="main-content">
   <div class="container-fluid pt-4 pb-5">
 
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <section class="hms-module-hero mb-4">
       <div>
-        <div class="text-uppercase text-muted small font-weight-bold" style="letter-spacing:1.3px;">Clinical · Inpatient Care</div>
-        <h1 class="h3 mb-1 text-gray-800 font-weight-bold">Ward / IPD Management</h1>
-        <p class="text-muted mb-0">Manage admissions, beds, ongoing inpatient stays and discharge from one workspace.</p>
+        <div class="hms-module-kicker">Clinical · Inpatient Care</div>
+        <h1>Ward / IPD Management</h1>
+        <p>Manage admissions, beds, ongoing inpatient stays and discharge from one workspace.</p>
       </div>
-      <div class="mt-3 mt-sm-0 d-flex flex-wrap" style="gap:8px;">
-        <a href="inpatient_charges.php" class="btn btn-outline-success shadow-sm"><i class="fas fa-file-invoice-dollar mr-2"></i>Daily Charges</a>
-        <a href="ward_configuration.php" class="btn btn-outline-primary shadow-sm"><i class="fas fa-sliders-h mr-2"></i>Ward &amp; Bed Setup</a>
-        <a href="admit_patient.php" class="btn btn-primary shadow-sm"><i class="fas fa-plus mr-2"></i>New Admission</a>
+      <div class="d-flex flex-wrap" style="gap:8px;">
+        <a href="inpatient_charges.php" class="btn shadow-sm"><i class="fas fa-file-invoice-dollar mr-2"></i>Daily Charges</a>
+        <a href="ward_configuration.php" class="btn shadow-sm"><i class="fas fa-sliders-h mr-2"></i>Ward &amp; Bed Setup</a>
+        <a href="admit_patient.php" class="btn shadow-sm"><i class="fas fa-plus mr-2"></i>New Admission</a>
       </div>
-    </div>
+    </section>
 
     <?php if (!empty($_SESSION['msg_success'])): ?>
       <div class="alert alert-success"><i class="fas fa-check-circle mr-2"></i><?=htmlspecialchars($_SESSION['msg_success'])?></div>
