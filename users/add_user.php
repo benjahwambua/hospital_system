@@ -204,3 +204,5 @@ function confirmSuperUser() {
     return true;
 }
 </script>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
