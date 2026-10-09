@@ -85,3 +85,7 @@ The Nursing Station now rejects shift handovers where the outgoing and incoming 
 ## Inpatient progress reconciliation (2026-10-09)
 
 The progress table now reflects the merged ward/bed master, inpatient daily-charge ledger and discharge-readiness confirmation work rather than listing daily charges and stronger discharge controls as unbuilt. These capabilities are implemented in code, but their database migrations still require controlled application to the target environment and subsequent UAT. Daily charge rates must be reviewed and configured by the hospital; the implementation does not assume a tariff. Engineering estimate for Inpatient/Ward: 85%, not production certification.
+
+## Nursing handover acknowledgement visibility (2026-10-09)
+
+The Nursing Station now displays the recorded acknowledgement timestamp and acknowledging user ID for acknowledged shift handovers, alongside any acknowledgement notes. This improves traceability in the screen but does not replace the broader searchable enterprise audit history. No functional tests or UAT have been run.
