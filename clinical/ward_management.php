@@ -11,7 +11,77 @@ if (empty($_SESSION['csrf_token'])) {
 }
 $csrfToken = $_SESSION['csrf_token'];
 $message = '';
+$canTransfer = can_module_action($conn, 'clinical', 'edit');
+$transferId = (int)($_GET['transfer_id'] ?? $_POST['transfer_id'] ?? 0);
+$transferAdmission = null;
 $dischargeId = (int)($_GET['discharge_id'] ?? $_POST['discharge_id'] ?? 0);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'transfer_bed') {
+    if (!$canTransfer) {
+        $message = "<div class='alert alert-danger'>You do not have permission to transfer inpatient beds.</div>";
+    } elseif (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
+        $message = "<div class='alert alert-danger'>Invalid security token. Please refresh and try again.</div>";
+    } else {
+        $transferId = (int)($_POST['transfer_id'] ?? 0);
+        $toWard = trim((string)($_POST['to_ward'] ?? ''));
+        $toBed = (int)($_POST['to_bed'] ?? 0);
+        $reason = trim((string)($_POST['transfer_reason'] ?? ''));
+        $allowedWards = ['General Ward (Male)','General Ward (Female)','Maternity Ward','Pediatric Ward','ICU'];
+        if ($transferId <= 0 || !in_array($toWard, $allowedWards, true) || $toBed < 1 || $toBed > 6 || $reason === '') {
+            $message = "<div class='alert alert-danger'>Select a valid destination ward and bed, and provide a transfer reason.</div>";
+        } else {
+            $conn->begin_transaction();
+            try {
+                $s = $conn->prepare("SELECT id,patient_id,ward_name,bed_number FROM admissions WHERE id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
+                if (!$s) throw new Exception('Unable to load active admission.');
+                $s->bind_param('i', $transferId);
+                $s->execute();
+                $source = $s->get_result()->fetch_assoc();
+                $s->close();
+                if (!$source) throw new Exception('Active admission not found.');
+                if ($source['ward_name'] === $toWard && (int)$source['bed_number'] === $toBed) throw new Exception('Choose a different destination bed.');
+                $s = $conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' AND id<>? LIMIT 1 FOR UPDATE");
+                if (!$s) throw new Exception('Unable to verify destination bed.');
+                $s->bind_param('sii', $toWard, $toBed, $transferId);
+                $s->execute();
+                $occupied = $s->get_result()->fetch_assoc();
+                $s->close();
+                if ($occupied) throw new Exception('The selected destination bed is occupied.');
+                $userId = (int)($_SESSION['user_id'] ?? 0);
+                $s = $conn->prepare("INSERT INTO inpatient_bed_transfers(admission_id,patient_id,from_ward,from_bed,to_ward,to_bed,transfer_reason,transferred_by) VALUES(?,?,?,?,?,?,?,?)");
+                if (!$s) throw new Exception('Unable to prepare transfer history.');
+                $s->bind_param('iisisisi', $transferId, $source['patient_id'], $source['ward_name'], $source['bed_number'], $toWard, $toBed, $reason, $userId);
+                if (!$s->execute()) throw new Exception('Unable to record transfer history.');
+                $s->close();
+                $s = $conn->prepare("UPDATE admissions SET ward_name=?,bed_number=? WHERE id=? AND status='Admitted'");
+                if (!$s) throw new Exception('Unable to prepare bed update.');
+                $s->bind_param('sii', $toWard, $toBed, $transferId);
+                if (!$s->execute() || $s->affected_rows !== 1) throw new Exception('Admission bed could not be updated.');
+                $s->close();
+                if (function_exists('audit')) audit('inpatient_bed_transfer', "admission_id={$transferId},from={$source['ward_name']}:{$source['bed_number']},to={$toWard}:{$toBed}");
+                $conn->commit();
+                $_SESSION['msg_success'] = 'Bed transfer completed and recorded.';
+                header('Location: ward_management.php?transferred=1');
+                exit;
+            } catch (Throwable $e) {
+                $conn->rollback();
+                error_log('Inpatient bed transfer error: '.$e->getMessage());
+                $message = "<div class='alert alert-danger'>Unable to transfer the patient. The admission was not changed.</div>";
+            }
+        }
+    }
+}
+
+if ($transferId > 0) {
+    $s = $conn->prepare("SELECT a.*,p.full_name,p.patient_number FROM admissions a JOIN patients p ON p.id=a.patient_id WHERE a.id=? AND a.status='Admitted' LIMIT 1");
+    if ($s) {
+        $s->bind_param('i', $transferId);
+        $s->execute();
+        $transferAdmission = $s->get_result()->fetch_assoc();
+        $s->close();
+    }
+    if (!$transferAdmission) $transferId = 0;
+}
 $dischargeAdmission = null;
 
 // Discharge is deliberately handled inside Ward / IPD.
@@ -247,6 +317,26 @@ include __DIR__ . '/../includes/sidebar.php';
     <?php endif; ?>
     <?=$message?>
 
+    <?php if ($transferAdmission && $canTransfer): ?>
+      <div id="transfer" class="discharge-panel" style="border-color:#c8def2;">
+        <div class="discharge-panel-head" style="background:#f2f8ff;border-color:#c8def2;color:#075b9d;"><i class="fas fa-exchange-alt mr-2"></i>Transfer Inpatient Bed</div>
+        <div class="discharge-panel-body">
+          <p class="mb-3"><strong><?=htmlspecialchars($transferAdmission['full_name'])?></strong> · <?=htmlspecialchars($transferAdmission['patient_number'] ?? '')?> — Current location: <?=htmlspecialchars($transferAdmission['ward_name'])?>, Bed <?= (int)$transferAdmission['bed_number'] ?></p>
+          <form method="post" action="ward_management.php?transfer_id=<?= (int)$transferId ?>#transfer">
+            <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
+            <input type="hidden" name="action" value="transfer_bed">
+            <input type="hidden" name="transfer_id" value="<?= (int)$transferId ?>">
+            <div class="row">
+              <div class="col-md-5 form-group"><label class="discharge-label">Destination Ward</label><select name="to_ward" class="form-control" required><?php foreach ($hospital_wards as $wardName => $totalBeds): ?><option value="<?=htmlspecialchars($wardName)?>" <?=($transferAdmission['ward_name']===$wardName?'disabled':'')?>><?=htmlspecialchars($wardName)?></option><?php endforeach; ?></select></div>
+              <div class="col-md-2 form-group"><label class="discharge-label">Bed</label><input type="number" min="1" max="6" name="to_bed" class="form-control" required></div>
+              <div class="col-md-5 form-group"><label class="discharge-label">Reason for Transfer</label><input name="transfer_reason" class="form-control" maxlength="500" required placeholder="Clinical need / bed management reason"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-3"><a href="ward_management.php" class="btn btn-light border">Cancel</a><button class="btn btn-primary" onclick="return confirm('Confirm transfer to the selected ward and bed?');"><i class="fas fa-exchange-alt mr-1"></i>Confirm Transfer</button></div>
+          </form>
+        </div>
+      </div>
+    <?php elseif ($transferId > 0 && !$canTransfer): ?><div class="alert alert-danger">You do not have permission to transfer inpatient beds.</div><?php endif; ?>
+
     <?php if ($dischargeAdmission && $canDischarge): ?>
       <div id="discharge" class="discharge-panel">
         <div class="discharge-panel-head"><i class="fas fa-sign-out-alt mr-2"></i>Discharge Patient</div>
@@ -316,6 +406,9 @@ include __DIR__ . '/../includes/sidebar.php';
                     $popContent .= "<div><b>Reason:</b> ".htmlspecialchars($p['reason'])."</div>";
                     $popContent .= "<div class='pop-btn-group d-flex justify-content-between'>";
                     $popContent .= "<a href='../patients/patient_dashboard.php?id=".$p['patient_id']."' class='btn btn-sm btn-outline-primary'><i class='fas fa-user-injured mr-1'></i> Patient Record</a>";
+                    if ($canTransfer) {
+                        $popContent .= "<a href='ward_management.php?transfer_id=".$p['id']."#transfer' class='btn btn-sm btn-outline-primary ml-2'><i class='fas fa-exchange-alt mr-1'></i> Transfer</a>";
+                    }
                     if ($canDischarge) {
                         $popContent .= "<a href='ward_management.php?discharge_id=".$p['id']."#discharge' class='btn btn-sm btn-danger ml-2'><i class='fas fa-sign-out-alt mr-1'></i> Discharge</a>";
                     }

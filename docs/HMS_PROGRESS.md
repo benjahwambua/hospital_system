@@ -9,8 +9,8 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Legacy file retirement / canonical workflows | 90% | Major obsolete wrappers retired | Final reference scan and UAT |
 | Explicit per-user permissions | 90% | View/Create/Edit/Delete/Approve engine active; legacy role gates largely retired | Verify every existing user assignment; remove remaining compatibility assumptions |
 | Insurance & SHA | 85% | Coverage, verification, preauthorization, claims, submission, remittances and reconciliation workspace implemented | Eligibility/tariff depth, denials/appeals, claim controls and UAT |
-| Inpatient / Ward | 65% | Admission, bed allocation, occupancy and discharge exist | Ward/bed master, transfers, richer occupancy, daily charges and discharge controls |
-| Nursing | 55% | Dedicated nursing station, observations, notes, care-plan/handover note types and inpatient linkage added in current work | Medication administration, tasking, formal care plans, shift workflow and UAT |
+| Inpatient / Ward | 75% | Admission, bed allocation, occupancy, discharge and transactional/audited bed transfers now exist | Configurable ward/bed master, occupancy history UI, daily charges, stronger discharge controls and UAT |
+| Nursing | 70% | Active inpatient nursing station, observations, notes, task assignment/completion and structured care plans are implemented in code | Medication administration linked to verified prescriptions, task assignment to staff directory, care-plan review/closure, escalation and UAT |
 | Central Stores | 70% | Item/location register, movement ledger, multi-item requisitions, procurement GRN receipts, independent physical-count approval, lot-level count snapshots and variances, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balances | Reconcile legacy untracked stock and historic lot gaps, valuation, wider department integration, automated regression tests and UAT |
 | Emergency / Casualty | 0% | Not implemented as a dedicated lifecycle | Triage, emergency encounter, acuity, treatment, disposition and billing |
 | Theatre / Surgery | 0% | Not implemented | Theatre scheduling, pre-op, intra-op, implants, anesthesia, recovery and billing |
@@ -61,3 +61,10 @@ The Nursing access-control migration was corrected on 2026-10-09; the live datab
 ## Central Stores release readiness note (2026-10-09)
 
 A deployment/UAT runbook is available at `docs/CENTRAL_STORES_DEPLOYMENT_UAT.md`. It documents backup and restore rehearsal, schema/index preflight, one-time migration sequencing, post-migration checks, a permissions and stock-control UAT checklist, legacy-count treatment, and rollback safeguards. This is documentation only: it does not mean the migration has been applied or UAT has passed. Central Stores remains at 70% engineering completion pending database deployment, lot reconciliation, integration, and witnessed UAT.
+
+
+## Inpatient / Nursing expansion (2026-10-09)
+
+The feature branch adds `database/inpatient_nursing_expansion_migration.sql` for bed-transfer history, assigned nursing tasks and structured care plans. Ward/IPD now supports a permission-gated, CSRF-protected transfer action that checks the destination bed, updates the active admission in a transaction, records the old/new ward and bed, and writes an audit event. The Nursing Station adds task creation, priority/due-time capture, task completion notes and structured care-plan capture linked to an active admission.
+
+These are implementation estimates only. Apply the new migration after `database/clinical_ipd_migration.sql` and `database/nursing_migration.sql` in a backed-up test database before enabling the features. No database execution or clinical UAT has been performed. Medication administration remains deliberately unimplemented until it can be linked safely to an actual prescription/medication order and its dispense/administration records.

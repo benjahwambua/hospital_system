@@ -82,6 +82,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $s->close();
                 }
             }
+        } elseif ($action === 'task_create') {
+            $title = trim((string)($_POST['task_title'] ?? ''));
+            $details = trim((string)($_POST['task_details'] ?? ''));
+            $priority = trim((string)($_POST['priority'] ?? 'Routine'));
+            $dueRaw = trim((string)($_POST['due_at'] ?? ''));
+            $assignedTo = (int)($_POST['assigned_to'] ?? 0);
+            $allowedPriorities = ['Routine','High','Urgent'];
+            $dueAt = null;
+            if ($dueRaw !== '') {
+                $parsedDue = DateTime::createFromFormat('Y-m-d\\TH:i', $dueRaw);
+                if ($parsedDue) $dueAt = $parsedDue->format('Y-m-d H:i:s');
+            }
+            if ($title === '' || !in_array($priority, $allowedPriorities, true) || ($dueRaw !== '' && $dueAt === null)) {
+                $message = '<div class="alert alert-danger">Enter a task title, valid priority and valid due time.</div>';
+            } else {
+                $s = $conn->prepare("INSERT INTO nursing_tasks(admission_id,patient_id,task_title,task_details,priority,due_at,assigned_to,created_by) VALUES(?,?,?,?,?,?,NULLIF(?,0),?)");
+                if ($s) {
+                    $s->bind_param('iissssii', $admissionId, $admission['patient_id'], $title, $details, $priority, $dueAt, $assignedTo, $userId);
+                    if ($s->execute()) {
+                        if (function_exists('audit')) audit('nursing_task_created', "admission_id={$admissionId},task_id={$s->insert_id},priority={$priority}");
+                        $message = '<div class="alert alert-success">Nursing task assigned to the inpatient record.</div>';
+                    } else $message = '<div class="alert alert-danger">Unable to create nursing task.</div>';
+                    $s->close();
+                }
+            }
+        } elseif ($action === 'task_complete') {
+            $taskId = (int)($_POST['task_id'] ?? 0);
+            $completionNotes = trim((string)($_POST['completion_notes'] ?? ''));
+            $s = $conn->prepare("UPDATE nursing_tasks SET status='Completed',completed_by=?,completed_at=NOW(),completion_notes=? WHERE id=? AND admission_id=? AND status IN ('Open','In Progress')");
+            if ($s) {
+                $s->bind_param('isii', $userId, $completionNotes, $taskId, $admissionId);
+                if ($s->execute() && $s->affected_rows === 1) {
+                    if (function_exists('audit')) audit('nursing_task_completed', "admission_id={$admissionId},task_id={$taskId}");
+                    $message = '<div class="alert alert-success">Nursing task marked complete.</div>';
+                } else $message = '<div class="alert alert-warning">Task was not updated; it may already be completed or no longer active.</div>';
+                $s->close();
+            }
+        } elseif ($action === 'care_plan_create') {
+            $problem = trim((string)($_POST['problem_or_need'] ?? ''));
+            $goal = trim((string)($_POST['goal'] ?? ''));
+            $interventions = trim((string)($_POST['interventions'] ?? ''));
+            $reviewRaw = trim((string)($_POST['review_due_at'] ?? ''));
+            $reviewDue = null;
+            if ($reviewRaw !== '') {
+                $parsedReview = DateTime::createFromFormat('Y-m-d\\TH:i', $reviewRaw);
+                if ($parsedReview) $reviewDue = $parsedReview->format('Y-m-d H:i:s');
+            }
+            if ($problem === '' || $goal === '' || $interventions === '' || ($reviewRaw !== '' && $reviewDue === null)) {
+                $message = '<div class="alert alert-danger">Care plan problem/need, goal and interventions are required.</div>';
+            } else {
+                $s = $conn->prepare("INSERT INTO nursing_care_plans(admission_id,patient_id,problem_or_need,goal,interventions,review_due_at,created_by) VALUES(?,?,?,?,?,?,?)");
+                if ($s) {
+                    $s->bind_param('iissssi', $admissionId, $admission['patient_id'], $problem, $goal, $interventions, $reviewDue, $userId);
+                    if ($s->execute()) {
+                        if (function_exists('audit')) audit('nursing_care_plan_created', "admission_id={$admissionId},plan_id={$s->insert_id}");
+                        $message = '<div class="alert alert-success">Nursing care plan saved.</div>';
+                    } else $message = '<div class="alert alert-danger">Unable to save nursing care plan.</div>';
+                    $s->close();
+                }
+            }
         }
     }
 }
@@ -153,6 +213,44 @@ include __DIR__ . '/../includes/sidebar.php';
         <h6 class="font-weight-bold mt-4">Latest Nursing Notes</h6><div class="table-responsive"><table class="n-table"><thead><tr><th>Date</th><th>Type</th><th>Shift</th><th>Note</th></tr></thead><tbody>
         <?php $ns=$conn->prepare("SELECT * FROM nursing_notes WHERE admission_id=? ORDER BY created_at DESC LIMIT 10"); if($ns){$ns->bind_param('i',$selected['id']);$ns->execute();$nrr=$ns->get_result();while($n=$nrr->fetch_assoc()): ?><tr><td><?=htmlspecialchars($n['created_at'])?></td><td><span class="badge-soft"><?=htmlspecialchars($n['note_type'])?></span></td><td><?=htmlspecialchars($n['shift']??'—')?></td><td><?=nl2br(htmlspecialchars($n['note_text']))?></td></tr><?php endwhile; $ns->close(); } ?></tbody></table></div>
       </div></div>
+      <?php endif; ?>
+      <?php if($selected): ?>
+      <div class="n-card">
+        <div class="n-head"><strong>Nursing Tasks</strong><span class="badge-soft">Admission #<?= (int)$selected['id'] ?></span></div>
+        <div class="n-body">
+          <?php if($canCreate): ?>
+          <form method="post" class="n-form mb-4">
+            <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="task_create"><input type="hidden" name="admission_id" value="<?= (int)$selected['id'] ?>">
+            <div class="form-row">
+              <div class="form-group col-md-6"><label>Task</label><input name="task_title" class="form-control" maxlength="180" required placeholder="e.g. Recheck observations"></div>
+              <div class="form-group col-md-3"><label>Priority</label><select name="priority" class="form-control"><option>Routine</option><option>High</option><option>Urgent</option></select></div>
+              <div class="form-group col-md-3"><label>Due</label><input type="datetime-local" name="due_at" class="form-control"></div>
+            </div>
+            <div class="form-group"><label>Instructions</label><textarea name="task_details" class="form-control" rows="2"></textarea></div>
+            <button class="btn btn-primary"><i class="fas fa-plus mr-1"></i>Assign Task</button>
+          </form>
+          <?php endif; ?>
+          <div class="table-responsive"><table class="n-table"><thead><tr><th>Task</th><th>Priority / Due</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          <?php $ts=$conn->prepare("SELECT * FROM nursing_tasks WHERE admission_id=? ORDER BY FIELD(priority,'Urgent','High','Routine'),due_at IS NULL,due_at,created_at DESC"); if($ts){$ts->bind_param('i',$selected['id']);$ts->execute();$tr=$ts->get_result();while($t=$tr->fetch_assoc()): ?>
+            <tr><td><strong><?=htmlspecialchars($t['task_title'])?></strong><div><?=nl2br(htmlspecialchars($t['task_details']??''))?></div><?php if(!empty($t['completion_notes'])): ?><small class="text-muted">Completion: <?=htmlspecialchars($t['completion_notes'])?></small><?php endif; ?></td><td><?=htmlspecialchars($t['priority'])?><br><small><?=htmlspecialchars($t['due_at']??'No due time')?></small></td><td><span class="badge-soft"><?=htmlspecialchars($t['status'])?></span></td><td><?php if($canCreate && in_array($t['status'],['Open','In Progress'],true)): ?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="task_complete"><input type="hidden" name="admission_id" value="<?= (int)$selected['id'] ?>"><input type="hidden" name="task_id" value="<?= (int)$t['id'] ?>"><input name="completion_notes" class="form-control mb-1" placeholder="Outcome (optional)"><button class="btn btn-sm btn-outline-success">Complete</button></form><?php else: ?>—<?php endif; ?></td></tr>
+          <?php endwhile; $ts->close(); } ?></tbody></table></div>
+        </div>
+      </div>
+      <div class="n-card">
+        <div class="n-head"><strong>Structured Care Plan</strong><span class="badge-soft">Admission #<?= (int)$selected['id'] ?></span></div>
+        <div class="n-body">
+          <?php if($canCreate): ?><form method="post" class="n-form mb-4">
+            <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="care_plan_create"><input type="hidden" name="admission_id" value="<?= (int)$selected['id'] ?>">
+            <div class="form-group"><label>Problem / Care Need</label><input name="problem_or_need" class="form-control" maxlength="180" required></div>
+            <div class="form-group"><label>Expected Goal</label><input name="goal" class="form-control" maxlength="500" required></div>
+            <div class="form-group"><label>Nursing Interventions</label><textarea name="interventions" class="form-control" rows="3" required></textarea></div>
+            <div class="form-group"><label>Review Due</label><input type="datetime-local" name="review_due_at" class="form-control"></div>
+            <button class="btn btn-primary"><i class="fas fa-clipboard-check mr-1"></i>Save Care Plan</button>
+          </form><?php endif; ?>
+          <div class="table-responsive"><table class="n-table"><thead><tr><th>Need / Goal</th><th>Interventions</th><th>Review</th><th>Status</th></tr></thead><tbody>
+          <?php $ps=$conn->prepare("SELECT * FROM nursing_care_plans WHERE admission_id=? ORDER BY FIELD(status,'Active','Achieved','Discontinued'),review_due_at IS NULL,review_due_at,created_at DESC"); if($ps){$ps->bind_param('i',$selected['id']);$ps->execute();$pr=$ps->get_result();while($plan=$pr->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($plan['problem_or_need'])?></strong><div><?=htmlspecialchars($plan['goal'])?></div></td><td><?=nl2br(htmlspecialchars($plan['interventions']))?></td><td><?=htmlspecialchars($plan['review_due_at']??'Not scheduled')?></td><td><span class="badge-soft"><?=htmlspecialchars($plan['status'])?></span></td></tr><?php endwhile; $ps->close(); } ?></tbody></table></div>
+        </div>
+      </div>
       <?php endif; ?>
     </div>
   </div>
