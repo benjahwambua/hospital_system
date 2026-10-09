@@ -21,14 +21,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $name = trim((string)($_POST['ward_name'] ?? ''));
                 $description = trim((string)($_POST['description'] ?? ''));
                 if ($name === '' || mb_strlen($name) > 120) throw new RuntimeException('Enter a ward name up to 120 characters.');
-                $stmt = $conn->prepare("INSERT INTO inpatient_wards(name,description,is_active,created_by) VALUES(?,?,1,?)");
+                $stmt = $conn->prepare("INSERT INTO inpatient_wards(name,description,daily_rate,is_active,created_by) VALUES(?,?,?,1,?)");
                 if (!$stmt) throw new RuntimeException('Unable to prepare ward creation.');
                 $userId = (int)($_SESSION['user_id'] ?? 0);
-                $stmt->bind_param('ssi', $name, $description, $userId);
+                $dailyRate = max(0, (float)($_POST['daily_rate'] ?? 0));
+                $stmt->bind_param('ssdi', $name, $description, $dailyRate, $userId);
                 if (!$stmt->execute()) throw new RuntimeException('Ward name may already exist.');
                 $stmt->close();
                 if (function_exists('audit')) audit('inpatient_ward_created', "ward={$name}");
                 $_SESSION['msg_success'] = 'Ward added.';
+                header('Location: ward_configuration.php'); exit;
+            } elseif ($action === 'set_rate') {
+                $wardId = (int)($_POST['ward_id'] ?? 0);
+                $dailyRate = (float)($_POST['daily_rate'] ?? -1);
+                if ($wardId <= 0 || !is_finite($dailyRate) || $dailyRate < 0 || $dailyRate > 10000000) throw new RuntimeException('Enter a valid non-negative daily rate.');
+                $stmt = $conn->prepare("UPDATE inpatient_wards SET daily_rate=? WHERE id=?");
+                if (!$stmt) throw new RuntimeException('Unable to prepare ward-rate update.');
+                $stmt->bind_param('di', $dailyRate, $wardId);
+                if (!$stmt->execute() || $stmt->affected_rows < 0) throw new RuntimeException('Unable to update daily rate.');
+                $stmt->close();
+                if (function_exists('audit')) audit('inpatient_ward_rate_changed', "ward_id={$wardId},daily_rate={$dailyRate}");
+                $_SESSION['msg_success'] = 'Ward daily rate updated.';
                 header('Location: ward_configuration.php'); exit;
             } elseif ($action === 'add_bed') {
                 $wardId = (int)($_POST['ward_id'] ?? 0);
@@ -75,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 $wards = [];
-$q = $conn->query("SELECT w.id,w.name,w.description,w.is_active,COUNT(CASE WHEN b.is_active=1 THEN 1 END) AS active_beds,COUNT(b.id) AS total_beds FROM inpatient_wards w LEFT JOIN inpatient_beds b ON b.ward_id=w.id GROUP BY w.id,w.name,w.description,w.is_active ORDER BY w.name");
+$q = $conn->query("SELECT w.id,w.name,w.description,w.daily_rate,w.is_active,COUNT(CASE WHEN b.is_active=1 THEN 1 END) AS active_beds,COUNT(b.id) AS total_beds FROM inpatient_wards w LEFT JOIN inpatient_beds b ON b.ward_id=w.id GROUP BY w.id,w.name,w.description,w.is_active ORDER BY w.name");
 if ($q) while ($row = $q->fetch_assoc()) $wards[] = $row;
 $beds = [];
 $q = $conn->query("SELECT b.id,b.ward_id,b.bed_number,b.label,b.is_active,w.name AS ward_name,EXISTS(SELECT 1 FROM admissions a WHERE a.status='Admitted' AND a.ward_name=w.name AND a.bed_number=b.bed_number) AS is_occupied FROM inpatient_beds b JOIN inpatient_wards w ON w.id=b.ward_id ORDER BY w.name,b.bed_number");
@@ -97,6 +110,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="action" value="add_ward">
           <div class="form-group"><label>Ward name</label><input class="form-control" name="ward_name" maxlength="120" required></div>
           <div class="form-group"><label>Description / speciality</label><input class="form-control" name="description" maxlength="255"></div>
+          <div class="form-group"><label>Daily ward rate (KES)</label><input type="number" min="0" max="10000000" step="0.01" class="form-control" name="daily_rate" value="0.00" required><small class="text-muted">Starts at zero; confirm the approved tariff before charging.</small></div>
           <button class="btn btn-primary" <?=(!$canEdit?'disabled':'')?>><i class="fas fa-plus mr-1"></i>Add ward</button>
         </form>
       </div></div>
@@ -110,8 +124,8 @@ include __DIR__ . '/../includes/sidebar.php';
       </div></div>
     </div>
     <div class="col-lg-7"><div class="card shadow-sm mb-4"><div class="card-header font-weight-bold">Ward Register</div><div class="card-body"><div class="table-responsive"><table class="table table-hover">
-      <thead><tr><th>Ward</th><th>Description</th><th>Active beds</th><th>Total records</th><th>Status</th></tr></thead><tbody>
-      <?php foreach ($wards as $ward): ?><tr><td class="font-weight-bold"><?=htmlspecialchars($ward['name'])?></td><td><?=htmlspecialchars($ward['description'] ?? '')?></td><td><?=(int)$ward['active_beds']?></td><td><?=(int)$ward['total_beds']?></td><td><?=((int)$ward['is_active']===1?'Active':'Inactive')?></td></tr><?php endforeach; ?>
+      <thead><tr><th>Ward</th><th>Description</th><th>Active beds</th><th>Daily rate (KES)</th><th>Total records</th><th>Status</th><th>Rate update</th></tr></thead><tbody>
+      <?php foreach ($wards as $ward): ?><tr><td class="font-weight-bold"><?=htmlspecialchars($ward['name'])?></td><td><?=htmlspecialchars($ward['description'] ?? '')?></td><td><?=(int)$ward['active_beds']?></td><td><?=number_format((float)$ward['daily_rate'],2)?></td><td><?=(int)$ward['total_beds']?></td><td><?=((int)$ward['is_active']===1?'Active':'Inactive')?></td><td><form method="post" class="form-inline"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="action" value="set_rate"><input type="hidden" name="ward_id" value="<?=(int)$ward['id']?>"><input type="number" min="0" max="10000000" step="0.01" name="daily_rate" class="form-control form-control-sm mr-1" style="max-width:120px" value="<?=htmlspecialchars((string)$ward['daily_rate'])?>" required><button class="btn btn-sm btn-outline-primary" <?=(!$canEdit?'disabled':'')?>>Save rate</button></form></td></tr><?php endforeach; ?>
       </tbody></table></div></div></div></div>
   </div>
   <div class="card shadow-sm"><div class="card-header font-weight-bold">Bed Register</div><div class="card-body"><div class="table-responsive"><table class="table table-hover">

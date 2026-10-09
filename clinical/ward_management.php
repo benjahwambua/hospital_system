@@ -335,6 +335,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <p class="text-muted mb-0">Manage admissions, beds, ongoing inpatient stays and discharge from one workspace.</p>
       </div>
       <div class="mt-3 mt-sm-0 d-flex flex-wrap" style="gap:8px;">
+        <a href="inpatient_charges.php" class="btn btn-outline-success shadow-sm"><i class="fas fa-file-invoice-dollar mr-2"></i>Daily Charges</a>
         <a href="ward_configuration.php" class="btn btn-outline-primary shadow-sm"><i class="fas fa-sliders-h mr-2"></i>Ward &amp; Bed Setup</a>
         <a href="admit_patient.php" class="btn btn-primary shadow-sm"><i class="fas fa-plus mr-2"></i>New Admission</a>
       </div>
