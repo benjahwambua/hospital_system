@@ -57,8 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $notes = trim((string)($_POST['notes'] ?? ''));
                 if ($itemId <= 0 || $locationId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item and location and enter a quantity greater than zero.');
                 $expiryValue = $expiry === '' ? null : $expiry;
-                $s = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,'Manual Receipt',?,?,?,?,?)");
-                $s->bind_param('iidssssi', $itemId, $locationId, $qty, $batch, $expiryValue, $notes, $uid);
+                $s = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,'Manual Receipt',?,?,?,?)");
+                $s->bind_param('iidsssi', $itemId, $locationId, $qty, $batch, $expiryValue, $notes, $uid);
                 if (!$s->execute()) throw new RuntimeException('Unable to record receipt.');
                 $movementId = $s->insert_id; $s->close();
                 stores_audit('central_stores_receipt', "movement_id=$movementId;item_id=$itemId;qty=$qty;location_id=$locationId");
@@ -118,11 +118,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $balance = stores_balance($conn, (int)$line['item_id'], $mainId);
                     if ($balance < $remaining) throw new RuntimeException('Insufficient Main Store stock for item ID ' . (int)$line['item_id'] . '. Available: ' . $balance . ', requested: ' . $remaining);
                     $m = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,'Issue',?,'Requisition',?,?,?)");
-                    $m->bind_param('iidi si', $line['item_id'], $mainId, $remaining, $reqId, $req['requisition_number'], $uid);
+                    $m->bind_param('iidisi', $line['item_id'], $mainId, $remaining, $reqId, $req['requisition_number'], $uid);
                     if (!$m->execute()) throw new RuntimeException('Unable to record stock issue.');
                     $m->close();
                     $d = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,'Transfer In',?,'Requisition',?,?,?)");
-                    $d->bind_param('iidi si', $line['item_id'], $req['destination_location_id'], $remaining, $reqId, $req['requisition_number'], $uid);
+                    $d->bind_param('iidisi', $line['item_id'], $req['destination_location_id'], $remaining, $reqId, $req['requisition_number'], $uid);
                     if (!$d->execute()) throw new RuntimeException('Unable to record destination stock.');
                     $d->close();
                     $u = $conn->prepare("UPDATE stores_requisition_items SET quantity_issued=quantity_issued+? WHERE id=?");
