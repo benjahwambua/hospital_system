@@ -76,8 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lines = [];
                 $seenItems = [];
                 foreach ($itemIds as $index => $postedItemId) {
+                    $postedQty = trim((string)($quantities[$index] ?? ''));
+                    if (trim((string)$postedItemId) === '' && $postedQty === '') continue;
                     $lineItemId = filter_var($postedItemId, FILTER_VALIDATE_INT);
-                    $lineQty = filter_var($quantities[$index] ?? null, FILTER_VALIDATE_FLOAT);
+                    $lineQty = filter_var($postedQty, FILTER_VALIDATE_FLOAT);
                     if ($lineItemId === false || $lineItemId <= 0 || $lineQty === false || $lineQty <= 0) {
                         throw new RuntimeException('Every requisition line must have a valid item and quantity greater than zero.');
                     }
