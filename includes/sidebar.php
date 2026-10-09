@@ -260,6 +260,8 @@ function isParentActive($paths) {
                 document.querySelectorAll(".has-submenu").forEach(item => {
                     if (item !== parent) {
                         item.classList.remove("open");
+                        const trigger = item.querySelector(".menu-toggle");
+                        if (trigger) trigger.setAttribute("aria-expanded", "false");
                     }
                 });
 
