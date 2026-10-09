@@ -109,6 +109,10 @@ function stores_lot_balance_rows(mysqli $conn, int $itemId, int $locationId): ar
 function stores_audit(string $action, string $details): void {
     if (function_exists('audit')) audit($action, $details);
 }
+function stores_valid_date(string $value): bool {
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date !== false && $date->format('Y-m-d') === $value;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!hash_equals($csrf, (string)($_POST['csrf_token'] ?? ''))) {
@@ -141,10 +145,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $notes = trim((string)($_POST['notes'] ?? ''));
                 if ($itemId <= 0 || $locationId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item and location and enter a quantity greater than zero.');
                 $expiryValue = $expiry === '' ? null : $expiry;
+                if ($expiryValue !== null && !stores_valid_date($expiryValue)) throw new RuntimeException('Enter a valid batch expiry date.');
+                $conn->begin_transaction();
+                $itemCheck = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
+                $itemCheck->bind_param('i', $itemId); $itemCheck->execute(); $validItem = $itemCheck->get_result()->fetch_assoc(); $itemCheck->close();
+                if (!$validItem) throw new RuntimeException('Select an active stock item before receiving stock.');
+                $locationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                $locationCheck->bind_param('i', $locationId); $locationCheck->execute(); $validLocation = $locationCheck->get_result()->fetch_assoc(); $locationCheck->close();
+                if (!$validLocation) throw new RuntimeException('Select an active stock location before receiving stock.');
                 $s = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,'Manual Receipt',?,?,?,?)");
                 $s->bind_param('iidsssi', $itemId, $locationId, $qty, $batch, $expiryValue, $notes, $uid);
                 if (!$s->execute()) throw new RuntimeException('Unable to record receipt.');
-                $movementId = $s->insert_id; $s->close();
+                $movementId = $s->insert_id; $s->close(); $conn->commit();
                 stores_audit('central_stores_receipt', "movement_id=$movementId;item_id=$itemId;qty=$qty;location_id=$locationId");
                 $message = 'Receipt recorded in the stock ledger.';
             } elseif ($action === 'create_requisition') {
@@ -176,6 +188,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$lines) throw new RuntimeException('Add at least one requested item and quantity.');
                 if ($department === '' || $dest <= 0) throw new RuntimeException('Complete the requesting department and destination.');
                 $conn->begin_transaction();
+                $destinationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                $destinationCheck->bind_param('i', $dest); $destinationCheck->execute(); $validDestination = $destinationCheck->get_result()->fetch_assoc(); $destinationCheck->close();
+                if (!$validDestination) throw new RuntimeException('Select an active destination location for the requisition.');
                 $number = 'REQ-' . date('Ymd-His') . '-' . random_int(100,999);
                 $s = $conn->prepare("INSERT INTO stores_requisitions (requisition_number,requesting_department,destination_location_id,requested_by,status,request_notes,submitted_at) VALUES (?,?,?,?,'Submitted',?,NOW())");
                 $s->bind_param('ssiis', $number, $department, $dest, $uid, $notes);
@@ -223,6 +238,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $main = $conn->query("SELECT id FROM stores_locations WHERE location_code='MAIN' AND active=1 LIMIT 1")->fetch_assoc();
                 if (!$main) throw new RuntimeException('Main store location is missing.');
                 $mainId = (int)$main['id'];
+                $destinationId = (int)$req['destination_location_id'];
+                $destinationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                $destinationCheck->bind_param('i', $destinationId); $destinationCheck->execute(); $validDestination = $destinationCheck->get_result()->fetch_assoc(); $destinationCheck->close();
+                if (!$validDestination) throw new RuntimeException('The requisition destination is inactive or missing. Reactivate it or cancel the requisition before issuing stock.');
                 foreach ($lineItems as $line) {
                     $remaining = (float)$line['quantity_requested'] - (float)$line['quantity_issued'];
                     if ($remaining <= 0) continue;
@@ -366,6 +385,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $itemId = (int)$line['item_id']; $locationId = (int)$countHead['location_id'];
                         $batch = $line['batch_number'] !== null && $line['batch_number'] !== '' ? $line['batch_number'] : null;
                         $expiry = $line['expiry_date'] !== null && $line['expiry_date'] !== '' ? $line['expiry_date'] : null;
+                        $itemLock = $conn->prepare("SELECT id FROM stores_items WHERE id=? FOR UPDATE");
+                        $itemLock->bind_param('i', $itemId); $itemLock->execute(); $lockedItem = $itemLock->get_result()->fetch_assoc(); $itemLock->close();
+                        if (!$lockedItem) throw new RuntimeException('A stock item in this count no longer exists.');
                         $currentBalance = stores_lot_balance($conn, $itemId, $locationId, $batch, $expiry);
                         if (abs($currentBalance - (float)$line['expected_quantity']) >= 0.0005) {
                             throw new RuntimeException('Stock changed after the count was opened for item ' . $line['item_name'] . ' (batch ' . ($batch ?? 'untracked') . '). Reject this count and recount before posting variances.');
@@ -395,7 +417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $notes = trim((string)($_POST['movement_notes'] ?? ''));
                 $movementBatch = trim((string)($_POST['movement_batch_number'] ?? ''));
                 $movementExpiry = trim((string)($_POST['movement_expiry_date'] ?? ''));
-                if ($movementExpiry !== '' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $movementExpiry)) throw new RuntimeException('Enter a valid batch expiry date.');
+                if ($movementExpiry !== '' && !stores_valid_date($movementExpiry)) throw new RuntimeException('Enter a valid batch expiry date.');
                 $batchValue = $movementBatch === '' ? null : $movementBatch;
                 $expiryValue = $movementExpiry === '' ? null : $movementExpiry;
                 $explicitlyUntracked = (string)($_POST['movement_untracked'] ?? '') === '1';
@@ -409,6 +431,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $itemCheck = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
                 $itemCheck->bind_param('i', $itemId); $itemCheck->execute(); $validItem = $itemCheck->get_result()->fetch_assoc(); $itemCheck->close();
                 if (!$validItem) throw new RuntimeException('Stock item is not active.');
+                $sourceLocationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                $sourceLocationCheck->bind_param('i', $fromId); $sourceLocationCheck->execute(); $validSourceLocation = $sourceLocationCheck->get_result()->fetch_assoc(); $sourceLocationCheck->close();
+                if (!$validSourceLocation) throw new RuntimeException('Select an active source/return location.');
+                if ($action === 'transfer_stock') {
+                    $destinationLocationCheck = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1 FOR UPDATE");
+                    $destinationLocationCheck->bind_param('i', $toId); $destinationLocationCheck->execute(); $validDestinationLocation = $destinationLocationCheck->get_result()->fetch_assoc(); $destinationLocationCheck->close();
+                    if (!$validDestinationLocation) throw new RuntimeException('Select an active destination location.');
+                }
                 $sourceBalance = stores_balance($conn, $itemId, $fromId);
                 if ($action !== 'return_stock' && $action !== 'adjust_stock' && $sourceBalance < $qty) throw new RuntimeException('Insufficient source stock. Available: ' . $sourceBalance);
                 if ($action === 'adjust_stock' && ($_POST['adjustment_direction'] ?? '') === 'out' && $sourceBalance < $qty) throw new RuntimeException('Adjustment would create negative stock.');
