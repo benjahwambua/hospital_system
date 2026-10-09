@@ -160,6 +160,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $conn->commit();
                 stores_audit('central_stores_requisition_issued', "requisition_id=$reqId");
                 $message = 'Requisition issued and stock ledger updated.';
+            } elseif ($action === 'create_stock_count') {
+                require_module_access($conn, 'central_stores', 'create');
+                $locationId = (int)($_POST['count_location_id'] ?? 0);
+                $notes = trim((string)($_POST['count_notes'] ?? ''));
+                if ($locationId <= 0) throw new RuntimeException('Select a location for the stock count.');
+                $loc = $conn->prepare("SELECT id FROM stores_locations WHERE id=? AND active=1");
+                $loc->bind_param('i', $locationId); $loc->execute(); $validLocation = $loc->get_result()->fetch_assoc(); $loc->close();
+                if (!$validLocation) throw new RuntimeException('Selected stock location is not active.');
+                $conn->begin_transaction();
+                $number = 'SC-' . date('Ymd-His') . '-' . random_int(100,999);
+                $h = $conn->prepare("INSERT INTO stores_stock_counts (count_number,location_id,status,notes,created_by) VALUES (?,?,'Counting',?,?)");
+                $h->bind_param('sisi', $number, $locationId, $notes, $uid);
+                if (!$h->execute()) throw new RuntimeException('Unable to create stock count session.');
+                $countId = (int)$h->insert_id; $h->close();
+                $stockItems = $conn->query("SELECT id FROM stores_items WHERE active=1 ORDER BY id");
+                $line = $conn->prepare("INSERT INTO stores_stock_count_lines (count_id,item_id,expected_quantity) VALUES (?,?,?)");
+                while ($stockItems && ($stockItem = $stockItems->fetch_assoc())) {
+                    $stockItemId = (int)$stockItem['id'];
+                    $expected = stores_balance($conn, $stockItemId, $locationId);
+                    $line->bind_param('iid', $countId, $stockItemId, $expected);
+                    if (!$line->execute()) throw new RuntimeException('Unable to snapshot stock count items.');
+                }
+                $line->close();
+                $conn->commit();
+                stores_audit('central_stores_count_created', "count_id=$countId;number=$number;location_id=$locationId");
+                $message = "Stock count $number opened. Enter physical quantities and submit it for approval.";
+            } elseif ($action === 'submit_stock_count') {
+                require_module_access($conn, 'central_stores', 'edit');
+                $countId = (int)($_POST['count_id'] ?? 0);
+                $counted = $_POST['counted_quantity'] ?? [];
+                if ($countId <= 0 || !is_array($counted) || !$counted) throw new RuntimeException('Enter physical quantities for the stock count.');
+                $conn->begin_transaction();
+                $head = $conn->prepare("SELECT id,status FROM stores_stock_counts WHERE id=? FOR UPDATE");
+                $head->bind_param('i', $countId); $head->execute(); $countHead = $head->get_result()->fetch_assoc(); $head->close();
+                if (!$countHead || $countHead['status'] !== 'Counting') throw new RuntimeException('Only an open stock count can be submitted.');
+                $line = $conn->prepare("SELECT id,expected_quantity FROM stores_stock_count_lines WHERE id=? AND count_id=? FOR UPDATE");
+                $update = $conn->prepare("UPDATE stores_stock_count_lines SET counted_quantity=?,variance_quantity=? WHERE id=? AND count_id=?");
+                $processed = 0;
+                foreach ($counted as $lineIdRaw => $quantityRaw) {
+                    if (trim((string)$quantityRaw) === '') continue;
+                    $lineId = filter_var($lineIdRaw, FILTER_VALIDATE_INT);
+                    $quantity = filter_var($quantityRaw, FILTER_VALIDATE_FLOAT);
+                    if ($lineId === false || $lineId <= 0 || $quantity === false || $quantity < 0) throw new RuntimeException('Physical quantities must be valid non-negative numbers.');
+                    $line->bind_param('ii', $lineId, $countId); $line->execute(); $lineRow = $line->get_result()->fetch_assoc();
+                    if (!$lineRow) throw new RuntimeException('A stock count line does not belong to this count.');
+                    $expected = (float)$lineRow['expected_quantity']; $variance = (float)$quantity - $expected;
+                    $update->bind_param('ddii', $quantity, $variance, $lineId, $countId);
+                    if (!$update->execute()) throw new RuntimeException('Unable to save a counted quantity.');
+                    $processed++;
+                }
+                $line->close(); $update->close();
+                $missing = $conn->prepare("SELECT COUNT(*) missing FROM stores_stock_count_lines WHERE count_id=? AND counted_quantity IS NULL");
+                $missing->bind_param('i', $countId); $missing->execute(); $missingCount = (int)$missing->get_result()->fetch_assoc()['missing']; $missing->close();
+                if ($missingCount > 0 || $processed === 0) throw new RuntimeException('Count every listed item, including zero-stock items, before submitting.');
+                $submit = $conn->prepare("UPDATE stores_stock_counts SET status='Submitted',submitted_by=?,submitted_at=NOW() WHERE id=? AND status='Counting'");
+                $submit->bind_param('ii', $uid, $countId);
+                if (!$submit->execute() || $submit->affected_rows !== 1) throw new RuntimeException('Unable to submit stock count.');
+                $submit->close(); $conn->commit();
+                stores_audit('central_stores_count_submitted', "count_id=$countId;lines=$processed");
+                $message = 'Stock count submitted for independent approval.';
+            } elseif ($action === 'decide_stock_count') {
+                require_module_access($conn, 'central_stores', 'approve');
+                $countId = (int)($_POST['count_id'] ?? 0);
+                $decision = (string)($_POST['decision'] ?? '');
+                $notes = trim((string)($_POST['decision_notes'] ?? ''));
+                if ($countId <= 0 || !in_array($decision, ['Approved','Rejected'], true)) throw new RuntimeException('Choose a valid stock count decision.');
+                $conn->begin_transaction();
+                $head = $conn->prepare("SELECT * FROM stores_stock_counts WHERE id=? FOR UPDATE");
+                $head->bind_param('i', $countId); $head->execute(); $countHead = $head->get_result()->fetch_assoc(); $head->close();
+                if (!$countHead || $countHead['status'] !== 'Submitted') throw new RuntimeException('Only submitted stock counts can be approved or rejected.');
+                if ($decision === 'Approved') {
+                    $lines = $conn->prepare("SELECT l.*,i.item_name FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY l.id FOR UPDATE");
+                    $lines->bind_param('i', $countId); $lines->execute(); $lineRows = $lines->get_result();
+                    $movement = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,?,?, 'Stock Count',?,?,?)");
+                    while ($line = $lineRows->fetch_assoc()) {
+                        if ($line['counted_quantity'] === null || $line['variance_quantity'] === null) throw new RuntimeException('Stock count is incomplete.');
+                        $variance = (float)$line['variance_quantity'];
+                        if (abs($variance) < 0.0005) continue;
+                        $itemId = (int)$line['item_id']; $locationId = (int)$countHead['location_id'];
+                        $movementType = $variance > 0 ? 'Adjustment In' : 'Adjustment Out';
+                        $quantity = abs($variance);
+                        $movementNotes = 'Approved physical count ' . $countHead['count_number'] . ($notes !== '' ? ' — ' . $notes : '');
+                        $movement->bind_param('iisd sii', $itemId, $locationId, $quantity, $movementType, $countId, $movementNotes, $uid);
+                        if (!$movement->execute()) throw new RuntimeException('Unable to post stock count variance.');
+                    }
+                    $movement->close(); $lines->close();
+                }
+                $decisionUpdate = $conn->prepare("UPDATE stores_stock_counts SET status=?,approved_by=?,approved_at=NOW(),notes=CONCAT(COALESCE(notes,''),?) WHERE id=? AND status='Submitted'");
+                $noteSuffix = $notes !== '' ? "\nDecision: " . $notes : '';
+                $decisionUpdate->bind_param('sisi', $decision, $uid, $noteSuffix, $countId);
+                if (!$decisionUpdate->execute() || $decisionUpdate->affected_rows !== 1) throw new RuntimeException('Unable to save stock count decision.');
+                $decisionUpdate->close(); $conn->commit();
+                stores_audit('central_stores_count_decision', "count_id=$countId;status=$decision");
+                $message = "Stock count $decision.";
             } elseif ($action === 'transfer_stock' || $action === 'return_stock' || $action === 'adjust_stock') {
                 require_module_access($conn, 'central_stores', $action === 'adjust_stock' ? 'approve' : 'create');
                 $itemId = (int)($_POST['movement_item_id'] ?? 0);
@@ -212,6 +306,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $items = $conn->query("SELECT i.*,COALESCE(SUM(CASE WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) AND m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) THEN -m.quantity ELSE 0 END),0) AS main_balance FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name");
 $locations = $conn->query("SELECT id,location_code,location_name,location_type FROM stores_locations WHERE active=1 ORDER BY location_name");
 $reqs = $conn->query("SELECT r.*,l.location_name FROM stores_requisitions r LEFT JOIN stores_locations l ON l.id=r.destination_location_id ORDER BY r.created_at DESC LIMIT 100");
+$countsRes = $conn->query("SELECT c.*,l.location_name FROM stores_stock_counts c JOIN stores_locations l ON l.id=c.location_id ORDER BY c.created_at DESC LIMIT 50");
+$countRows = []; if ($countsRes) while ($row=$countsRes->fetch_assoc()) $countRows[]=$row;
+$activeCount = null; foreach ($countRows as $countRow) if ($countRow['status']==='Counting') { $activeCount=$countRow; break; }
+$activeCountLines = [];
+if ($activeCount) {
+    $lineRes = $conn->prepare("SELECT l.id,l.item_id,l.expected_quantity,l.counted_quantity,i.item_code,i.item_name,i.unit FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY i.item_name");
+    $activeCountId=(int)$activeCount['id']; $lineRes->bind_param('i',$activeCountId); $lineRes->execute(); $lineResult=$lineRes->get_result();
+    while($row=$lineResult->fetch_assoc()) $activeCountLines[]=$row;
+    $lineRes->close();
+}
+$pendingCountLines = [];
+foreach ($countRows as $countRow) {
+    if ($countRow['status'] !== 'Submitted') continue;
+    $pendingId=(int)$countRow['id'];
+    $pendingStmt=$conn->prepare("SELECT l.expected_quantity,l.counted_quantity,l.variance_quantity,i.item_code,i.item_name,i.unit FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY i.item_name");
+    $pendingStmt->bind_param('i',$pendingId); $pendingStmt->execute(); $res=$pendingStmt->get_result(); $detail=[];
+    while($line=$res->fetch_assoc()) $detail[]=$line;
+    $pendingStmt->close(); $countRow['lines']=$detail; $pendingCountLines[]=$countRow;
+}
 $lowStock = 0; $itemRows = [];
 if ($items) while ($row=$items->fetch_assoc()) { if ((float)$row['main_balance'] <= (float)$row['reorder_level']) $lowStock++; $itemRows[]=$row; }
 $locationRows=[]; if ($locations) while($row=$locations->fetch_assoc()) $locationRows[]=$row;
@@ -245,6 +358,11 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 <?php else:?><p class="text-secondary mb-0">You do not have permission to record stock movements.</p><?php endif;?>
 </div></div>
 <div class="panel"><div class="panel-head">Department Requisition</div><div class="panel-body"><?php if($canCreate):?><form method="post" class="row g-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_requisition"><div class="col-md-6"><label class="form-label">Requesting Department</label><input class="form-control" name="department" required placeholder="e.g. Ward A"></div><div class="col-md-6"><label class="form-label">Destination</label><select class="form-select" name="destination_location_id" required><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-12"><label class="form-label">Requested Items</label><div class="row g-2"><?php for($line=0;$line<4;$line++):?><div class="col-md-8"><select class="form-select" name="req_item_id[]" <?=$line===0?'required':''?>><option value=""><?=$line===0?'Select item (required)':'Add another item (optional)'?></option><?php foreach($itemRows as $it):?><option value="<?=$it['id']?>"><?=htmlspecialchars($it['item_code'].' — '.$it['item_name'])?></option><?php endforeach;?></select></div><div class="col-md-4"><input class="form-control" type="number" min=".001" step=".001" name="req_quantity[]" placeholder="Quantity <?=$line+1?>" <?=$line===0?'required':''?>></div><?php endfor;?></div><small class="text-secondary">Add up to four different items in one requisition. Leave unused lines blank.</small></div><div class="col-12"><label class="form-label">Reason / Notes</label><input class="form-control" name="request_notes"></div><div class="col-12"><button class="btn btn-primary btn-sm">Submit Requisition</button></div></form><?php endif;?></div></div>
+<div class="panel"><div class="panel-head">Physical Stock Counts & Variance Approval</div><div class="panel-body">
+<?php if($canCreate && !$activeCount):?><form method="post" class="row g-2 mb-3"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_stock_count"><div class="col-md-5"><label class="form-label">Location to Count</label><select class="form-select" name="count_location_id" required><option value="">Select location</option><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-md-5"><label class="form-label">Count Notes</label><input class="form-control" name="count_notes" maxlength="500" placeholder="Count team / reason"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary btn-sm">Start Count</button></div></form><?php elseif($activeCount):?><div class="alert alert-info">Open count <strong><?=htmlspecialchars($activeCount['count_number'])?></strong> at <?=htmlspecialchars($activeCount['location_name'])?>. Enter actual physical quantities for every listed item, including zero-stock items.</div><?php endif;?>
+<?php if($activeCount && $canEdit):?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="submit_stock_count"><input type="hidden" name="count_id" value="<?=$activeCount['id']?>"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>System Qty</th><th>Physical Qty</th></tr></thead><tbody><?php foreach($activeCountLines as $line):?><tr><td><?=htmlspecialchars($line['item_code'].' — '.$line['item_name'])?> <small class="text-secondary">(<?=htmlspecialchars($line['unit'])?>)</small></td><td><?=number_format((float)$line['expected_quantity'],3)?></td><td><input class="form-control form-control-sm" type="number" min="0" step=".001" name="counted_quantity[<?=$line['id']?>]" value="<?=htmlspecialchars((string)($line['counted_quantity']??''))?>" required></td></tr><?php endforeach;?></tbody></table></div><button class="btn btn-primary btn-sm" onclick="return confirm('Submit this completed count for approval? You cannot edit it after submission.')">Submit Count for Approval</button></form><?php elseif($activeCount):?><p class="text-secondary">You do not have edit permission to enter physical counts.</p><?php endif;?>
+<?php if($canApprove && $pendingCountLines):?><h6 class="fw-bold mt-4">Counts Awaiting Approval</h6><?php foreach($pendingCountLines as $pending):?><div class="border rounded p-3 mb-3"><div class="d-flex justify-content-between flex-wrap gap-2"><strong><?=htmlspecialchars($pending['count_number'])?> · <?=htmlspecialchars($pending['location_name'])?></strong><span class="pill">Submitted</span></div><div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>Item</th><th>System</th><th>Counted</th><th>Variance</th></tr></thead><tbody><?php foreach($pending['lines'] as $line):$variance=(float)$line['variance_quantity'];?><tr><td><?=htmlspecialchars($line['item_code'].' — '.$line['item_name'])?></td><td><?=number_format((float)$line['expected_quantity'],3)?></td><td><?=number_format((float)$line['counted_quantity'],3)?></td><td class="<?=$variance<0?'text-danger':($variance>0?'text-success':'')?>"><?=number_format($variance,3)?></td></tr><?php endforeach;?></tbody></table></div><form method="post" class="d-flex gap-2 flex-wrap"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="decide_stock_count"><input type="hidden" name="count_id" value="<?=$pending['id']?>"><input class="form-control form-control-sm" name="decision_notes" maxlength="500" placeholder="Approval / rejection reason"><button class="btn btn-success btn-sm" name="decision" value="Approved" onclick="return confirm('Approve variances and post stock adjustments to the ledger?')">Approve & Post Variances</button><button class="btn btn-outline-danger btn-sm" name="decision" value="Rejected" onclick="return confirm('Reject this count without changing stock balances?')">Reject</button></form></div><?php endforeach;?><?php endif;?>
+<div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Count</th><th>Location</th><th>Status</th><th>Created</th></tr></thead><tbody><?php foreach($countRows as $cr):?><tr><td><?=htmlspecialchars($cr['count_number'])?></td><td><?=htmlspecialchars($cr['location_name'])?></td><td><span class="pill"><?=htmlspecialchars($cr['status'])?></span></td><td><?=htmlspecialchars($cr['created_at'])?></td></tr><?php endforeach;?><?php if(!$countRows):?><tr><td colspan="4" class="text-center text-secondary">No physical counts have been started.</td></tr><?php endif;?></tbody></table></div></div></div>
 <div class="panel"><div class="panel-head">Recent Stock Ledger</div><div class="panel-body"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Item</th><th>Location</th><th>Movement</th><th>Qty</th><th>Reference / Notes</th><th>Recorded By</th></tr></thead><tbody>
 <?php $ledger=$conn->query("SELECT m.*,i.item_code,i.item_name,l.location_name,u.full_name FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id LEFT JOIN users u ON u.id=m.created_by ORDER BY m.created_at DESC,m.id DESC LIMIT 100"); if($ledger): while($mv=$ledger->fetch_assoc()):?>
 <tr><td><?=htmlspecialchars($mv['created_at'])?></td><td><?=htmlspecialchars($mv['item_code'].' — '.$mv['item_name'])?></td><td><?=htmlspecialchars($mv['location_name'])?></td><td><span class="pill"><?=htmlspecialchars($mv['movement_type'])?></span></td><td><?=number_format((float)$mv['quantity'],3)?></td><td><?=htmlspecialchars(trim(($mv['reference_type']??'').' '.($mv['reference_id']??'').' '.($mv['notes']??'')))?></td><td><?=htmlspecialchars($mv['full_name']??'System')?></td></tr>
