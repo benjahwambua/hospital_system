@@ -121,3 +121,8 @@ The stock receipt path now validates and locks an active item and active locatio
 ### Shared footer coverage follow-up (2026-10-09)
 
 A wider shared-include search found two additional authenticated pages that used the common header and sidebar but omitted the common footer: `accounting/add_expense.php` and `users/add_user.php`. Both now include the standard footer, so the layout wrapper closes consistently. Print-only reports and receipts remain intentional standalone documents. PHP Syntax Audit is required; browser visual review and UAT have not been run.
+
+
+## Hospital Command Centre visual standard (2026-10-09)
+
+Dashboard layout refinement keeps the established blue-to-teal hero, four headline metrics, Quick Access, Operational Pulse, low-stock watch, service activity and Super User-only financial overview. Refined spacing, fluid heading sizing and min-width-safe responsive grid columns to reduce overflow risk on narrower screens; chart canvases now have accessible labels. Central Stores remains linked through the canonical `stores/index.php` route. This formalizes the Command Centre as the visual reference for page-header hierarchy, typography, spacing, cards and responsive layout; module pages should reuse shared shell includes and `hms-module-*` styling rather than inventing local variants. PHP syntax CI is the code-quality gate; no browser screenshot comparison or functional UAT has been performed.
