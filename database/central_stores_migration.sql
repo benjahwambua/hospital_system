@@ -87,3 +87,33 @@ WHERE COALESCE(u.is_super,0)=0
 INSERT INTO stores_locations (location_code,location_name,location_type)
 SELECT 'MAIN','Main Stores','Main Store'
 WHERE NOT EXISTS (SELECT 1 FROM stores_locations WHERE location_code='MAIN');
+
+
+-- Physical stock counts and approval-controlled variance posting.
+CREATE TABLE IF NOT EXISTS stores_stock_counts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    count_number VARCHAR(50) NOT NULL UNIQUE,
+    location_id INT NOT NULL,
+    status ENUM('Counting','Submitted','Approved','Rejected') NOT NULL DEFAULT 'Counting',
+    notes VARCHAR(500) NULL,
+    created_by INT NOT NULL,
+    submitted_by INT NULL,
+    approved_by INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    submitted_at DATETIME NULL,
+    approved_at DATETIME NULL,
+    INDEX idx_stores_counts_status (status),
+    INDEX idx_stores_counts_location (location_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS stores_stock_count_lines (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    count_id BIGINT NOT NULL,
+    item_id INT NOT NULL,
+    expected_quantity DECIMAL(12,3) NOT NULL DEFAULT 0,
+    counted_quantity DECIMAL(12,3) NULL,
+    variance_quantity DECIMAL(12,3) NULL,
+    INDEX idx_stores_count_lines_count (count_id),
+    INDEX idx_stores_count_lines_item (item_id),
+    UNIQUE KEY uq_stores_count_item (count_id,item_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
