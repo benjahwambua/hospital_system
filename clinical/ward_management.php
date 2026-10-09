@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'trans
                 $userId = (int)($_SESSION['user_id'] ?? 0);
                 $s = $conn->prepare("INSERT INTO inpatient_bed_transfers(admission_id,patient_id,from_ward,from_bed,to_ward,to_bed,transfer_reason,transferred_by) VALUES(?,?,?,?,?,?,?,?)");
                 if (!$s) throw new Exception('Unable to prepare transfer history.');
-                $s->bind_param('iisisssi', $transferId, $source['patient_id'], $source['ward_name'], $source['bed_number'], $toWard, $toBed, $reason, $userId);
+                $s->bind_param('iisisisi', $transferId, $source['patient_id'], $source['ward_name'], $source['bed_number'], $toWard, $toBed, $reason, $userId);
                 if (!$s->execute()) throw new Exception('Unable to record transfer history.');
                 $s->close();
                 $s = $conn->prepare("UPDATE admissions SET ward_name=?,bed_number=? WHERE id=? AND status='Admitted'");
