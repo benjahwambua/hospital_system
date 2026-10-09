@@ -117,3 +117,7 @@ Audited the primary module landing pages and found two shared-shell exceptions: 
 ## Central Stores ledger integrity hardening (2026-10-09)
 
 The stock receipt path now validates and locks an active item and active location within a transaction before writing the receipt. Requisition creation and issue validate active destination locations; transfers/returns/adjustments validate active source locations, and transfers validate active destinations. Expiry input uses calendar-date validation rather than format-only validation. Physical-count approval locks each referenced item before comparing the count snapshot with the current lot balance, reducing the chance of approving a stale count while concurrent stock movement is being posted. Requisition issue and transfer operations acquire item/location locks in a stable order to reduce deadlock risk. Central Stores estimate updated from 70% to 72% implementation completion; this is not a production-readiness certification. No functional concurrency test, database migration, browser review or UAT has been run.
+
+### Shared footer coverage follow-up (2026-10-09)
+
+A wider shared-include search found two additional authenticated pages that used the common header and sidebar but omitted the common footer: `accounting/add_expense.php` and `users/add_user.php`. Both now include the standard footer, so the layout wrapper closes consistently. Print-only reports and receipts remain intentional standalone documents. PHP Syntax Audit is required; browser visual review and UAT have not been run.

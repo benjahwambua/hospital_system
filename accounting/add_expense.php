@@ -50,3 +50,5 @@ include __DIR__.'/../includes/sidebar.php';
         <button class="btn btn-danger">Save Expense</button>
     </form>
 </div>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
