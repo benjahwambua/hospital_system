@@ -96,7 +96,7 @@ Nursing is now estimated at 84% engineering completion after adding an optional 
 
 ## Shared dashboard-aligned styling (2026-10-09)
 
-Added shared `hms-module-*` workspace styles to `assets/css/style.css`, based on the Hospital Command Centre dashboard's blue-to-teal hero, rounded panels, responsive spacing and restrained table styling. Applied the visual standard to the Insurance & SHA landing page, patient coverage, claims, preauthorizations and remittances, plus ward/bed configuration, inpatient daily charges and the nursing MAR. This is a presentation consistency change only; it does not change workflow permissions or data semantics. PHP Syntax Audit and visual review in a running browser are still required; no functional tests or UAT were run.
+Added shared `hms-module-*` workspace styles to `assets/css/style.css`, based on the Hospital Command Centre dashboard's blue-to-teal hero, rounded panels, responsive spacing and restrained table styling. Applied the visual standard to the Insurance & SHA landing page, patient coverage, claims, preauthorizations and remittances, plus ward/IPD management, ward/bed configuration, inpatient daily charges, the Nursing Station and nursing MAR. This is a presentation consistency change only; it does not change workflow permissions or data semantics. PHP Syntax Audit and visual review in a running browser are still required; no functional tests or UAT were run.
 
 ## Nursing MAR scheduled-dose accountability (2026-10-09)
 
