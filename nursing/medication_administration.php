@@ -60,7 +60,21 @@ include __DIR__ . '/../includes/sidebar.php';
  <div class="form-row"><div class="form-group col-md-4"><label>Outcome</label><select class="form-control" name="status" required><option value="Given">Given</option><option value="Omitted">Omitted</option><option value="Refused">Refused</option><option value="Held">Held</option><option value="Not Available">Not Available</option></select></div><div class="form-group col-md-4"><label>Dose given</label><input class="form-control" name="dose_given" maxlength="120" placeholder="Dose actually administered"></div><div class="form-group col-md-4"><label>Route</label><input class="form-control" name="route" maxlength="80" placeholder="e.g. oral, IV"></div></div>
  <div class="form-group"><label>Notes / reason if not given</label><textarea class="form-control" name="administration_notes" rows="2"></textarea></div><button class="btn btn-primary" name="save_mar" value="1">Save administration record</button></form></div></div><?php endif; ?>
  <div class="card"><div class="card-header"><strong>Recorded medication outcomes</strong></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Medicine / Rx</th><th>Outcome</th><th>Dose / Route</th><th>Recorded</th><th>Notes</th></tr></thead><tbody>
- <?php $s=$conn->prepare("SELECT m.*,s.drug_name FROM nursing_medication_administrations m JOIN pharmacy_stock s ON s.id=m.medicine_id WHERE m.admission_id=? ORDER BY m.created_at DESC");if($s){$s->bind_param('i',$admissionId);$s->execute();$rs=$s->get_result();if($rs->num_rows){while($row=$rs->fetch_assoc()): ?><tr><td><?=htmlspecialchars($row['drug_name'])?><br><small>Prescription #<?=(int)$row['prescription_id']?></small></td><td><?=htmlspecialchars($row['status'])?></td><td><?=htmlspecialchars($row['dose_given']??'—')?> / <?=htmlspecialchars($row['route']??'—')?></td><td><?=htmlspecialchars($row['administered_at']??$row['created_at'])?></td><td><?=nl2br(htmlspecialchars($row['administration_notes']??''))?></td></tr><?php endwhile;}else: ?><tr><td colspan="5" class="text-center text-muted py-3">No medication administration outcomes recorded.</td></tr><?php endif;$s->close();} ?>
+ <?php
+ $s=$conn->prepare("SELECT m.*,s.drug_name FROM nursing_medication_administrations m JOIN pharmacy_stock s ON s.id=m.medicine_id WHERE m.admission_id=? ORDER BY m.created_at DESC");
+ if($s){
+   $s->bind_param('i',$admissionId);
+   $s->execute();
+   $rs=$s->get_result();
+   if($rs->num_rows>0){
+     while($row=$rs->fetch_assoc()){
+       echo '<tr><td>'.htmlspecialchars($row['drug_name']).'<br><small>Prescription #'.(int)$row['prescription_id'].'</small></td><td>'.htmlspecialchars($row['status']).'</td><td>'.htmlspecialchars($row['dose_given']??'—').' / '.htmlspecialchars($row['route']??'—').'</td><td>'.htmlspecialchars($row['administered_at']??$row['created_at']).'</td><td>'.nl2br(htmlspecialchars($row['administration_notes']??'')).'</td></tr>';
+     }
+   } else {
+     echo '<tr><td colspan="5" class="text-center text-muted py-3">No medication administration outcomes recorded.</td></tr>';
+   }
+   $s->close();
+ } ?>
  </tbody></table></div></div>
  <?php endif; ?>
 </div>
