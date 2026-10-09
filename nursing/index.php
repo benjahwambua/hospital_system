@@ -13,7 +13,7 @@ $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedAction = (string)($_POST['action'] ?? '');
-    $permissionDenied = $postedAction === 'care_plan_review' ? !$canApprove : !$canCreate;
+    $permissionDenied = in_array($postedAction, ['care_plan_review','shift_handover_ack'], true) ? !$canApprove : !$canCreate;
     if ($permissionDenied) {
         $message = '<div class="alert alert-danger">You do not have permission to perform this nursing action.</div>';
     } elseif (!hash_equals($csrf, (string)($_POST['csrf_token'] ?? ''))) {
@@ -35,6 +35,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$admission) {
             $message = '<div class="alert alert-danger">Active inpatient admission not found.</div>';
+        } elseif ($action === 'shift_handover_create') {
+            $outgoingShift = trim((string)($_POST['outgoing_shift'] ?? ''));
+            $incomingShift = trim((string)($_POST['incoming_shift'] ?? ''));
+            $handoverSummary = trim((string)($_POST['handover_summary'] ?? ''));
+            $outstandingTasks = trim((string)($_POST['outstanding_tasks'] ?? ''));
+            $allowedShifts = ['Day','Evening','Night'];
+            if (!in_array($outgoingShift, $allowedShifts, true) || !in_array($incomingShift, $allowedShifts, true) || $handoverSummary === '') {
+                $message = '<div class="alert alert-danger">Choose valid outgoing and incoming shifts and enter the handover summary.</div>';
+            } else {
+                $s = $conn->prepare("INSERT INTO nursing_shift_handovers(admission_id,patient_id,outgoing_shift,incoming_shift,handover_summary,outstanding_tasks,handed_over_by,status) VALUES(?,?,?,?,?,?,?,'Pending')");
+                if ($s) {
+                    $s->bind_param('iissssi', $admissionId, $admission['patient_id'], $outgoingShift, $incomingShift, $handoverSummary, $outstandingTasks, $userId);
+                    if ($s->execute()) {
+                        if (function_exists('audit')) audit('nursing_shift_handover_created', "admission_id={$admissionId},handover_id={$s->insert_id}");
+                        $message = '<div class="alert alert-success">Shift handover saved and is awaiting acknowledgement.</div>';
+                    } else $message = '<div class="alert alert-danger">Unable to save shift handover.</div>';
+                    $s->close();
+                }
+            }
+        } elseif ($action === 'shift_handover_ack') {
+            $handoverId = (int)($_POST['handover_id'] ?? 0);
+            $ackNotes = trim((string)($_POST['acknowledgement_notes'] ?? ''));
+            $s = $conn->prepare("UPDATE nursing_shift_handovers SET status='Acknowledged',acknowledged_by=?,acknowledged_at=NOW(),acknowledgement_notes=? WHERE id=? AND admission_id=? AND status='Pending' AND handed_over_by<>?");
+            if ($s) {
+                $s->bind_param('isiii', $userId, $ackNotes, $handoverId, $admissionId, $userId);
+                if ($s->execute() && $s->affected_rows === 1) {
+                    if (function_exists('audit')) audit('nursing_shift_handover_acknowledged', "admission_id={$admissionId},handover_id={$handoverId}");
+                    $message = '<div class="alert alert-success">Shift handover acknowledged.</div>';
+                } else $message = '<div class="alert alert-warning">Handover was not acknowledged. It may already be closed or must be acknowledged by a different user.</div>';
+                $s->close();
+            }
         } elseif ($action === 'note') {
             $noteType = trim((string)($_POST['note_type'] ?? 'Progress Note'));
             $shift = trim((string)($_POST['shift'] ?? ''));
@@ -234,6 +265,28 @@ include __DIR__ . '/../includes/sidebar.php';
       </div></div>
       <?php endif; ?>
       <?php if($selected): ?>
+      <div class="n-card">
+        <div class="n-head"><strong>Shift Handover</strong><span class="badge-soft">Admission #<?= (int)$selected['id'] ?></span></div>
+        <div class="n-body">
+          <?php if($canCreate): ?>
+          <form method="post" class="n-form mb-4">
+            <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="shift_handover_create"><input type="hidden" name="admission_id" value="<?=(int)$selected['id']?>">
+            <div class="form-row">
+              <div class="form-group col-md-6"><label>Outgoing Shift</label><select name="outgoing_shift" class="form-control" required><option value="">Choose shift</option><option>Day</option><option>Evening</option><option>Night</option></select></div>
+              <div class="form-group col-md-6"><label>Incoming Shift</label><select name="incoming_shift" class="form-control" required><option value="">Choose shift</option><option>Day</option><option>Evening</option><option>Night</option></select></div>
+            </div>
+            <div class="form-group"><label>Patient / Care Handover Summary</label><textarea name="handover_summary" class="form-control" rows="3" required maxlength="8000" placeholder="Current status, key observations, care priorities and escalation already done"></textarea></div>
+            <div class="form-group"><label>Outstanding Tasks / Follow-up</label><textarea name="outstanding_tasks" class="form-control" rows="2" maxlength="8000" placeholder="Tasks still pending, due times and follow-up required"></textarea></div>
+            <button class="btn btn-primary">Save Handover for Acknowledgement</button>
+          </form>
+          <?php endif; ?>
+          <div class="table-responsive"><table class="n-table"><thead><tr><th>Shifts</th><th>Handover</th><th>Outstanding Tasks</th><th>Recorded</th><th>Status / Acknowledgement</th></tr></thead><tbody>
+          <?php $hs=$conn->prepare("SELECT * FROM nursing_shift_handovers WHERE admission_id=? ORDER BY handed_over_at DESC LIMIT 15"); if($hs){$hs->bind_param('i',$selected['id']);$hs->execute();$hr=$hs->get_result();while($h=$hr->fetch_assoc()): ?>
+            <tr><td><?=htmlspecialchars($h['outgoing_shift'])?> → <?=htmlspecialchars($h['incoming_shift'])?></td><td><?=nl2br(htmlspecialchars($h['handover_summary']))?></td><td><?=nl2br(htmlspecialchars($h['outstanding_tasks']??''))?></td><td><?=htmlspecialchars($h['handed_over_at'])?><small class="d-block text-muted">User #<?=(int)$h['handed_over_by']?></small></td><td><span class="badge-soft"><?=htmlspecialchars($h['status'])?></span><?php if(!empty($h['acknowledgement_notes'])): ?><div class="small mt-1"><?=nl2br(htmlspecialchars($h['acknowledgement_notes']))?></div><?php endif; ?><?php if($canApprove && $h['status']==='Pending' && (int)$h['handed_over_by'] !== (int)($_SESSION['user_id']??0)): ?><form method="post" class="mt-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="shift_handover_ack"><input type="hidden" name="admission_id" value="<?=(int)$selected['id']?>"><input type="hidden" name="handover_id" value="<?=(int)$h['id']?>"><textarea name="acknowledgement_notes" class="form-control form-control-sm mb-1" rows="2" maxlength="4000" placeholder="Acknowledgement / follow-up note"></textarea><button class="btn btn-sm btn-outline-primary">Acknowledge</button></form><?php endif; ?></td></tr>
+          <?php endwhile; $hs->close(); } ?>
+          </tbody></table></div>
+        </div>
+      </div>
       <div class="n-card">
         <div class="n-head"><strong>Nursing Tasks</strong><span class="badge-soft">Admission #<?= (int)$selected['id'] ?></span></div>
         <div class="n-body">
