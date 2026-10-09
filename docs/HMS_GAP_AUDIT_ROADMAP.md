@@ -132,7 +132,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 ### Phase 1 — Hospital enterprise core
 
 1. **Insurance & SHA** — payers, plans, patient coverage, eligibility, tariffs, preauthorization, claims, denials, appeals, remittances and payer reconciliation.
-2. **Central Stores** — reconcile legacy untracked stock and historical lot gaps; complete batch-level valuation from GRN receipt through departmental issue; verify returns, adjustments, counts and FEFO issue controls in UAT.
+2. **Central Stores** — reconcile legacy untracked stock and historical lot gaps; complete batch-level valuation from GRN receipt through departmental issue; verify active-record guards, concurrent stock locking, returns, adjustments, counts and FEFO issue controls in UAT.
 3. **Inpatient/Ward expansion** — ward master, bed master, occupancy, transfers, admission lifecycle, daily charges and discharge.
 4. **Nursing** — nursing notes, observations, care plans, handover, medication administration, intake/output and tasks.
 
