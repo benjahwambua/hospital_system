@@ -250,6 +250,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 while ($stockItems && ($stockItem = $stockItems->fetch_assoc())) {
                     $stockItemId = (int)$stockItem['id'];
                     $lots = stores_lot_balance_rows($conn, $stockItemId, $locationId);
+                    $hasUntrackedLot = false;
+                    foreach ($lots as $existingLot) {
+                        if (($existingLot['batch_number'] ?? null) === null && ($existingLot['expiry_date'] ?? null) === null) {
+                            $hasUntrackedLot = true;
+                            break;
+                        }
+                    }
+                    // Keep an explicit zero-balance untracked line so physical stock with missing lot labels can be recorded as a variance.
+                    if (!$hasUntrackedLot) $lots[] = ['batch_number'=>null,'expiry_date'=>null,'balance'=>0.0];
                     if (!$lots) $lots = [['batch_number'=>null,'expiry_date'=>null,'balance'=>0.0]];
                     foreach ($lots as $lot) {
                         $batch = $lot['batch_number'];
