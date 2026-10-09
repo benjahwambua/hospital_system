@@ -131,3 +131,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 </div>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
