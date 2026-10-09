@@ -23,6 +23,22 @@ function stores_balance(mysqli $conn, int $itemId, int $locationId): float {
     $s->close();
     return $v;
 }
+function stores_batch_balances(mysqli $conn, int $itemId, int $locationId): array {
+    $sql = "SELECT MAX(batch_number) AS batch_number, MAX(expiry_date) AS expiry_date,
+                   COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) AS balance
+            FROM stores_movements WHERE item_id=? AND location_id=?
+            GROUP BY COALESCE(batch_number,''), COALESCE(expiry_date,'1000-01-01')
+            HAVING balance > 0
+            ORDER BY (MAX(expiry_date) IS NULL) ASC, MAX(expiry_date) ASC, MAX(batch_number) ASC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('ii', $itemId, $locationId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $lots = [];
+    while ($row = $result->fetch_assoc()) $lots[] = $row;
+    $stmt->close();
+    return $lots;
+}
 function stores_audit(string $action, string $details): void {
     if (function_exists('audit')) audit($action, $details);
 }
@@ -142,16 +158,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($lineItems as $line) {
                     $remaining = (float)$line['quantity_requested'] - (float)$line['quantity_issued'];
                     if ($remaining <= 0) continue;
-                    $balance = stores_balance($conn, (int)$line['item_id'], $mainId);
-                    if ($balance < $remaining) throw new RuntimeException('Insufficient Main Store stock for item ID ' . (int)$line['item_id'] . '. Available: ' . $balance . ', requested: ' . $remaining);
-                    $m = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,'Issue',?,'Requisition',?,?,?)");
-                    $m->bind_param('iidisi', $line['item_id'], $mainId, $remaining, $reqId, $req['requisition_number'], $uid);
-                    if (!$m->execute()) throw new RuntimeException('Unable to record stock issue.');
-                    $m->close();
-                    $d = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,'Transfer In',?,'Requisition',?,?,?)");
-                    $d->bind_param('iidisi', $line['item_id'], $req['destination_location_id'], $remaining, $reqId, $req['requisition_number'], $uid);
-                    if (!$d->execute()) throw new RuntimeException('Unable to record destination stock.');
-                    $d->close();
+                    $itemId = (int)$line['item_id'];
+                    // Lock the item master row so concurrent issues of the same item serialize before reading lot balances.
+                    $itemLock = $conn->prepare("SELECT id FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
+                    $itemLock->bind_param('i', $itemId); $itemLock->execute(); $activeItem = $itemLock->get_result()->fetch_assoc(); $itemLock->close();
+                    if (!$activeItem) throw new RuntimeException('A requested stock item is no longer active.');
+                    $lots = stores_batch_balances($conn, $itemId, $mainId);
+                    $eligible = [];
+                    $available = 0.0;
+                    $today = date('Y-m-d');
+                    foreach ($lots as $lot) {
+                        $expiryDate = (string)($lot['expiry_date'] ?? '');
+                        if ($expiryDate !== '' && $expiryDate < $today) continue; // Never issue expired, tracked lots.
+                        $lotBalance = (float)$lot['balance'];
+                        if ($lotBalance <= 0) continue;
+                        $eligible[] = $lot;
+                        $available += $lotBalance;
+                    }
+                    if ($available + 0.0005 < $remaining) throw new RuntimeException('Insufficient non-expired stock for item ID ' . $itemId . '. Available: ' . $available . ', requested: ' . $remaining . '. Expired lots are excluded.');
+                    $toAllocate = $remaining;
+                    foreach ($eligible as $lot) {
+                        if ($toAllocate <= 0.0005) break;
+                        $issueQty = min($toAllocate, (float)$lot['balance']);
+                        $batch = $lot['batch_number'] !== null && $lot['batch_number'] !== '' ? $lot['batch_number'] : null;
+                        $expiry = $lot['expiry_date'] !== null && $lot['expiry_date'] !== '' ? $lot['expiry_date'] : null;
+                        $m = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Issue',?,'Requisition',?,?,?,?,?)");
+                        $m->bind_param('iidisssi', $itemId, $mainId, $issueQty, $reqId, $batch, $expiry, $req['requisition_number'], $uid);
+                        if (!$m->execute()) throw new RuntimeException('Unable to record lot-specific stock issue.');
+                        $m->close();
+                        $d = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Transfer In',?,'Requisition',?,?,?,?,?)");
+                        $d->bind_param('iidisssi', $itemId, $req['destination_location_id'], $issueQty, $reqId, $batch, $expiry, $req['requisition_number'], $uid);
+                        if (!$d->execute()) throw new RuntimeException('Unable to record destination lot balance.');
+                        $d->close();
+                        $toAllocate -= $issueQty;
+                    }
+                    if ($toAllocate > 0.0005) throw new RuntimeException('Lot allocation did not cover the requested quantity; no changes were committed.');
                     $u = $conn->prepare("UPDATE stores_requisition_items SET quantity_issued=quantity_issued+? WHERE id=?");
                     $u->bind_param('di', $remaining, $line['id']); $u->execute(); $u->close();
                 }
