@@ -110,7 +110,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'radiology')): ?>
         <div class="has-submenu <?= isParentActive(['radiology/dashboard.php','radiology_requests.php', 'radiology_results.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-x-ray icon-main"></i> Radiology
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -124,7 +124,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'pharmacy')): ?>
         <div class="has-submenu <?= isParentActive(['pharmacy/dashboard.php','dispensing_queue.php', 'sell_medicine.php', 'add_stock.php', 'view_stock.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-pills icon-main"></i> Pharmacy
                 <i class="fas fa-chevron-down caret"></i>
             </a>
@@ -139,7 +139,7 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'maternity')): ?>
         <div class="has-submenu <?= isParentActive(['maternity/index.php','maternity/add.php','maternity/antenatal.php','maternity/postnatal.php','maternity/deliveries.php','maternity/admissions.php','maternity/stats.php']) ?>">
-            <a href="#" class="menu-toggle">
+            <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-baby icon-main"></i> Maternity
                 <i class="fas fa-chevron-down caret"></i>
             </a>
