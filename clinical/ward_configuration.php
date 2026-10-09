@@ -132,5 +132,5 @@ include __DIR__ . '/../includes/sidebar.php';
     <thead><tr><th>Ward / Bed</th><th>Label</th><th>Occupancy</th><th>Status</th><th>Action</th></tr></thead><tbody>
     <?php foreach ($beds as $bed): ?><tr><td><?=htmlspecialchars($bed['ward_name'])?> · Bed <?=(int)$bed['bed_number']?></td><td><?=htmlspecialchars($bed['label'] ?? '')?></td><td><?=((int)$bed['is_occupied']===1?'<span class="badge badge-danger">Occupied</span>':'<span class="badge badge-success">Free</span>')?></td><td><?=((int)$bed['is_active']===1?'Active':'Inactive')?></td><td><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="action" value="toggle_bed"><input type="hidden" name="bed_id" value="<?=(int)$bed['id']?>"><button class="btn btn-sm btn-outline-secondary" <?=(!$canEdit || (int)$bed['is_occupied']===1?'disabled':'')?>><?=((int)$bed['is_active']===1?'Deactivate':'Activate')?></button></form></td></tr><?php endforeach; ?>
     </tbody></table></div></div></div>
-</div></div>
+</div></div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
