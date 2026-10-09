@@ -39,6 +39,35 @@ function stores_batch_balances(mysqli $conn, int $itemId, int $locationId): arra
     $stmt->close();
     return $lots;
 }
+function stores_lot_balance(mysqli $conn, int $itemId, int $locationId, ?string $batch, ?string $expiry): float {
+    $sql = "SELECT COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) AS balance
+            FROM stores_movements WHERE item_id=? AND location_id=? AND COALESCE(batch_number,'') = COALESCE(?, '') AND expiry_date <=> ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('iiss', $itemId, $locationId, $batch, $expiry);
+    $stmt->execute();
+    $balance = (float)($stmt->get_result()->fetch_assoc()['balance'] ?? 0);
+    $stmt->close();
+    return $balance;
+}
+function stores_lot_balance_rows(mysqli $conn, int $itemId, int $locationId): array {
+    $sql = "SELECT MAX(batch_number) AS batch_number, MAX(expiry_date) AS expiry_date,
+                   COALESCE(SUM(CASE WHEN movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN quantity ELSE -quantity END),0) AS balance
+            FROM stores_movements WHERE item_id=? AND location_id=?
+            GROUP BY COALESCE(batch_number,''), COALESCE(expiry_date,'1000-01-01')
+            ORDER BY (MAX(expiry_date) IS NULL) ASC, MAX(expiry_date) ASC, MAX(batch_number) ASC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('ii', $itemId, $locationId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $lots = [];
+    while ($row = $result->fetch_assoc()) {
+        $row['batch_number'] = ($row['batch_number'] ?? '') === '' ? null : $row['batch_number'];
+        $row['expiry_date'] = ($row['expiry_date'] ?? '') === '' ? null : $row['expiry_date'];
+        $lots[] = $row;
+    }
+    $stmt->close();
+    return $lots;
+}
 function stores_audit(string $action, string $details): void {
     if (function_exists('audit')) audit($action, $details);
 }
@@ -68,7 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $itemId = (int)($_POST['item_id'] ?? 0);
                 $locationId = (int)($_POST['location_id'] ?? 0);
                 $qty = filter_var($_POST['quantity'] ?? 0, FILTER_VALIDATE_FLOAT);
-                $batch = trim((string)($_POST['batch_number'] ?? ''));
+                $batchRaw = trim((string)($_POST['batch_number'] ?? ''));
+                $batch = $batchRaw === '' ? null : $batchRaw;
                 $expiry = trim((string)($_POST['expiry_date'] ?? ''));
                 $notes = trim((string)($_POST['notes'] ?? ''));
                 if ($itemId <= 0 || $locationId <= 0 || $qty === false || $qty <= 0) throw new RuntimeException('Select an item and location and enter a quantity greater than zero.');
@@ -216,12 +246,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$h->execute()) throw new RuntimeException('Unable to create stock count session.');
                 $countId = (int)$h->insert_id; $h->close();
                 $stockItems = $conn->query("SELECT id FROM stores_items WHERE active=1 ORDER BY id");
-                $line = $conn->prepare("INSERT INTO stores_stock_count_lines (count_id,item_id,expected_quantity) VALUES (?,?,?)");
+                $line = $conn->prepare("INSERT INTO stores_stock_count_lines (count_id,item_id,batch_number,expiry_date,lot_key,expected_quantity) VALUES (?,?,?,?,?,?)");
                 while ($stockItems && ($stockItem = $stockItems->fetch_assoc())) {
                     $stockItemId = (int)$stockItem['id'];
-                    $expected = stores_balance($conn, $stockItemId, $locationId);
-                    $line->bind_param('iid', $countId, $stockItemId, $expected);
-                    if (!$line->execute()) throw new RuntimeException('Unable to snapshot stock count items.');
+                    $lots = stores_lot_balance_rows($conn, $stockItemId, $locationId);
+                    $hasUntrackedLot = false;
+                    foreach ($lots as $existingLot) {
+                        if (($existingLot['batch_number'] ?? null) === null && ($existingLot['expiry_date'] ?? null) === null) {
+                            $hasUntrackedLot = true;
+                            break;
+                        }
+                    }
+                    // Keep an explicit zero-balance untracked line so physical stock with missing lot labels can be recorded as a variance.
+                    if (!$hasUntrackedLot) $lots[] = ['batch_number'=>null,'expiry_date'=>null,'balance'=>0.0];
+                    if (!$lots) $lots = [['batch_number'=>null,'expiry_date'=>null,'balance'=>0.0]];
+                    foreach ($lots as $lot) {
+                        $batch = $lot['batch_number'];
+                        $expiry = $lot['expiry_date'];
+                        $lotKey = hash('sha256', (string)($batch ?? '') . "\0" . (string)($expiry ?? ''));
+                        $expected = (float)$lot['balance'];
+                        $line->bind_param('iisssd', $countId, $stockItemId, $batch, $expiry, $lotKey, $expected);
+                        if (!$line->execute()) throw new RuntimeException('Unable to snapshot stock count lot balances.');
+                    }
                 }
                 $line->close();
                 $conn->commit();
@@ -275,21 +321,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($decision === 'Approved') {
                     $lines = $conn->prepare("SELECT l.*,i.item_name FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY l.id FOR UPDATE");
                     $lines->bind_param('i', $countId); $lines->execute(); $lineRows = $lines->get_result();
-                    $movement = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,notes,created_by) VALUES (?,?,?,?, 'Stock Count',?,?,?)");
+                    $movement = $conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,?,?, 'Stock Count',?,?,?,?,?)");
                     while ($line = $lineRows->fetch_assoc()) {
                         if ($line['counted_quantity'] === null || $line['variance_quantity'] === null) throw new RuntimeException('Stock count is incomplete.');
                         $variance = (float)$line['variance_quantity'];
                         $itemId = (int)$line['item_id']; $locationId = (int)$countHead['location_id'];
-                        $currentBalance = stores_balance($conn, $itemId, $locationId);
+                        $batch = $line['batch_number'] !== null && $line['batch_number'] !== '' ? $line['batch_number'] : null;
+                        $expiry = $line['expiry_date'] !== null && $line['expiry_date'] !== '' ? $line['expiry_date'] : null;
+                        $currentBalance = stores_lot_balance($conn, $itemId, $locationId, $batch, $expiry);
                         if (abs($currentBalance - (float)$line['expected_quantity']) >= 0.0005) {
-                            throw new RuntimeException('Stock changed after the count was opened for item ' . $line['item_name'] . '. Reject this count and recount before posting variances.');
+                            throw new RuntimeException('Stock changed after the count was opened for item ' . $line['item_name'] . ' (batch ' . ($batch ?? 'untracked') . '). Reject this count and recount before posting variances.');
                         }
                         if (abs($variance) < 0.0005) continue;
                         $movementType = $variance > 0 ? 'Adjustment In' : 'Adjustment Out';
                         $quantity = abs($variance);
-                        $movementNotes = 'Approved physical count ' . $countHead['count_number'] . ($notes !== '' ? ' — ' . $notes : '');
-                        $movement->bind_param('iisdisi', $itemId, $locationId, $movementType, $quantity, $countId, $movementNotes, $uid);
-                        if (!$movement->execute()) throw new RuntimeException('Unable to post stock count variance.');
+                        $movementNotes = 'Approved lot-level physical count ' . $countHead['count_number'] . ($notes !== '' ? ' — ' . $notes : '');
+                        $movement->bind_param('iisdisssi', $itemId, $locationId, $movementType, $quantity, $countId, $batch, $expiry, $movementNotes, $uid);
+                        if (!$movement->execute()) throw new RuntimeException('Unable to post lot-specific stock count variance.');
                     }
                     $movement->close(); $lines->close();
                 }
@@ -385,7 +433,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $items = $conn->query("SELECT i.*,COALESCE(SUM(CASE WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) AND m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) THEN -m.quantity ELSE 0 END),0) AS main_balance FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name");
-$expiryLots = $conn->query("SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,i.item_code,i.item_name,l.location_name,MAX(m.created_at) AS last_activity,SUM(CASE WHEN m.movement_type='Receipt' THEN m.quantity ELSE 0 END) AS received_quantity FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id WHERE (m.batch_number IS NOT NULL AND m.batch_number<>'') OR m.expiry_date IS NOT NULL GROUP BY m.item_id,m.location_id,COALESCE(m.batch_number,''),COALESCE(m.expiry_date,'1000-01-01'),i.item_code,i.item_name,l.location_name ORDER BY (MAX(m.expiry_date) IS NULL),MAX(m.expiry_date),i.item_name");
+$expiryLots = $conn->query("SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,i.item_code,i.item_name,l.location_name,MAX(m.created_at) AS last_activity,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS current_balance FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id WHERE (m.batch_number IS NOT NULL AND m.batch_number<>'') OR m.expiry_date IS NOT NULL GROUP BY m.item_id,m.location_id,COALESCE(m.batch_number,''),COALESCE(m.expiry_date,'1000-01-01'),i.item_code,i.item_name,l.location_name ORDER BY (MAX(m.expiry_date) IS NULL),MAX(m.expiry_date),i.item_name");
 $expiryRows=[]; if($expiryLots) while($row=$expiryLots->fetch_assoc()) $expiryRows[]=$row;
 $locations = $conn->query("SELECT id,location_code,location_name,location_type FROM stores_locations WHERE active=1 ORDER BY location_name");
 $reqs = $conn->query("SELECT r.*,l.location_name FROM stores_requisitions r LEFT JOIN stores_locations l ON l.id=r.destination_location_id ORDER BY r.created_at DESC LIMIT 100");
@@ -394,7 +442,7 @@ $countRows = []; if ($countsRes) while ($row=$countsRes->fetch_assoc()) $countRo
 $activeCount = null; foreach ($countRows as $countRow) if ($countRow['status']==='Counting') { $activeCount=$countRow; break; }
 $activeCountLines = [];
 if ($activeCount) {
-    $lineRes = $conn->prepare("SELECT l.id,l.item_id,l.expected_quantity,l.counted_quantity,i.item_code,i.item_name,i.unit FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY i.item_name");
+    $lineRes = $conn->prepare("SELECT l.id,l.item_id,l.expected_quantity,l.counted_quantity,l.batch_number,l.expiry_date,i.item_code,i.item_name,i.unit FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY i.item_name,l.expiry_date,l.batch_number");
     $activeCountId=(int)$activeCount['id']; $lineRes->bind_param('i',$activeCountId); $lineRes->execute(); $lineResult=$lineRes->get_result();
     while($row=$lineResult->fetch_assoc()) $activeCountLines[]=$row;
     $lineRes->close();
@@ -403,7 +451,7 @@ $pendingCountLines = [];
 foreach ($countRows as $countRow) {
     if ($countRow['status'] !== 'Submitted') continue;
     $pendingId=(int)$countRow['id'];
-    $pendingStmt=$conn->prepare("SELECT l.expected_quantity,l.counted_quantity,l.variance_quantity,i.item_code,i.item_name,i.unit FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY i.item_name");
+    $pendingStmt=$conn->prepare("SELECT l.expected_quantity,l.counted_quantity,l.variance_quantity,l.batch_number,l.expiry_date,i.item_code,i.item_name,i.unit FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY i.item_name,l.expiry_date,l.batch_number");
     $pendingStmt->bind_param('i',$pendingId); $pendingStmt->execute(); $res=$pendingStmt->get_result(); $detail=[];
     while($line=$res->fetch_assoc()) $detail[]=$line;
     $pendingStmt->close(); $countRow['lines']=$detail; $pendingCountLines[]=$countRow;
@@ -444,15 +492,15 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 </div></div>
 <div class="panel"><div class="panel-head">Department Requisition</div><div class="panel-body"><?php if($canCreate):?><form method="post" class="row g-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_requisition"><div class="col-md-6"><label class="form-label">Requesting Department</label><input class="form-control" name="department" required placeholder="e.g. Ward A"></div><div class="col-md-6"><label class="form-label">Destination</label><select class="form-select" name="destination_location_id" required><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-12"><label class="form-label">Requested Items</label><div class="row g-2"><?php for($line=0;$line<4;$line++):?><div class="col-md-8"><select class="form-select" name="req_item_id[]" <?=$line===0?'required':''?>><option value=""><?=$line===0?'Select item (required)':'Add another item (optional)'?></option><?php foreach($itemRows as $it):?><option value="<?=$it['id']?>"><?=htmlspecialchars($it['item_code'].' — '.$it['item_name'])?></option><?php endforeach;?></select></div><div class="col-md-4"><input class="form-control" type="number" min=".001" step=".001" name="req_quantity[]" placeholder="Quantity <?=$line+1?>" <?=$line===0?'required':''?>></div><?php endfor;?></div><small class="text-secondary">Add up to four different items in one requisition. Leave unused lines blank.</small></div><div class="col-12"><label class="form-label">Reason / Notes</label><input class="form-control" name="request_notes"></div><div class="col-12"><button class="btn btn-primary btn-sm">Submit Requisition</button></div></form><?php endif;?></div></div>
 <div class="panel"><div class="panel-head">Physical Stock Counts & Variance Approval</div><div class="panel-body">
-<?php if($canCreate && !$activeCount):?><form method="post" class="row g-2 mb-3"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_stock_count"><div class="col-md-5"><label class="form-label">Location to Count</label><select class="form-select" name="count_location_id" required><option value="">Select location</option><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-md-5"><label class="form-label">Count Notes</label><input class="form-control" name="count_notes" maxlength="500" placeholder="Count team / reason"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary btn-sm">Start Count</button></div></form><?php elseif($activeCount):?><div class="alert alert-info">Open count <strong><?=htmlspecialchars($activeCount['count_number'])?></strong> at <?=htmlspecialchars($activeCount['location_name'])?>. Enter actual physical quantities for every listed item, including zero-stock items.</div><?php endif;?>
-<?php if($activeCount && $canEdit):?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="submit_stock_count"><input type="hidden" name="count_id" value="<?=$activeCount['id']?>"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>System Qty</th><th>Physical Qty</th></tr></thead><tbody><?php foreach($activeCountLines as $line):?><tr><td><?=htmlspecialchars($line['item_code'].' — '.$line['item_name'])?> <small class="text-secondary">(<?=htmlspecialchars($line['unit'])?>)</small></td><td><?=number_format((float)$line['expected_quantity'],3)?></td><td><input class="form-control form-control-sm" type="number" min="0" step=".001" name="counted_quantity[<?=$line['id']?>]" value="<?=htmlspecialchars((string)($line['counted_quantity']??''))?>" required></td></tr><?php endforeach;?></tbody></table></div><button class="btn btn-primary btn-sm" onclick="return confirm('Submit this completed count for approval? You cannot edit it after submission.')">Submit Count for Approval</button></form><?php elseif($activeCount):?><p class="text-secondary">You do not have edit permission to enter physical counts.</p><?php endif;?>
-<?php if($canApprove && $pendingCountLines):?><h6 class="fw-bold mt-4">Counts Awaiting Approval</h6><?php foreach($pendingCountLines as $pending):?><div class="border rounded p-3 mb-3"><div class="d-flex justify-content-between flex-wrap gap-2"><strong><?=htmlspecialchars($pending['count_number'])?> · <?=htmlspecialchars($pending['location_name'])?></strong><span class="pill">Submitted</span></div><div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>Item</th><th>System</th><th>Counted</th><th>Variance</th></tr></thead><tbody><?php foreach($pending['lines'] as $line):$variance=(float)$line['variance_quantity'];?><tr><td><?=htmlspecialchars($line['item_code'].' — '.$line['item_name'])?></td><td><?=number_format((float)$line['expected_quantity'],3)?></td><td><?=number_format((float)$line['counted_quantity'],3)?></td><td class="<?=$variance<0?'text-danger':($variance>0?'text-success':'')?>"><?=number_format($variance,3)?></td></tr><?php endforeach;?></tbody></table></div><form method="post" class="d-flex gap-2 flex-wrap"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="decide_stock_count"><input type="hidden" name="count_id" value="<?=$pending['id']?>"><input class="form-control form-control-sm" name="decision_notes" maxlength="500" placeholder="Approval / rejection reason"><button class="btn btn-success btn-sm" name="decision" value="Approved" onclick="return confirm('Approve variances and post stock adjustments to the ledger?')">Approve & Post Variances</button><button class="btn btn-outline-danger btn-sm" name="decision" value="Rejected" onclick="return confirm('Reject this count without changing stock balances?')">Reject</button></form></div><?php endforeach;?><?php endif;?>
+<?php if($canCreate && !$activeCount):?><form method="post" class="row g-2 mb-3"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="create_stock_count"><div class="col-md-5"><label class="form-label">Location to Count</label><select class="form-select" name="count_location_id" required><option value="">Select location</option><?php foreach($locationRows as $loc):?><option value="<?=$loc['id']?>"><?=htmlspecialchars($loc['location_name'])?></option><?php endforeach;?></select></div><div class="col-md-5"><label class="form-label">Count Notes</label><input class="form-control" name="count_notes" maxlength="500" placeholder="Count team / reason"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary btn-sm">Start Count</button></div></form><?php elseif($activeCount):?><div class="alert alert-info">Open count <strong><?=htmlspecialchars($activeCount['count_number'])?></strong> at <?=htmlspecialchars($activeCount['location_name'])?>. Enter actual physical quantities for every listed batch/expiry group, including untracked and zero-stock lots.</div><?php endif;?>
+<?php if($activeCount && $canEdit):?><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="submit_stock_count"><input type="hidden" name="count_id" value="<?=$activeCount['id']?>"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>Batch / Expiry</th><th>System Qty</th><th>Physical Qty</th></tr></thead><tbody><?php foreach($activeCountLines as $line):?><tr><td><?=htmlspecialchars($line['item_code'].' — '.$line['item_name'])?> <small class="text-secondary">(<?=htmlspecialchars($line['unit'])?>)</small></td><td><?=htmlspecialchars($line['batch_number']?:'Untracked')?> / <?=htmlspecialchars($line['expiry_date']?:'No expiry')?></td><td><?=number_format((float)$line['expected_quantity'],3)?></td><td><input class="form-control form-control-sm" type="number" min="0" step=".001" name="counted_quantity[<?=$line['id']?>]" value="<?=htmlspecialchars((string)($line['counted_quantity']??''))?>" required></td></tr><?php endforeach;?></tbody></table></div><button class="btn btn-primary btn-sm" onclick="return confirm('Submit this completed count for approval? You cannot edit it after submission.')">Submit Count for Approval</button></form><?php elseif($activeCount):?><p class="text-secondary">You do not have edit permission to enter physical counts.</p><?php endif;?>
+<?php if($canApprove && $pendingCountLines):?><h6 class="fw-bold mt-4">Counts Awaiting Approval</h6><?php foreach($pendingCountLines as $pending):?><div class="border rounded p-3 mb-3"><div class="d-flex justify-content-between flex-wrap gap-2"><strong><?=htmlspecialchars($pending['count_number'])?> · <?=htmlspecialchars($pending['location_name'])?></strong><span class="pill">Submitted</span></div><div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>Item</th><th>Batch / Expiry</th><th>System</th><th>Counted</th><th>Variance</th></tr></thead><tbody><?php foreach($pending['lines'] as $line):$variance=(float)$line['variance_quantity'];?><tr><td><?=htmlspecialchars($line['item_code'].' — '.$line['item_name'])?></td><td><?=htmlspecialchars($line['batch_number']?:'Untracked')?> / <?=htmlspecialchars($line['expiry_date']?:'No expiry')?></td><td><?=number_format((float)$line['expected_quantity'],3)?></td><td><?=number_format((float)$line['counted_quantity'],3)?></td><td class="<?=$variance<0?'text-danger':($variance>0?'text-success':'')?>"><?=number_format($variance,3)?></td></tr><?php endforeach;?></tbody></table></div><form method="post" class="d-flex gap-2 flex-wrap"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="decide_stock_count"><input type="hidden" name="count_id" value="<?=$pending['id']?>"><input class="form-control form-control-sm" name="decision_notes" maxlength="500" placeholder="Approval / rejection reason"><button class="btn btn-success btn-sm" name="decision" value="Approved" onclick="return confirm('Approve variances and post stock adjustments to the ledger?')">Approve & Post Variances</button><button class="btn btn-outline-danger btn-sm" name="decision" value="Rejected" onclick="return confirm('Reject this count without changing stock balances?')">Reject</button></form></div><?php endforeach;?><?php endif;?>
 <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Count</th><th>Location</th><th>Status</th><th>Created</th></tr></thead><tbody><?php foreach($countRows as $cr):?><tr><td><?=htmlspecialchars($cr['count_number'])?></td><td><?=htmlspecialchars($cr['location_name'])?></td><td><span class="pill"><?=htmlspecialchars($cr['status'])?></span></td><td><?=htmlspecialchars($cr['created_at'])?></td></tr><?php endforeach;?><?php if(!$countRows):?><tr><td colspan="4" class="text-center text-secondary">No physical counts have been started.</td></tr><?php endif;?></tbody></table></div></div></div>
 <div class="panel"><div class="panel-head">Batch & Expiry Register</div><div class="panel-body">
-<p class="small text-secondary">This register lists batch/expiry details captured on stock movements. The quantity shown is cumulative receipt quantity, not current batch balance; batch-level availability remains incomplete until all issues, transfers and returns carry lot allocations.</p>
-<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>Location</th><th>Batch / Lot</th><th>Expiry</th><th>Expiry Status</th><th>Receipt Qty</th><th>Last Activity</th></tr></thead><tbody>
+<p class="small text-secondary">This register calculates current batch/expiry balance from signed stock movements. Historical movements recorded without lot details remain in the separate untracked balance and should be reconciled during physical counts.</p>
+<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>Location</th><th>Batch / Lot</th><th>Expiry</th><th>Expiry Status</th><th>On Hand</th><th>Last Activity</th></tr></thead><tbody>
 <?php foreach($expiryRows as $lot):$expiryText=(string)($lot['expiry_date']??'');$expiryTs=$expiryText!==''?strtotime($expiryText):false;$daysLeft=$expiryTs!==false?(int)floor(($expiryTs-strtotime(date('Y-m-d')))/86400):null;$expiryStatus=$daysLeft===null?'No expiry recorded':($daysLeft<0?'Expired':($daysLeft<=30?'Expires within 30 days':($daysLeft<=90?'Expires within 90 days':'In date')));$statusClass=$daysLeft!==null&&$daysLeft<0?'text-danger fw-bold':($daysLeft!==null&&$daysLeft<=30?'text-warning fw-bold':'text-success');?> 
-<tr><td><strong><?=htmlspecialchars($lot['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($lot['item_code'])?></small></td><td><?=htmlspecialchars($lot['location_name'])?></td><td><?=htmlspecialchars($lot['batch_number']?:'—')?></td><td><?=htmlspecialchars($expiryText?:'—')?></td><td class="<?=$statusClass?>"><?=htmlspecialchars($expiryStatus)?></td><td><?=number_format((float)$lot['received_quantity'],3)?></td><td><?=htmlspecialchars($lot['last_activity'])?></td></tr>
+<tr><td><strong><?=htmlspecialchars($lot['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($lot['item_code'])?></small></td><td><?=htmlspecialchars($lot['location_name'])?></td><td><?=htmlspecialchars($lot['batch_number']?:'—')?></td><td><?=htmlspecialchars($expiryText?:'—')?></td><td class="<?=$statusClass?>"><?=htmlspecialchars($expiryStatus)?></td><td><?=number_format((float)$lot['current_balance'],3)?></td><td><?=htmlspecialchars($lot['last_activity'])?></td></tr>
 <?php endforeach;?><?php if(!$expiryRows):?><tr><td colspan="7" class="text-center text-secondary">No batch or expiry information recorded yet.</td></tr><?php endif;?>
 </tbody></table></div></div></div>
 <div class="panel"><div class="panel-head">Recent Stock Ledger</div><div class="panel-body"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Item</th><th>Location</th><th>Movement</th><th>Qty</th><th>Reference / Notes</th><th>Recorded By</th></tr></thead><tbody>
