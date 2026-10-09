@@ -202,6 +202,11 @@ function isParentActive($paths) {
         </div>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'central_stores')): ?>
+        <div class="menu-title">Inventory & Stores</div>
+        <a href="/hospital_system/stores/index.php" class="<?= isActive('stores/index.php') ?>"><i class="fas fa-warehouse icon-main"></i> Central Stores</a>
+        <?php endif; ?>
+
         <?php if (can_access_module($conn, 'finance')): ?>
         <div class="menu-title">Finance</div>
         <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register icon-main"></i> Central Cashier</a>
