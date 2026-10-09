@@ -53,3 +53,4 @@ include __DIR__ . '/../includes/sidebar.php';
 <?php if(!$recentClaims): ?><tr><td colspan="6" class="text-center text-muted py-4">No claims found.</td></tr><?php else: foreach($recentClaims as $c): ?><tr><td><strong><?=htmlspecialchars($c['claim_number'])?></strong></td><td><?=htmlspecialchars($c['full_name'])?></td><td><?=htmlspecialchars($c['payer_name'])?></td><td><span class="badge-soft"><?=htmlspecialchars($c['claim_status'])?></span></td><td>KES <?=number_format((float)$c['total_claim_amount'],2)?></td><td>KES <?=number_format((float)$c['total_approved_amount'],2)?></td></tr><?php endforeach; endif; ?>
 </tbody></table></div></div>
 </div></div></div>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
