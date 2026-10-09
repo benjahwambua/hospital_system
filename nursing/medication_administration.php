@@ -77,5 +77,5 @@ include __DIR__ . '/../includes/sidebar.php';
  } ?>
  </tbody></table></div></div>
  <?php endif; ?>
-</div>
+</div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
