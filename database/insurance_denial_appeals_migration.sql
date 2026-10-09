@@ -30,7 +30,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql := IF(
   EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=@db AND table_name='claim_denials')
   AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@db AND table_name='claim_denials' AND column_name='resolution_outcome'),
-  'ALTER TABLE claim_denials ADD COLUMN resolution_outcome ENUM('Approved','Partially Approved','Upheld','Written Off') NULL AFTER appeal_notes',
+  'ALTER TABLE claim_denials ADD COLUMN resolution_outcome ENUM(''Approved'',''Partially Approved'',''Upheld'',''Written Off'') NULL AFTER appeal_notes',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
