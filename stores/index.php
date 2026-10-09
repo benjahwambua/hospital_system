@@ -542,6 +542,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+
+/*
+ * A read-only cross-system catalogue lets Central Stores staff see stock that
+ * already exists in the Pharmacy and Laboratory ledgers. It deliberately does
+ * not merge those balances into the Central Stores movement ledger.
+ */
+$systemInventoryRows = [];
+$inventorySourceCounts = ['Central Stores'=>0, 'Pharmacy'=>0, 'Laboratory'=>0];
+$hasPharmacyStock = false;
+$hasLabInventory = false;
+$tablesCheck = $conn->query("SHOW TABLES LIKE 'pharmacy_stock'");
+$hasPharmacyStock = $tablesCheck && $tablesCheck->num_rows > 0;
+$tablesCheck = $conn->query("SHOW TABLES LIKE 'lab_inventory'");
+$hasLabInventory = $tablesCheck && $tablesCheck->num_rows > 0;
+$systemInventorySql = "
+    SELECT 'Central Stores' AS source, i.item_code AS code, i.item_name AS item_name,
+           COALESCE(i.category,'General') AS category, i.unit AS unit,
+           COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS quantity,
+           GROUP_CONCAT(DISTINCT NULLIF(m.batch_number,'') ORDER BY m.batch_number SEPARATOR ', ') AS batches,
+           MAX(m.expiry_date) AS expiry_date, i.active AS active
+    FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id
+    WHERE i.active=1 GROUP BY i.id
+";
+$systemInventoryParts = [$systemInventorySql];
+if ($hasPharmacyStock) {
+    $systemInventoryParts[] = "SELECT 'Pharmacy' AS source, CONCAT('PH-',p.id) AS code, p.drug_name AS item_name,
+        'Medicine' AS category, p.unit AS unit, p.quantity AS quantity, p.batch_no AS batches,
+        p.expiry_date AS expiry_date, 1 AS active FROM pharmacy_stock p";
+}
+if ($hasLabInventory) {
+    $systemInventoryParts[] = "SELECT 'Laboratory' AS source, CONCAT('LAB-',l.id) AS code, l.item_name AS item_name,
+        COALESCE(l.category,'Laboratory Consumable') AS category, l.unit AS unit, l.quantity AS quantity,
+        l.batch_no AS batches, l.expiry_date AS expiry_date, 1 AS active
+        FROM lab_inventory l WHERE l.status='active'";
+}
+$systemInventoryResult = $conn->query(implode(" UNION ALL ", $systemInventoryParts) . " ORDER BY item_name, source");
+if ($systemInventoryResult) {
+    while ($inventoryRow = $systemInventoryResult->fetch_assoc()) {
+        $inventoryRow['quantity'] = (float)$inventoryRow['quantity'];
+        $inventoryRow['expiry_date'] = $inventoryRow['expiry_date'] ?? '';
+        $inventoryRow['batches'] = $inventoryRow['batches'] ?? '';
+        $systemInventoryRows[] = $inventoryRow;
+        if (isset($inventorySourceCounts[$inventoryRow['source']])) $inventorySourceCounts[$inventoryRow['source']]++;
+    }
+}
+
 $items = $conn->query("SELECT i.*,COALESCE(SUM(CASE WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) AND m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) THEN -m.quantity ELSE 0 END),0) AS main_balance FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name");
 $expiryLots = $conn->query("SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,i.item_code,i.item_name,l.location_name,MAX(m.created_at) AS last_activity,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS current_balance FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id WHERE (m.batch_number IS NOT NULL AND m.batch_number<>'') OR m.expiry_date IS NOT NULL GROUP BY m.item_id,m.location_id,COALESCE(m.batch_number,''),COALESCE(m.expiry_date,'1000-01-01'),i.item_code,i.item_name,l.location_name ORDER BY (MAX(m.expiry_date) IS NULL),MAX(m.expiry_date),i.item_name");
 $expiryRows=[]; if($expiryLots) while($row=$expiryLots->fetch_assoc()) $expiryRows[]=$row;
@@ -604,6 +650,40 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 <?php include __DIR__.'/../includes/sidebar.php'; ?>
 <div class="stores-wrap"><section class="hero"><small>Inventory control</small><h1 class="h3 fw-bold mt-2 mb-2">Central Stores</h1><p class="mb-0">A single stock ledger for receipts, departmental requisitions and controlled issues.</p></section>
 <?php if($message!==''):?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif;?><?php if($error!==''):?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif;?>
+<div class="panel"><div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2"><span>Existing Hospital Inventory Catalogue</span><span class="pill"><?=count($systemInventoryRows)?> item records</span></div><div class="panel-body">
+<p class="small text-secondary mb-3">Existing medicines and consumables from Central Stores, Pharmacy and Laboratory are visible here in one place. Balances are labelled by their source ledger; they are not added together or changed by this view.</p>
+<div class="row g-2 mb-3">
+<div class="col-md-4"><input class="form-control" id="systemInventorySearch" type="search" placeholder="Search item, code, category or batch" aria-label="Search hospital inventory"></div>
+<div class="col-md-3"><select class="form-select" id="systemInventorySource" aria-label="Filter inventory source"><option value="">All inventory sources</option><option>Central Stores</option><option>Pharmacy</option><option>Laboratory</option></select></div>
+<div class="col-md-5 d-flex flex-wrap gap-2 align-items-center"><span class="pill">Central Stores: <?=$inventorySourceCounts['Central Stores']?></span><span class="pill">Pharmacy: <?=$inventorySourceCounts['Pharmacy']?></span><span class="pill">Laboratory: <?=$inventorySourceCounts['Laboratory']?></span></div>
+</div>
+<div class="table-responsive"><table class="table table-sm" id="systemInventoryTable"><thead><tr><th>Item / Medicine</th><th>Source</th><th>Category</th><th>Unit</th><th>On Hand</th><th>Batch / Lot</th><th>Expiry</th></tr></thead><tbody>
+<?php foreach($systemInventoryRows as $inventoryRow):?><tr data-source="<?=htmlspecialchars($inventoryRow['source'])?>" data-search="<?=htmlspecialchars(strtolower($inventoryRow['item_name'].' '.$inventoryRow['code'].' '.$inventoryRow['category'].' '.$inventoryRow['batches']))?>"><td><strong><?=htmlspecialchars($inventoryRow['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($inventoryRow['code'])?></small></td><td><span class="pill"><?=htmlspecialchars($inventoryRow['source'])?></span></td><td><?=htmlspecialchars($inventoryRow['category'])?></td><td><?=htmlspecialchars($inventoryRow['unit'])?></td><td class="<?=((float)$inventoryRow['quantity']<=0?'text-danger fw-bold':'')?>"><?=number_format((float)$inventoryRow['quantity'],3)?></td><td><?=htmlspecialchars($inventoryRow['batches']!==''?$inventoryRow['batches']:'—')?></td><td><?=htmlspecialchars($inventoryRow['expiry_date']!==''?$inventoryRow['expiry_date']:'—')?></td></tr><?php endforeach;?>
+<?php if(!$systemInventoryRows):?><tr><td colspan="7" class="text-center text-secondary py-3">No inventory records were found in the available stock tables.</td></tr><?php endif;?>
+<tr id="systemInventoryNoMatches" hidden><td colspan="7" class="text-center text-secondary py-3">No items match your search.</td></tr>
+</tbody></table></div></div></div>
+<script>
+(function(){
+ const search=document.getElementById('systemInventorySearch');
+ const source=document.getElementById('systemInventorySource');
+ const table=document.getElementById('systemInventoryTable');
+ const empty=document.getElementById('systemInventoryNoMatches');
+ if(!search||!source||!table||!empty)return;
+ function filterRows(){
+  const term=search.value.trim().toLowerCase();
+  let visible=0;
+  table.querySelectorAll('tbody tr[data-source]').forEach(function(row){
+   const matchText=(row.getAttribute('data-search')||'').includes(term);
+   const matchSource=!source.value||row.getAttribute('data-source')===source.value;
+   row.hidden=!(matchText&&matchSource);
+   if(!row.hidden)visible++;
+  });
+  empty.hidden=visible!==0;
+ }
+ search.addEventListener('input',filterRows);
+ source.addEventListener('change',filterRows);
+})();
+</script>
 <div class="row g-3 mb-4"><div class="col-md-4"><div class="metric"><span class="text-secondary small">Active stock items</span><strong><?=count($itemRows)?></strong></div></div><div class="col-md-4"><div class="metric"><span class="text-secondary small">Items at/below reorder level</span><strong><?= $lowStock ?></strong></div></div><div class="col-md-4"><div class="metric"><span class="text-secondary small">Open requisitions</span><strong><?=count(array_filter($reqRows,fn($r)=>in_array($r['status'],['Submitted','Approved','Partially Issued'],true)))?></strong></div></div></div>
 <div class="row g-3"><div class="col-xl-6">
 <div class="panel"><div class="panel-head">Stock Item Register</div><div class="panel-body"><?php if($canCreate):?><form method="post" class="row g-2 mb-3"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="add_item"><div class="col-md-4"><label class="form-label">Item Code</label><input class="form-control" name="item_code" required maxlength="60"></div><div class="col-md-8"><label class="form-label">Item Name</label><input class="form-control" name="item_name" required maxlength="180"></div><div class="col-md-4"><label class="form-label">Category</label><input class="form-control" name="category"></div><div class="col-md-4"><label class="form-label">Unit</label><input class="form-control" name="unit" value="Each" required></div><div class="col-md-4"><label class="form-label">Reorder Level</label><input class="form-control" type="number" min="0" step=".001" name="reorder_level" value="0"></div><div class="col-12"><button class="btn btn-primary btn-sm"><i class="fa fa-plus me-1"></i>Add Item</button></div></form><?php endif;?><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>Unit</th><th>Main Store</th><th>Reorder</th></tr></thead><tbody><?php foreach($itemRows as $it):?><tr><td><strong><?=htmlspecialchars($it['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($it['item_code'])?><?= $it['category']?' · '.htmlspecialchars($it['category']):'' ?></small></td><td><?=htmlspecialchars($it['unit'])?></td><td><?=number_format((float)$it['main_balance'],3)?></td><td><?=number_format((float)$it['reorder_level'],3)?></td></tr><?php endforeach;?><?php if(!$itemRows):?><tr><td colspan="4" class="text-center text-secondary py-3">No stock items registered yet.</td></tr><?php endif;?></tbody></table></div></div></div>
