@@ -14,7 +14,7 @@ $canFinance = can_access_module($conn, 'finance');
 $canProcurement = can_access_module($conn, 'procurement');
 $canPatientOverview = $canFrontDesk || $canClinical;
 $canDiagnosticOverview = $canLaboratory || $canRadiology;
-$canServiceOverview = $canClinical || $canLaboratory || $canRadiology || $canPharmacy;
+$canServiceOverview = $canClinical || $canLaboratory || $canRadiology;
 
 $currentUserId=(int)($_SESSION['user_id']??0);
 $isSuper=false;
@@ -41,8 +41,15 @@ if($isSuper){
     if($q)while($r=$q->fetch_assoc()){ $chartLabels[]=$r['day'];$chartData[]=(float)$r['total']; }
 }
 $serviceLabels=[];$serviceData=[];
-$q=$conn->query("SELECT COALESCE(category,'Other') category,COUNT(*) total FROM patient_services GROUP BY category ORDER BY total DESC LIMIT 6");
-if($q)while($r=$q->fetch_assoc()){ $serviceLabels[]=$r['category'];$serviceData[]=(int)$r['total']; }
+$serviceConditions=[];
+if($canLaboratory) $serviceConditions[]="category='lab'";
+if($canRadiology) $serviceConditions[]="category='radiology'";
+if($canClinical) $serviceConditions[]="(category IS NULL OR category NOT IN ('lab','radiology'))";
+if($serviceConditions){
+    $serviceSql="SELECT COALESCE(category,'Other') category,COUNT(*) total FROM patient_services WHERE (".implode(' OR ',$serviceConditions).") GROUP BY category ORDER BY total DESC LIMIT 6";
+    $q=$conn->query($serviceSql);
+    if($q)while($r=$q->fetch_assoc()){ $serviceLabels[]=$r['category'];$serviceData[]=(int)$r['total']; }
+}
 
 $lowItems=$conn->query("SELECT drug_name,quantity FROM pharmacy_stock WHERE quantity<15 ORDER BY quantity ASC LIMIT 5");
 
@@ -69,7 +76,7 @@ include __DIR__ . '/includes/sidebar.php';
     <?php if($canPatientOverview): ?><a class="exec-card" href="patients/patient_list.php"><div class="exec-card-top"><small>Total Patients</small><span class="exec-icon"><i class="fas fa-users"></i></span></div><div class="exec-value"><?= number_format($patients) ?></div><div class="exec-sub">Registered patients</div></a><?php endif; ?>
     <?php if($canFrontDesk || $canClinical): ?><a class="exec-card" href="patients/appointments.php"><div class="exec-card-top"><small>Today's Visits</small><span class="exec-icon"><i class="fas fa-user-md"></i></span></div><div class="exec-value"><?= number_format($todayVisits) ?></div><div class="exec-sub"><?= $appointments ?> appointments still open</div></a><?php endif; ?>
     <?php if($canClinical): ?><a class="exec-card" href="clinical/index.php"><div class="exec-card-top"><small>Admitted</small><span class="exec-icon"><i class="fas fa-bed"></i></span></div><div class="exec-value"><?= number_format($admitted) ?></div><div class="exec-sub">Current admissions</div></a><?php endif; ?>
-    <?php if($canDiagnosticOverview): ?><a class="exec-card" href="lab/lab_results.php"><div class="exec-card-top"><small>Diagnostic Queue</small><span class="exec-icon"><i class="fas fa-vials"></i></span></div><div class="exec-value"><?= number_format($labPending+$radPending) ?></div><div class="exec-sub"><?= $labPending ?> lab · <?= $radPending ?> radiology</div></a><?php endif; ?>
+    <?php if($canDiagnosticOverview): ?><a class="exec-card" href="<?= $canLaboratory ? 'lab/lab_results.php' : 'radiology/radiology_results.php' ?>"><div class="exec-card-top"><small>Diagnostic Queue</small><span class="exec-icon"><i class="fas fa-vials"></i></span></div><div class="exec-value"><?= number_format(($canLaboratory ? $labPending : 0)+($canRadiology ? $radPending : 0)) ?></div><div class="exec-sub"><?php if($canLaboratory): ?><?= $labPending ?> lab<?php endif; ?><?php if($canLaboratory && $canRadiology): ?> · <?php endif; ?><?php if($canRadiology): ?><?= $radPending ?> radiology<?php endif; ?></div></a><?php endif; ?>
   </section>
 
   <section class="exec-grid">
