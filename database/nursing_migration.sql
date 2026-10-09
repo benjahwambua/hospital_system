@@ -38,15 +38,22 @@ CREATE TABLE IF NOT EXISTS nursing_observations (
     INDEX idx_nursing_obs_time (observation_time)
 ) ENGINE=InnoDB;
 
-INSERT INTO module_access (module_key, module_name, description, sort_order)
-SELECT 'nursing','Nursing','Inpatient nursing observations, notes, care plans and shift handover',96
-WHERE NOT EXISTS (SELECT 1 FROM module_access WHERE module_key='nursing');
+-- Register Nursing in the canonical access-control module table.
+INSERT INTO access_modules (module_key, module_name, description, sort_order, active)
+SELECT 'nursing', 'Nursing', 'Inpatient nursing observations, notes, care plans and shift handover', 96, 1
+WHERE NOT EXISTS (SELECT 1 FROM access_modules WHERE module_key = 'nursing');
 
-INSERT INTO user_module_access (user_id, module_key, can_view, can_create, can_edit, can_delete, can_approve)
-SELECT u.id,'nursing',1,1,1,0,1
+-- Grant a conservative initial set of permissions to existing clinical staff.
+-- Administrators can adjust each user's permissions from Access Rights.
+INSERT INTO user_module_access
+    (user_id, module_id, can_view, can_create, can_edit, can_delete, can_approve)
+SELECT u.id, am.id, 1, 1, 1, 0, 1
 FROM users u
-WHERE LOWER(COALESCE(u.role,'')) IN ('admin','doctor','nurse')
+JOIN access_modules am ON am.module_key = 'nursing' AND am.active = 1
+WHERE LOWER(COALESCE(u.role, '')) IN ('admin', 'doctor', 'nurse')
+  AND COALESCE(u.is_super, 0) = 0
   AND NOT EXISTS (
-      SELECT 1 FROM user_module_access uma
-      WHERE uma.user_id=u.id AND uma.module_key='nursing'
+      SELECT 1
+      FROM user_module_access uma
+      WHERE uma.user_id = u.id AND uma.module_id = am.id
   );
