@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
                 foreach ($itemIds as $i => $stockId) {
                     $stockId = (int)$stockId;
                     $inventoryType = strtolower(trim((string)($inventoryTypes[$i] ?? 'pharmacy')));
-                    if (!in_array($inventoryType, ['pharmacy','lab'], true)) $inventoryType = 'pharmacy';
+                    if (!in_array($inventoryType, ['pharmacy','lab','stores'], true)) $inventoryType = 'pharmacy';
                     $inventoryItemId = (int)($inventoryItemIds[$i] ?? $stockId);
                     $name = trim((string)($itemNames[$i] ?? ''));
                     $qty = max(1, (int)($qtys[$i] ?? 0));
@@ -77,8 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_po'])) {
 
                     if ($inventoryType === 'pharmacy') {
                         $itemCheck = $conn->prepare("SELECT id, drug_name FROM pharmacy_stock WHERE id=? LIMIT 1");
-                    } else {
+                    } elseif ($inventoryType === 'lab') {
                         $itemCheck = $conn->prepare("SELECT id, item_name FROM lab_inventory WHERE id=? AND status='active' LIMIT 1");
+                    } else {
+                        $itemCheck = $conn->prepare("SELECT id, item_name FROM stores_items WHERE id=? AND active=1 LIMIT 1");
                     }
                     $itemCheck->bind_param('i', $inventoryItemId);
                     $itemCheck->execute();
@@ -125,6 +127,8 @@ $stockRes = $conn->query('SELECT id, drug_name AS item_name, buying_price, quant
 if ($stockRes) while ($row = $stockRes->fetch_assoc()) { $row['inventory_type']='pharmacy'; $stockItems[]=$row; }
 $labRes = $conn->query("SELECT id, item_name, buying_price, quantity FROM lab_inventory WHERE status='active' ORDER BY item_name ASC");
 if ($labRes) while ($row = $labRes->fetch_assoc()) { $row['inventory_type']='lab'; $stockItems[]=$row; }
+$storesRes = $conn->query("SELECT i.id,i.item_name,0 AS buying_price,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS quantity FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id AND m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name ASC");
+if ($storesRes) while ($row = $storesRes->fetch_assoc()) { $row['inventory_type']='stores'; $stockItems[]=$row; }
 $stockRes = null;
 
 include __DIR__ . '/../includes/header.php';
@@ -221,7 +225,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <input type="hidden" name="item_id[]" class="item-id" value="">
             <input type="hidden" name="item_name[]" class="item-name" value="">
             <input type="hidden" name="inventory_item_id[]" class="inventory-item-id" value="">
-            <select name="inventory_type[]" class="form-control form-control-sm inventory-type mb-1"><option value="pharmacy">Pharmacy</option><option value="lab">Laboratory</option></select>
+            <select name="inventory_type[]" class="form-control form-control-sm inventory-type mb-1"><option value="pharmacy">Pharmacy</option><option value="lab">Laboratory</option><option value="stores">Central Stores</option></select>
             <input type="text" class="form-control item-search" list="stock-item-options" placeholder="Search medicine/item..." required>
         </td>
         <td><input type="number" name="qty[]" class="form-control qty" min="1" value="1" required></td>
@@ -233,7 +237,8 @@ include __DIR__ . '/../includes/sidebar.php';
 <datalist id="stock-item-options">
     <?php foreach ($stockItems as $stock): ?>
         <option
-            value="<?= htmlspecialchars($stock['item_name']) ?>"
+            value="<?= htmlspecialchars($stock['item_name'].' ['.strtoupper($stock['inventory_type']).']') ?>"
+            data-name="<?= htmlspecialchars($stock['item_name']) ?>"
             data-id="<?= (int)$stock['id'] ?>"
             data-type="<?= htmlspecialchars($stock['inventory_type']) ?>"
             data-price="<?= number_format((float)($stock['buying_price'] ?? 0), 2, '.', '') ?>"
@@ -272,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const option = Array.from(document.querySelectorAll('#stock-item-options option'))
                 .find((opt) => (opt.value || '').trim().toLowerCase() === chosenName);
             const id = option?.dataset?.id || '';
-            const name = option?.value || '';
+            const name = option?.dataset?.name || '';
             const price = option?.dataset?.price || '0.00';
             const type = option?.dataset?.type || 'pharmacy';
 
