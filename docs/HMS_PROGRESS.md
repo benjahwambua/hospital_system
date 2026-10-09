@@ -41,7 +41,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 ## Active priority sequence
 
 1. Finish **Inpatient/Ward + Nursing**.
-2. Build **Central Stores** as the hospital-wide inventory control layer.
+2. Continue **Central Stores**: stock counts/variance approval, batch/expiry visibility and department integration.
 3. Complete the remaining **Insurance/SHA controls**: denials, appeals, tariffs and stronger eligibility/claim validation.
 4. Build **Emergency/Casualty**.
 5. Build **Theatre/Surgery**.
@@ -55,4 +55,4 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 
 The system has moved beyond a basic HMS prototype. The strongest areas are patient/reception, clinical departmental workflows, billing/cashier, procurement, permissions and the newly operational insurance revenue-cycle chain.
 
-The Nursing access-control migration was corrected on 2026-10-09; the live database migration and Nursing UAT are still outstanding. The first Central Stores workspace is implemented but not yet UAT-certified.\n\nThe main production-readiness risk is now **incomplete enterprise workflows**, especially stores, inpatient/nursing depth, emergency, theatre, coding and control/analytics—not the absence of more menu items.
+The Nursing access-control migration was corrected on 2026-10-09; the live database migration and Nursing UAT are still outstanding. Central Stores requisitions now support multiple items, and procurement GRNs can post receipts directly to the Main Stores movement ledger. The live database migrations and end-to-end receiving/requisition UAT remain outstanding.\n\nThe main production-readiness risk is now **incomplete enterprise workflows**, especially stores, inpatient/nursing depth, emergency, theatre, coding and control/analytics—not the absence of more menu items.
