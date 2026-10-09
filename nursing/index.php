@@ -12,8 +12,10 @@ $csrf = $_SESSION['csrf_token'];
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!$canCreate) {
-        $message = '<div class="alert alert-danger">You do not have permission to record nursing care.</div>';
+    $postedAction = (string)($_POST['action'] ?? '');
+    $permissionDenied = $postedAction === 'care_plan_review' ? !$canApprove : !$canCreate;
+    if ($permissionDenied) {
+        $message = '<div class="alert alert-danger">You do not have permission to perform this nursing action.</div>';
     } elseif (!hash_equals($csrf, (string)($_POST['csrf_token'] ?? ''))) {
         $message = '<div class="alert alert-danger">Invalid security token. Please refresh and try again.</div>';
     } else {
@@ -142,6 +144,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $s->close();
                 }
             }
+        } elseif ($action === 'care_plan_review') {
+            $planId = (int)($_POST['plan_id'] ?? 0);
+            $newStatus = trim((string)($_POST['plan_status'] ?? ''));
+            $reviewNotes = trim((string)($_POST['review_notes'] ?? ''));
+            if (!in_array($newStatus, ['Achieved','Discontinued'], true) || $planId <= 0 || $reviewNotes === '') {
+                $message = '<div class="alert alert-danger">Choose a valid closure status and document the review outcome.</div>';
+            } else {
+                $s = $conn->prepare("UPDATE nursing_care_plans SET status=?,reviewed_by=?,reviewed_at=NOW(),review_notes=? WHERE id=? AND admission_id=? AND status='Active'");
+                if ($s) {
+                    $s->bind_param('sisii', $newStatus, $userId, $reviewNotes, $planId, $admissionId);
+                    if ($s->execute() && $s->affected_rows === 1) {
+                        if (function_exists('audit')) audit('nursing_care_plan_reviewed', "admission_id={$admissionId},plan_id={$planId},status={$newStatus}");
+                        $message = '<div class="alert alert-success">Care plan review saved.</div>';
+                    } else $message = '<div class="alert alert-warning">Care plan was not updated; it may already be closed.</div>';
+                    $s->close();
+                }
+            }
         }
     }
 }
@@ -247,8 +266,8 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="form-group"><label>Review Due</label><input type="datetime-local" name="review_due_at" class="form-control"></div>
             <button class="btn btn-primary"><i class="fas fa-clipboard-check mr-1"></i>Save Care Plan</button>
           </form><?php endif; ?>
-          <div class="table-responsive"><table class="n-table"><thead><tr><th>Need / Goal</th><th>Interventions</th><th>Review</th><th>Status</th></tr></thead><tbody>
-          <?php $ps=$conn->prepare("SELECT * FROM nursing_care_plans WHERE admission_id=? ORDER BY FIELD(status,'Active','Achieved','Discontinued'),review_due_at IS NULL,review_due_at,created_at DESC"); if($ps){$ps->bind_param('i',$selected['id']);$ps->execute();$pr=$ps->get_result();while($plan=$pr->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($plan['problem_or_need'])?></strong><div><?=htmlspecialchars($plan['goal'])?></div></td><td><?=nl2br(htmlspecialchars($plan['interventions']))?></td><td><?=htmlspecialchars($plan['review_due_at']??'Not scheduled')?></td><td><span class="badge-soft"><?=htmlspecialchars($plan['status'])?></span></td></tr><?php endwhile; $ps->close(); } ?></tbody></table></div>
+          <div class="table-responsive"><table class="n-table"><thead><tr><th>Need / Goal</th><th>Interventions</th><th>Review</th><th>Status / Action</th></tr></thead><tbody>
+          <?php $ps=$conn->prepare("SELECT * FROM nursing_care_plans WHERE admission_id=? ORDER BY FIELD(status,'Active','Achieved','Discontinued'),review_due_at IS NULL,review_due_at,created_at DESC"); if($ps){$ps->bind_param('i',$selected['id']);$ps->execute();$pr=$ps->get_result();while($plan=$pr->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($plan['problem_or_need'])?></strong><div><?=htmlspecialchars($plan['goal'])?></div></td><td><?=nl2br(htmlspecialchars($plan['interventions']))?><?php if(!empty($plan['review_notes'])): ?><div class="text-muted mt-1"><small>Review: <?=nl2br(htmlspecialchars($plan['review_notes']))?></small></div><?php endif; ?></td><td><?=htmlspecialchars($plan['review_due_at']??'Not scheduled')?></td><td><span class="badge-soft"><?=htmlspecialchars($plan['status'])?></span><?php if($canApprove && $plan['status']==='Active'): ?><form method="post" class="mt-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="care_plan_review"><input type="hidden" name="admission_id" value="<?= (int)$selected['id'] ?>"><input type="hidden" name="plan_id" value="<?= (int)$plan['id'] ?>"><select name="plan_status" class="form-control form-control-sm mb-1" required><option value="Achieved">Achieved</option><option value="Discontinued">Discontinued</option></select><textarea name="review_notes" class="form-control form-control-sm mb-1" rows="2" required placeholder="Review outcome / rationale"></textarea><button class="btn btn-sm btn-outline-primary">Record Review</button></form><?php endif; ?></td></tr><?php endwhile; $ps->close(); } ?></tbody></table></div>
         </div>
       </div>
       <?php endif; ?>
