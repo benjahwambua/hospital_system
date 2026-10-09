@@ -63,7 +63,7 @@ Highest-priority gaps:
 | Claims | Partial | Schema exists; end-to-end workflow missing |
 | Preauthorization | Partial | Schema exists; operational workflow missing |
 | Remittance/reconciliation | Partial | Schema exists; payer remittance workflow missing |
-| Central stores | Partial | Item/location master, movement ledger, multi-item requisitions, GRN receipts, transfers, returns, adjustments and physical count sessions with independently approved variances exist. Batch/expiry visibility, valuation, wider department integration and UAT remain |
+| Central stores | Partial | Item/location master, multi-item requisitions, GRN receipts, physical counts with independent variance approval, FEFO requisition issues, lot-aware transfers and expiry register exist. Lot-aware count variances/returns/adjustments, reliable batch balances, valuation, wider integration and UAT remain |
 | Stock requisitions | Partial | Department requisitions support up to four items per request with approval and issue; partial issue controls, counts and department-level integration remain |
 | Batch/expiry control | Partial | Pharmacy/lab support exists; needs unified model |
 | Procurement | Strong | PO, receiving, suppliers and payables exist |
@@ -132,7 +132,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 ### Phase 1 — Hospital enterprise core
 
 1. **Insurance & SHA** — payers, plans, patient coverage, eligibility, tariffs, preauthorization, claims, denials, appeals, remittances and payer reconciliation.
-2. **Central Stores** — batch/expiry traceability, valuation and links from GRN receipt through departmental issue and reconciliation; verify stock count/variance controls in UAT.
+2. **Central Stores** — finish lot-aware count variances, returns and adjustments; reconcile batch-level balances and valuation from GRN receipt through departmental issue; verify controls in UAT.
 3. **Inpatient/Ward expansion** — ward master, bed master, occupancy, transfers, admission lifecycle, daily charges and discharge.
 4. **Nursing** — nursing notes, observations, care plans, handover, medication administration, intake/output and tasks.
 
