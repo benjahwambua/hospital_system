@@ -230,6 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $head = $conn->prepare("SELECT * FROM stores_stock_counts WHERE id=? FOR UPDATE");
                 $head->bind_param('i', $countId); $head->execute(); $countHead = $head->get_result()->fetch_assoc(); $head->close();
                 if (!$countHead || $countHead['status'] !== 'Submitted') throw new RuntimeException('Only submitted stock counts can be approved or rejected.');
+                if ($decision === 'Approved' && (int)$countHead['created_by'] === $uid) throw new RuntimeException('A stock count must be approved by a different user from the person who opened it.');
                 if ($decision === 'Approved') {
                     $lines = $conn->prepare("SELECT l.*,i.item_name FROM stores_stock_count_lines l JOIN stores_items i ON i.id=l.item_id WHERE l.count_id=? ORDER BY l.id FOR UPDATE");
                     $lines->bind_param('i', $countId); $lines->execute(); $lineRows = $lines->get_result();
@@ -237,12 +238,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     while ($line = $lineRows->fetch_assoc()) {
                         if ($line['counted_quantity'] === null || $line['variance_quantity'] === null) throw new RuntimeException('Stock count is incomplete.');
                         $variance = (float)$line['variance_quantity'];
-                        if (abs($variance) < 0.0005) continue;
                         $itemId = (int)$line['item_id']; $locationId = (int)$countHead['location_id'];
+                        $currentBalance = stores_balance($conn, $itemId, $locationId);
+                        if (abs($currentBalance - (float)$line['expected_quantity']) >= 0.0005) {
+                            throw new RuntimeException('Stock changed after the count was opened for item ' . $line['item_name'] . '. Reject this count and recount before posting variances.');
+                        }
+                        if (abs($variance) < 0.0005) continue;
                         $movementType = $variance > 0 ? 'Adjustment In' : 'Adjustment Out';
                         $quantity = abs($variance);
                         $movementNotes = 'Approved physical count ' . $countHead['count_number'] . ($notes !== '' ? ' — ' . $notes : '');
-                        $movement->bind_param('iisd sii', $itemId, $locationId, $quantity, $movementType, $countId, $movementNotes, $uid);
+                        $movement->bind_param('iisdisi', $itemId, $locationId, $movementType, $quantity, $countId, $movementNotes, $uid);
                         if (!$movement->execute()) throw new RuntimeException('Unable to post stock count variance.');
                     }
                     $movement->close(); $lines->close();
