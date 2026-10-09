@@ -52,8 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'post_
             $stmt = $conn->prepare("INSERT INTO inpatient_daily_charges(admission_id,patient_id,ward_id,ward_name,bed_number,charge_date,daily_rate,invoice_id,invoice_item_id,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)");
             if (!$stmt) throw new RuntimeException('Unable to prepare daily-charge ledger entry.');
             $wardId = (int)$stay['ward_id']; $bedNumber = (int)$stay['bed_number'];
-            $stmt->bind_param('iis sisdiii', $admissionId, $patientId, $wardId, $stay['ward_name'], $bedNumber, $chargeDate, $rate, $invoiceId, $itemId, $userId);
-            // Bind parameter type strings cannot contain spaces.
+            $stmt->bind_param('iiisisdiii', $admissionId, $patientId, $wardId, $stay['ward_name'], $bedNumber, $chargeDate, $rate, $invoiceId, $itemId, $userId);
             if (!$stmt->execute()) throw new RuntimeException('Unable to save the daily-charge ledger entry.');
             $stmt->close();
             if (function_exists('audit')) audit('inpatient_daily_charge_posted', "admission_id={$admissionId},charge_date={$chargeDate},invoice_id={$invoiceId},amount={$rate}");
