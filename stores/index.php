@@ -360,7 +360,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($outType === 'Adjustment Out' && $batchValue !== null) {
                         $lotBalance = 0.0;
                         foreach (stores_batch_balances($conn, $itemId, $fromId) as $lot) {
-                            if ((string)($lot['batch_number'] ?? '') === $movementBatch && (string)($lot['expiry_date'] ?? '') === $movementExpiry) $lotBalance = (float)$lot['balance'];
+                            if ((string)($lot['batch_number'] ?? '') === $movementBatch && ($movementExpiry === '' || (string)($lot['expiry_date'] ?? '') === $movementExpiry)) $lotBalance += (float)$lot['balance'];
                         }
                         if ($lotBalance + 0.0005 < $qty) throw new RuntimeException('The selected batch does not have enough recorded stock for this adjustment.');
                     }
