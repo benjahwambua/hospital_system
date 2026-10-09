@@ -89,6 +89,11 @@ function isParentActive($paths) {
                 <a href="/hospital_system/appointments/appointments.php" class="<?= isActive('appointments/appointments.php') ?>"><i class="fas fa-calendar-alt"></i> Appointment Management</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
+                <a href="/hospital_system/clinical/admit_patient.php" class="<?= isActive('clinical/admit_patient.php') ?>"><i class="fas fa-procedures"></i> Admit Patient</a>
+                <a href="/hospital_system/clinical/inpatient_charges.php" class="<?= isActive('clinical/inpatient_charges.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Inpatient Charges</a>
+                <a href="/hospital_system/clinical/ward_configuration.php" class="<?= isActive('clinical/ward_configuration.php') ?>"><i class="fas fa-cog"></i> Ward &amp; Bed Configuration</a>
+                <a href="/hospital_system/vitals/vitals_add.php" class="<?= isActive('vitals/vitals_add.php') ?>"><i class="fas fa-heartbeat"></i> Record Vital Signs</a>
+                <a href="/hospital_system/prescriptions/view_prescriptions.php" class="<?= isActive('prescriptions/view_prescriptions.php') ?>"><i class="fas fa-prescription"></i> Prescriptions</a>
             </div>
         </div>
         <?php endif; ?>
@@ -134,6 +139,12 @@ function isParentActive($paths) {
                 <a href="/hospital_system/pharmacy/dispensing_queue.php" class="<?= isActive('dispensing_queue.php') ?>"><i class="fas fa-clipboard-check"></i> Dispensing Queue</a>
                 <a href="/hospital_system/pharmacy/sell_medicine.php" class="<?= isActive('sell_medicine.php') ?>"><i class="fas fa-file-prescription"></i> Sell Medicine</a>
                 <a href="/hospital_system/pharmacy/view_stock.php" class="<?= isActive('view_stock.php') ?>"><i class="fas fa-capsules"></i> View Stock</a>
+                <a href="/hospital_system/pharmacy/manage_stock.php" class="<?= isActive('manage_stock.php') ?>"><i class="fas fa-boxes"></i> Manage Stock</a>
+                <a href="/hospital_system/pharmacy/add_stock.php" class="<?= isActive('add_stock.php') ?>"><i class="fas fa-plus-square"></i> Receive / Add Stock</a>
+                <a href="/hospital_system/pharmacy/stock_movements.php" class="<?= isActive('pharmacy/stock_movements.php') ?>"><i class="fas fa-exchange-alt"></i> Stock Movement History</a>
+                <a href="/hospital_system/pharmacy/stock_take.php" class="<?= isActive('stock_take.php') ?>"><i class="fas fa-clipboard-list"></i> Stock Take</a>
+                <a href="/hospital_system/pharmacy/pharmacy_sales_report.php" class="<?= isActive('pharmacy_sales_report.php') ?>"><i class="fas fa-chart-line"></i> Pharmacy Sales Report</a>
+                <a href="/hospital_system/pharmacy/walkin_sale.php" class="<?= isActive('walkin_sale.php') ?>"><i class="fas fa-cash-register"></i> Walk-in Sale</a>
             </div>
         </div>
         <?php endif; ?>
@@ -158,7 +169,13 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'nursing')): ?>
         <div class="menu-title">Inpatient Care</div>
-        <a href="/hospital_system/nursing/index.php" class="<?= isActive('nursing/index.php') ?>"><i class="fas fa-user-nurse icon-main"></i> Nursing Station</a>
+        <div class="has-submenu <?= isParentActive(['nursing/']) ?>">
+            <a href="#" class="menu-toggle" aria-expanded="false"><i class="fas fa-user-nurse icon-main"></i> Nursing <i class="fas fa-chevron-down caret"></i></a>
+            <div class="submenu">
+                <a href="/hospital_system/nursing/index.php" class="<?= isActive('nursing/index.php') ?>"><i class="fas fa-th-large"></i> Nursing Station</a>
+                <a href="/hospital_system/nursing/medication_administration.php" class="<?= isActive('nursing/medication_administration.php') ?>"><i class="fas fa-pills"></i> Medication Administration (MAR)</a>
+            </div>
+        </div>
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'finance_admin')): ?>
@@ -169,6 +186,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/finance/dashboard.php" class="<?= isActive('finance/dashboard.php') ?>"><i class="fas fa-th-large"></i> Finance Dashboard</a>
                                 <a href="/hospital_system/billing/view_bills.php" class="<?= isActive('view_bills.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Billing & Invoices</a>
                 <a href="/hospital_system/billing/mpesa.php" class="<?= isActive('mpesa.php') ?>"><i class="fas fa-mobile-alt"></i> M-Pesa Payments</a>
+                <a href="/hospital_system/accounting/dashboard.php" class="<?= isActive('accounting/dashboard.php') ?>"><i class="fas fa-chart-pie"></i> Accounting Dashboard</a>
                 <a href="/hospital_system/accounting/ledger.php" class="<?= isActive('accounting/ledger.php') ?>"><i class="fas fa-calculator"></i> Ledger</a>
                 <a href="/hospital_system/accounting/reconciliation.php" class="<?= isActive('reconciliation.php') ?>"><i class="fas fa-balance-scale"></i> Financial Reconciliation</a>
                 <a href="/hospital_system/expenses/add_expense.php" class="<?= isActive('add_expense.php') ?>"><i class="fas fa-money-bill-wave"></i> Record Expense</a>
@@ -202,6 +220,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/procurement/receive_inventory.php" class="<?= isActive('receive_inventory.php') ?>"><i class="fas fa-warehouse"></i> Receive Inventory</a>
                 <a href="/hospital_system/procurement/supplier_payables.php" class="<?= isActive('supplier_payables.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Supplier Payables</a>
                 <a href="/hospital_system/procurement/supplier_statement.php" class="<?= isActive('supplier_statement.php') ?>"><i class="fas fa-file-alt"></i> Supplier Statement</a>
+                <a href="/hospital_system/procurement/add_expenses.php" class="<?= isActive('procurement/add_expenses.php') ?>"><i class="fas fa-receipt"></i> Procurement Expenses</a>
             </div>
         </div>
         <?php endif; ?>
@@ -217,6 +236,7 @@ function isParentActive($paths) {
         <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>"><i class="fas fa-clock icon-main"></i> Cashier Shift</a>
         <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock icon-main"></i> Aged Receivables</a>
         <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
+        <a href="/hospital_system/cashier/refund.php" class="<?= isActive('cashier/refund.php') ?>"><i class="fas fa-undo icon-main"></i> Refunds</a>
         <?php endif; ?>
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
@@ -230,6 +250,9 @@ function isParentActive($paths) {
                 <a href="/hospital_system/services/price_history.php" class="<?= isActive('services/price_history.php') ?>"><i class="fas fa-history"></i> Price History</a>
                 <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
                 <a href="/hospital_system/reports/reports.php" class="<?= isActive('reports/reports.php') ?>"><i class="fas fa-file-alt"></i> System Reports</a>
+                <a href="/hospital_system/reports/daily.php" class="<?= isActive('reports/daily.php') ?>"><i class="fas fa-calendar-day"></i> Daily Operations Report</a>
+                <a href="/hospital_system/reports/patient_medical_report.php" class="<?= isActive('reports/patient_medical_report.php') ?>"><i class="fas fa-file-medical"></i> Patient Medical Report</a>
+                <a href="/hospital_system/reports/medical_examination_certificate.php" class="<?= isActive('reports/medical_examination_certificate.php') ?>"><i class="fas fa-file-signature"></i> Medical Examination Certificate</a>
             </div>
         </div>
         <?php endif; ?>
