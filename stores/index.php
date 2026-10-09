@@ -580,16 +580,55 @@ if ($hasLabInventory) {
         l.reorder_level AS reorder_level, l.batch_no AS batches, l.expiry_date AS expiry_date, 1 AS active
         FROM lab_inventory l WHERE l.status='active'";
 }
+$systemInventoryError = false;
 $systemInventoryResult = $conn->query(implode(" UNION ALL ", $systemInventoryParts) . " ORDER BY item_name, source");
 if ($systemInventoryResult) {
     while ($inventoryRow = $systemInventoryResult->fetch_assoc()) {
         $inventoryRow['quantity'] = (float)$inventoryRow['quantity'];
         $inventoryRow['expiry_date'] = $inventoryRow['expiry_date'] ?? '';
         $inventoryRow['batches'] = $inventoryRow['batches'] ?? '';
+        $inventoryRow['reorder_level'] = (float)($inventoryRow['reorder_level'] ?? 0);
         $systemInventoryRows[] = $inventoryRow;
         if (isset($inventorySourceCounts[$inventoryRow['source']])) $inventorySourceCounts[$inventoryRow['source']]++;
     }
+} else {
+    $systemInventoryError = true;
+    error_log('HMS Central Stores inventory catalogue query failed: ' . $conn->error);
 }
+
+/*
+ * Exact-name matches across separate ledgers are review candidates only.
+ * They are never merged or treated as confirmed duplicate stock records.
+ */
+$reconciliationGroups = [];
+foreach ($systemInventoryRows as $inventoryRow) {
+    $normalizedName = strtolower(trim(preg_replace('/\\s+/', ' ', (string)$inventoryRow['item_name'])));
+    if ($normalizedName === '') continue;
+    if (!isset($reconciliationGroups[$normalizedName])) {
+        $reconciliationGroups[$normalizedName] = [
+            'name' => (string)$inventoryRow['item_name'],
+            'sources' => [],
+            'units' => [],
+            'rows' => 0,
+        ];
+    }
+    $source = (string)$inventoryRow['source'];
+    $reconciliationGroups[$normalizedName]['sources'][$source] = true;
+    $unit = strtolower(trim((string)$inventoryRow['unit']));
+    if ($unit !== '') $reconciliationGroups[$normalizedName]['units'][$unit] = (string)$inventoryRow['unit'];
+    $reconciliationGroups[$normalizedName]['rows']++;
+}
+$reconciliationCandidates = [];
+foreach ($reconciliationGroups as $group) {
+    if (count($group['sources']) < 2) continue;
+    $group['source_names'] = array_keys($group['sources']);
+    $group['unit_mismatch'] = count($group['units']) > 1;
+    $reconciliationCandidates[] = $group;
+}
+usort($reconciliationCandidates, static function ($a, $b) {
+    if ($a['unit_mismatch'] !== $b['unit_mismatch']) return $a['unit_mismatch'] ? -1 : 1;
+    return strcasecmp($a['name'], $b['name']);
+});
 
 $items = $conn->query("SELECT i.*,COALESCE(SUM(CASE WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) AND m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) THEN -m.quantity ELSE 0 END),0) AS main_balance FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name");
 $expiryLots = $conn->query("SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,i.item_code,i.item_name,l.location_name,MAX(m.created_at) AS last_activity,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS current_balance FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id WHERE (m.batch_number IS NOT NULL AND m.batch_number<>'') OR m.expiry_date IS NOT NULL GROUP BY m.item_id,m.location_id,COALESCE(m.batch_number,''),COALESCE(m.expiry_date,'1000-01-01'),i.item_code,i.item_name,l.location_name ORDER BY (MAX(m.expiry_date) IS NULL),MAX(m.expiry_date),i.item_name");
@@ -687,6 +726,13 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
  source.addEventListener('change',filterRows);
 })();
 </script>
+<?php if($systemInventoryError): ?><div class="alert alert-danger" role="alert">The consolidated inventory catalogue could not be loaded. Please check the application error log; no inventory changes were made.</div><?php endif; ?>
+<div class="panel mb-4"><div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2"><span>Cross-Ledger Reconciliation Preview</span><span class="pill"><?=count($reconciliationCandidates)?> review candidates</span></div><div class="panel-body">
+<p class="small text-secondary mb-3">Exact item-name matches found in more than one inventory source are listed for staff review. A match is not proof of a duplicate: different batches and departmental stock can be legitimate. Nothing is merged or adjusted here.</p>
+<?php if(!$reconciliationCandidates): ?><div class="text-secondary small">No exact-name cross-ledger candidates were found in the available inventory records.</div><?php else: ?>
+<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item name</th><th>Sources</th><th>Unit review</th><th>Records</th><th>Review status</th></tr></thead><tbody>
+<?php foreach($reconciliationCandidates as $candidate): ?><tr><td><strong><?=htmlspecialchars($candidate['name'])?></strong></td><td><?=htmlspecialchars(implode(', ', $candidate['source_names']))?></td><td><?php if($candidate['unit_mismatch']): ?><span class="text-danger fw-bold">Possible unit mismatch</span><br><small><?=htmlspecialchars(implode(' / ', array_values($candidate['units'])))?></small><?php else: ?><span class="text-secondary">Unit names match</span><?php endif; ?></td><td><?= (int)$candidate['rows'] ?></td><td><span class="pill">Manual review required</span></td></tr><?php endforeach; ?>
+</tbody></table></div><?php endif; ?></div></div>
 <div class="row g-3 mb-4"><div class="col-md-4"><div class="metric"><span class="text-secondary small">Active stock items</span><strong><?=count($itemRows)?></strong></div></div><div class="col-md-4"><div class="metric"><span class="text-secondary small">Items at/below reorder level</span><strong><?= $lowStock ?></strong></div></div><div class="col-md-4"><div class="metric"><span class="text-secondary small">Open requisitions</span><strong><?=count(array_filter($reqRows,fn($r)=>in_array($r['status'],['Submitted','Approved','Partially Issued'],true)))?></strong></div></div></div>
 <div class="row g-3"><div class="col-xl-6">
 <div class="panel"><div class="panel-head">Stock Item Register</div><div class="panel-body"><?php if($canCreate):?><form method="post" class="row g-2 mb-3"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="action" value="add_item"><div class="col-md-4"><label class="form-label">Item Code</label><input class="form-control" name="item_code" required maxlength="60"></div><div class="col-md-8"><label class="form-label">Item Name</label><input class="form-control" name="item_name" required maxlength="180"></div><div class="col-md-4"><label class="form-label">Category</label><input class="form-control" name="category"></div><div class="col-md-4"><label class="form-label">Unit</label><input class="form-control" name="unit" value="Each" required></div><div class="col-md-4"><label class="form-label">Reorder Level</label><input class="form-control" type="number" min="0" step=".001" name="reorder_level" value="0"></div><div class="col-12"><button class="btn btn-primary btn-sm"><i class="fa fa-plus me-1"></i>Add Item</button></div></form><?php endif;?><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Item</th><th>Unit</th><th>Main Store</th><th>Reorder</th></tr></thead><tbody><?php foreach($itemRows as $it):?><tr><td><strong><?=htmlspecialchars($it['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($it['item_code'])?><?= $it['category']?' · '.htmlspecialchars($it['category']):'' ?></small></td><td><?=htmlspecialchars($it['unit'])?></td><td><?=number_format((float)$it['main_balance'],3)?></td><td><?=number_format((float)$it['reorder_level'],3)?></td></tr><?php endforeach;?><?php if(!$itemRows):?><tr><td colspan="4" class="text-center text-secondary py-3">No stock items registered yet.</td></tr><?php endif;?></tbody></table></div></div></div>
