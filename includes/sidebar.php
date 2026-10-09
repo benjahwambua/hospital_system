@@ -108,6 +108,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/lab/dashboard.php" class="<?= isActive('lab/dashboard.php') ?>"><i class="fas fa-th-large"></i> Laboratory Dashboard</a>
                 <a href="/hospital_system/lab/lab_requests.php" class="<?= isActive('lab_requests.php') ?>"><i class="fas fa-vial"></i> Lab Requests</a>
                 <a href="/hospital_system/lab/lab_results.php" class="<?= isActive('lab_results.php') ?>"><i class="fas fa-poll-h"></i> Lab Results</a>
+                <a href="/hospital_system/lab/lab_receipt.php" class="<?= isActive('lab/lab_receipt.php') ?>"><i class="fas fa-receipt"></i> Lab Receipt</a>
                 <a href="/hospital_system/lab/inventory/index.php" class="<?= isActive('lab/inventory/') ?>"><i class="fas fa-boxes"></i> Lab Inventory</a>
                 <?php if (can_module_action($conn, 'laboratory', 'edit')): ?><a href="/hospital_system/lab/inventory/test_materials.php" class="<?= isActive('lab/inventory/test_materials.php') ?>"><i class="fas fa-flask"></i> Test Materials</a><?php endif; ?>
             </div>
@@ -161,6 +162,8 @@ function isParentActive($paths) {
                 <a href="/hospital_system/maternity/antenatal.php" class="<?= isActive('maternity/antenatal.php') ?>"><i class="fas fa-heartbeat"></i> Antenatal (ANC)</a>
                 <a href="/hospital_system/maternity/postnatal.php" class="<?= isActive('maternity/postnatal.php') ?>"><i class="fas fa-female"></i> Postnatal (PNC)</a>
                 <a href="/hospital_system/maternity/deliveries.php" class="<?= isActive('maternity/deliveries.php') ?>"><i class="fas fa-baby"></i> Deliveries</a>
+                <a href="/hospital_system/maternity/delivery_records.php" class="<?= isActive('maternity/delivery_records.php') ?>"><i class="fas fa-clipboard-list"></i> Delivery Records</a>
+                <a href="/hospital_system/maternity/visit_history.php" class="<?= isActive('maternity/visit_history.php') ?>"><i class="fas fa-history"></i> Maternity Visit History</a>
                 <a href="/hospital_system/maternity/admissions.php" class="<?= isActive('maternity/admissions.php') ?>"><i class="fas fa-procedures"></i> Admissions</a>
                 <a href="/hospital_system/maternity/stats.php" class="<?= isActive('maternity/stats.php') ?>"><i class="fas fa-chart-bar"></i> Reports</a>
             </div>
@@ -245,8 +248,10 @@ function isParentActive($paths) {
             <div class="submenu">
                 <a href="/hospital_system/administration/dashboard.php" class="<?= isActive('administration/dashboard.php') ?>"><i class="fas fa-th-large"></i> Administration Dashboard</a>
                 <a href="/hospital_system/users/view_users.php" class="<?= isActive('view_users.php') ?>"><i class="fas fa-users-cog"></i> Manage Users</a>
+                <a href="/hospital_system/users/add_user.php" class="<?= isActive('users/add_user.php') ?>"><i class="fas fa-user-plus"></i> Add User</a>
                 <a href="/hospital_system/users/access_rights.php" class="<?= isActive('access_rights.php') ?>"><i class="fas fa-user-shield"></i> Access Rights</a>
                 <a href="/hospital_system/services/view_services.php" class="<?= isActive('services/view_services.php') ?>"><i class="fas fa-list-alt"></i> Service Catalogue</a>
+                <a href="/hospital_system/services/add_service.php" class="<?= isActive('services/add_service.php') ?>"><i class="fas fa-plus-circle"></i> Add / Configure Service</a>
                 <a href="/hospital_system/services/price_history.php" class="<?= isActive('services/price_history.php') ?>"><i class="fas fa-history"></i> Price History</a>
                 <a href="/hospital_system/settings/system_settings.php" class="<?= isActive('system_settings.php') ?>"><i class="fas fa-sliders-h"></i> General Settings</a>
                 <a href="/hospital_system/reports/reports.php" class="<?= isActive('reports/reports.php') ?>"><i class="fas fa-file-alt"></i> System Reports</a>
