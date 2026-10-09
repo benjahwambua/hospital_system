@@ -59,7 +59,7 @@ Highest-priority gaps:
 | Diagnosis coding / ICD-10 | Missing | Structured coding needed |
 | Procedure coding | Missing | Structured procedure coding needed |
 | Insurance/SHA data model | Partial | Strong schema foundation exists in insurance_migration.sql |
-| Insurance/SHA operational UI | Missing | Eligibility, preauth, claims, remittance and denial workflows needed |
+| Insurance/SHA operational UI | Partial | Coverage, preauthorizations, claims, remittances and a denial/appeal register exist in code; deeper eligibility/tariff rules, denial/appeal UAT and reconciliation controls remain |
 | Claims | Partial | Schema exists; end-to-end workflow missing |
 | Preauthorization | Partial | Schema exists; operational workflow missing |
 | Remittance/reconciliation | Partial | Schema exists; payer remittance workflow missing |
