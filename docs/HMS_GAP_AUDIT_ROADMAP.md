@@ -63,8 +63,8 @@ Highest-priority gaps:
 | Claims | Partial | Schema exists; end-to-end workflow missing |
 | Preauthorization | Partial | Schema exists; operational workflow missing |
 | Remittance/reconciliation | Partial | Schema exists; payer remittance workflow missing |
-| Central stores | Missing | Procurement receiving exists, but hospital-wide stores control is missing |
-| Stock requisitions | Missing | Department-to-stores requisition workflow needed |
+| Central stores | Partial | Item/location master, movement ledger, requisitions, approvals, transfers, returns and adjustments exist; procurement GRNs can post into Main Stores. Stock counts, valuation, batch/expiry controls and UAT remain |
+| Stock requisitions | Partial | Department requisitions support up to four items per request with approval and issue; partial issue controls, counts and department-level integration remain |
 | Batch/expiry control | Partial | Pharmacy/lab support exists; needs unified model |
 | Procurement | Strong | PO, receiving, suppliers and payables exist |
 | Supplier management | Strong | Keep and extend |
@@ -132,7 +132,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 ### Phase 1 — Hospital enterprise core
 
 1. **Insurance & SHA** — payers, plans, patient coverage, eligibility, tariffs, preauthorization, claims, denials, appeals, remittances and payer reconciliation.
-2. **Central Stores** — item master, locations, batches, expiry, stock ledger, requisitions, issues, transfers, returns, counts, variance and reorder levels.
+2. **Central Stores** — complete stock counts/variance approval, batch/expiry traceability, valuation and links from GRN receipt through departmental issue and reconciliation.
 3. **Inpatient/Ward expansion** — ward master, bed master, occupancy, transfers, admission lifecycle, daily charges and discharge.
 4. **Nursing** — nursing notes, observations, care plans, handover, medication administration, intake/output and tasks.
 
