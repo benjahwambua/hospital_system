@@ -12,6 +12,9 @@ $canRadiology = can_access_module($conn, 'radiology');
 $canPharmacy = can_access_module($conn, 'pharmacy');
 $canFinance = can_access_module($conn, 'finance');
 $canProcurement = can_access_module($conn, 'procurement');
+$canMaternity = can_access_module($conn, 'maternity');
+$canInsurance = can_access_module($conn, 'insurance');
+$canNursing = can_access_module($conn, 'nursing');
 $canPatientOverview = $canFrontDesk || $canClinical;
 $canDiagnosticOverview = $canLaboratory || $canRadiology;
 $canServiceOverview = $canClinical || $canLaboratory || $canRadiology;
@@ -32,6 +35,15 @@ $labPending=dash_count($conn,"SELECT COUNT(*) total FROM patient_services WHERE 
 $radPending=dash_count($conn,"SELECT COUNT(*) total FROM patient_services WHERE category='radiology' AND COALESCE(status,'Pending') NOT IN ('Completed','Cancelled')");
 $rxPending=dash_count($conn,"SELECT COUNT(*) total FROM pharmacy_queue WHERE status='pending'");
 $admitted=dash_count($conn,"SELECT COUNT(*) total FROM admissions WHERE status='Admitted'");
+$maternityUpcoming = $canMaternity ? dash_count($conn,"SELECT COUNT(*) total FROM appointments a JOIN patients p ON p.id=a.patient_id WHERE a.appointment_date>=NOW() AND p.clinic_category IN ('ANC','PNC','Maternity') AND COALESCE(a.status,'') NOT IN ('Cancelled','Completed')") : 0;
+$pendingPurchaseOrders = $canProcurement ? dash_count($conn,"SELECT COUNT(*) total FROM purchase_orders WHERE status='Pending'") : 0;
+$openInsuranceClaims = 0;
+if ($canInsurance) {
+    $claimsTable = $conn->query("SHOW TABLES LIKE 'claim_headers'");
+    if ($claimsTable && $claimsTable->num_rows > 0) {
+        $openInsuranceClaims = dash_count($conn,"SELECT COUNT(*) total FROM claim_headers WHERE claim_status IN ('Draft','Submitted','Under Review','Partially Approved')");
+    }
+}
 $lowStock=dash_count($conn,"SELECT COUNT(*) total FROM pharmacy_stock WHERE quantity<15");
 $revenue=$isSuper?dash_amount($conn,"SELECT COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.created_at>=CURDATE() AND p.created_at<CURDATE()+INTERVAL 1 DAY),0)-COALESCE((SELECT SUM(r.amount) FROM payment_refunds r WHERE r.created_at>=CURDATE() AND r.created_at<CURDATE()+INTERVAL 1 DAY AND r.status='Approved'),0) total"):0;
 
@@ -75,7 +87,7 @@ include __DIR__ . '/includes/sidebar.php';
   <section class="exec-metrics">
     <?php if($canPatientOverview): ?><a class="exec-card" href="patients/patient_list.php"><div class="exec-card-top"><small>Total Patients</small><span class="exec-icon"><i class="fas fa-users"></i></span></div><div class="exec-value"><?= number_format($patients) ?></div><div class="exec-sub">Registered patients</div></a><?php endif; ?>
     <?php if($canFrontDesk || $canClinical): ?><a class="exec-card" href="patients/appointments.php"><div class="exec-card-top"><small>Today's Visits</small><span class="exec-icon"><i class="fas fa-user-md"></i></span></div><div class="exec-value"><?= number_format($todayVisits) ?></div><div class="exec-sub"><?= $appointments ?> appointments still open</div></a><?php endif; ?>
-    <?php if($canClinical): ?><a class="exec-card" href="clinical/index.php"><div class="exec-card-top"><small>Admitted</small><span class="exec-icon"><i class="fas fa-bed"></i></span></div><div class="exec-value"><?= number_format($admitted) ?></div><div class="exec-sub">Current admissions</div></a><?php endif; ?>
+    <?php if($canClinical || $canNursing): ?><a class="exec-card" href="<?= $canClinical ? 'clinical/index.php' : 'nursing/index.php' ?>"><div class="exec-card-top"><small>Admitted</small><span class="exec-icon"><i class="fas fa-bed"></i></span></div><div class="exec-value"><?= number_format($admitted) ?></div><div class="exec-sub">Current admissions</div></a><?php endif; ?>
     <?php if($canDiagnosticOverview): ?><a class="exec-card" href="<?= $canLaboratory ? 'lab/lab_results.php' : 'radiology/radiology_results.php' ?>"><div class="exec-card-top"><small>Diagnostic Queue</small><span class="exec-icon"><i class="fas fa-vials"></i></span></div><div class="exec-value"><?= number_format(($canLaboratory ? $labPending : 0)+($canRadiology ? $radPending : 0)) ?></div><div class="exec-sub"><?php if($canLaboratory): ?><?= $labPending ?> lab<?php endif; ?><?php if($canLaboratory && $canRadiology): ?> · <?php endif; ?><?php if($canRadiology): ?><?= $radPending ?> radiology<?php endif; ?></div></a><?php endif; ?>
   </section>
 
@@ -94,6 +106,9 @@ include __DIR__ . '/includes/sidebar.php';
       <?php if($canRadiology): ?><a href="radiology/radiology_results.php" class="alert-row text-decoration-none"><span class="label">Pending radiology</span><strong><?= $radPending ?></strong></a><?php endif; ?>
       <?php if($canPharmacy): ?><a href="pharmacy/dispensing_queue.php" class="alert-row text-decoration-none"><span class="label">Pending pharmacy</span><strong><?= $rxPending ?></strong></a><?php endif; ?>
       <?php if($canPharmacy): ?><a href="pharmacy/view_stock.php" class="alert-row danger text-decoration-none"><span class="label">Low pharmacy stock</span><strong><?= $lowStock ?></strong></a><?php endif; ?>
+      <?php if($canMaternity): ?><a href="maternity/index.php" class="alert-row text-decoration-none"><span class="label">Upcoming maternity appointments</span><strong><?= $maternityUpcoming ?></strong></a><?php endif; ?>
+      <?php if($canProcurement): ?><a href="procurement/purchase_orders.php?status=Pending" class="alert-row text-decoration-none"><span class="label">Purchase orders pending approval</span><strong><?= $pendingPurchaseOrders ?></strong></a><?php endif; ?>
+      <?php if($canInsurance && $claimsTable && $claimsTable->num_rows > 0): ?><a href="insurance/claims.php" class="alert-row text-decoration-none"><span class="label">Open insurance claims</span><strong><?= $openInsuranceClaims ?></strong></a><?php endif; ?>
     </div></div></div>
   </section>
 
