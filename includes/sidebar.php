@@ -42,7 +42,7 @@ function isParentActive($paths) {
 .sidebar nav a.active{background:var(--sidebar-active);color:#063b73;box-shadow:0 5px 14px rgba(0,0,0,.13)}.sidebar nav a.active .icon-main{color:#063b73}
 .menu-title{display:flex;align-items:center;gap:8px;padding:17px 8px 6px;color:var(--sidebar-muted);font-size:9px;text-transform:uppercase;font-weight:800;letter-spacing:1.6px}.menu-title:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.1)}
 .has-submenu>a{margin-top:4px}.has-submenu.open>a{background:rgba(255,255,255,.075);color:#fff;border-left:3px solid var(--sidebar-accent);padding-left:9px}.caret{margin-left:auto;font-size:10px;color:var(--sidebar-muted);transition:transform .2s}.has-submenu.open>a .caret{transform:rotate(180deg);color:var(--sidebar-accent)}
-.submenu{max-height:0;overflow:hidden;transition:max-height .25s ease;background:rgba(0,0,0,.09);margin:0 3px;border-radius:0 0 10px 10px}.has-submenu.open .submenu{max-height:620px;padding:4px 3px 6px;margin-bottom:5px}
+.submenu{max-height:0;overflow:hidden;transition:max-height .25s ease;background:rgba(0,0,0,.09);margin:0 3px;border-radius:0 0 10px 10px}.has-submenu.open .submenu{max-height:1400px;padding:4px 3px 6px;margin-bottom:5px}
 .submenu a{display:flex;align-items:center;gap:9px;margin:1px 0;padding:8px 10px 8px 34px;border-radius:7px;color:#c9def2;text-decoration:none;font-size:12px;font-weight:500;transition:.2s}.submenu a i{width:16px;text-align:center;font-size:12px;color:#91b9dc}.submenu a:hover{background:rgba(255,255,255,.07);color:#fff;transform:translateX(2px)}.submenu a.active{background:rgba(255,255,255,.96);color:#063b73;font-weight:700}.submenu a.active i{color:#063b73}
 .logout-link{margin-top:8px!important;background:rgba(255,92,92,.08)!important;color:#ffb0b0!important;border:1px solid rgba(255,120,120,.18)}.logout-link:hover{background:#d9534f!important;color:#fff!important}
 @media(max-width:768px){.sidebar{width:230px;height:calc(100vh - var(--header-height,75px));top:var(--header-height,75px)}.submenu a{padding-left:30px}}
@@ -85,7 +85,8 @@ function isParentActive($paths) {
             <div class="submenu">
                 <a href="/hospital_system/clinical/index.php" class="<?= isActive('clinical/index.php') ?>"><i class="fas fa-th-large"></i> Clinical Dashboard</a>
                 <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient List</a>
-                <a href="/hospital_system/patients/appointments.php" class="<?= isActive('appointments.php') ?>"><i class="fas fa-calendar-check"></i> Appointments</a>
+                <a href="/hospital_system/patients/appointments.php" class="<?= isActive('patients/appointments.php') ?>"><i class="fas fa-calendar-check"></i> Patient Appointments</a>
+                <a href="/hospital_system/appointments/appointments.php" class="<?= isActive('appointments/appointments.php') ?>"><i class="fas fa-calendar-alt"></i> Appointment Management</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
             </div>
