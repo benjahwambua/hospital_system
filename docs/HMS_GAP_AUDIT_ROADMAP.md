@@ -52,7 +52,7 @@ Highest-priority gaps:
 | Maternity | Strong | ANC, labour, PNC, deliveries and admissions exist |
 | Inpatient admission | Adequate | Admission and active stay records exist; transfer is now transactional and auditable |
 | Ward/bed management | Adequate | Occupancy and discharge, configurable ward/bed master, active-bed capacity, transfer history and manual duplicate-protected daily ward charges linked to canonical invoices exist; discharge readiness and end-to-end financial reconciliation require UAT |
-| Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, and structured shift handover with separate-user acknowledgement; medication administration, formal staff master/roster integration, overdue escalation and UAT remain |
+| Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, structured shift handover with separate-user acknowledgement, and a prescription/dispense-linked MAR with optional scheduled-dose timestamps and duplicate-slot protection; real order scheduling, allergy/interaction checks, staff roster integration, overdue escalation and UAT remain |
 | Emergency / casualty | Missing | ED lifecycle and triage workflow needed |
 | Theatre / surgery | Missing | Theatre scheduling and peri-operative workflow needed |
 | Referrals | Partial | Orders/referrals area exists; dedicated lifecycle is not established |
