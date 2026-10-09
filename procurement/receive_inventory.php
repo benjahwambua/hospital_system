@@ -48,11 +48,17 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 if($inventoryType==='pharmacy' && ($batchNo==='' || $expiryDate==='')) {
                     throw new Exception('Batch number and expiry date are required for pharmacy/medicine receipts.');
                 }
-                if($expiryDate!=='' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/',$expiryDate)) {
-                    throw new Exception('Invalid expiry date.');
+                if ($expiryDate !== '') {
+                    $expiryParsed = DateTime::createFromFormat('!Y-m-d', $expiryDate);
+                    if (!$expiryParsed || $expiryParsed->format('Y-m-d') !== $expiryDate) {
+                        throw new Exception('Invalid expiry date.');
+                    }
                 }
-                if($dueDate!=='' && !preg_match('/^\\d{4}-\\d{2}-\\d{2}$/',$dueDate)) {
-                    throw new Exception('Invalid supplier due date.');
+                if ($dueDate !== '') {
+                    $dueParsed = DateTime::createFromFormat('!Y-m-d', $dueDate);
+                    if (!$dueParsed || $dueParsed->format('Y-m-d') !== $dueDate) {
+                        throw new Exception('Invalid supplier due date.');
+                    }
                 }
                 $inventoryId=(int)($item['inventory_item_id']??0);
                 $newBalance=0;
@@ -86,7 +92,18 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                         $inventoryId=(int)$u->insert_id; $u->close(); $newBalance=$qty;
                     }
                     $m=$conn->prepare("INSERT INTO stock_movements (stock_id,movement_type,quantity_change,balance_after,note,user_id,created_at) VALUES (?,'in',?,?,?, ?,NOW())");
-                    if($m){$note="GRN receipt for PO #$poId / Supplier Invoice $supplierInvoice";$uid=(int)$_SESSION['user_id'];$change=$qty;$m->bind_param('iiisi',$inventoryId,$change,$newBalance,$note,$uid);$m->execute();$m->close();}
+                    if (!$m) throw new Exception('Unable to prepare the pharmacy stock movement audit record: ' . $conn->error);
+                    $note="GRN receipt for PO #$poId / Supplier Invoice $supplierInvoice";
+                    $uid=(int)$_SESSION['user_id'];
+                    $change=(float)$qty;
+                    $movementBalance=(float)$newBalance;
+                    $m->bind_param('iddsi',$inventoryId,$change,$movementBalance,$note,$uid);
+                    if (!$m->execute()) {
+                        $movementError=$m->error;
+                        $m->close();
+                        throw new Exception('Unable to record the pharmacy stock movement: ' . $movementError);
+                    }
+                    $m->close();
                 } elseif ($inventoryType==='lab') {
                     $stock=null;
                     if($inventoryId>0){$s=$conn->prepare("SELECT id,quantity FROM lab_inventory WHERE id=? FOR UPDATE");$s->bind_param('i',$inventoryId);$s->execute();$stock=$s->get_result()->fetch_assoc();$s->close();}
@@ -94,7 +111,19 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     if($stock){$newBalance=(float)$stock['quantity']+$qty;$u=$conn->prepare("UPDATE lab_inventory SET quantity=?, buying_price=?, batch_no=?, expiry_date=? WHERE id=?");$u->bind_param('ddssi',$newBalance,$unitCost,$batchNo,$expiryDate,$stock['id']);if(!$u->execute())throw new Exception('Unable to update laboratory inventory.');$u->close();$inventoryId=(int)$stock['id'];}
                     else{$name=$item['item_name'];$cat='Laboratory Consumable';$unit='Piece';$reorder=0;$status='active';$u=$conn->prepare("INSERT INTO lab_inventory (item_name,category,unit,quantity,reorder_level,buying_price,status,batch_no,expiry_date) VALUES (?,?,?,?,?,?,?,?,?)");$u->bind_param('sssdddsss',$name,$cat,$unit,$qty,$reorder,$unitCost,$status,$batchNo,$expiryDate);if(!$u->execute())throw new Exception('Unable to create laboratory inventory item: '.$u->error);$inventoryId=(int)$u->insert_id;$u->close();$newBalance=$qty;}
                     $m=$conn->prepare("INSERT INTO lab_inventory_movements (inventory_id,movement_type,quantity,balance_after,reference_no,note,user_id) VALUES (?,'in',?,?,?, ?,?)");
-                    if($m){$ref="PO-$poId-GRN";$note="Supplier Invoice $supplierInvoice";$uid=(int)$_SESSION['user_id'];$m->bind_param('idsssi',$inventoryId,$qty,$newBalance,$ref,$note,$uid);$m->execute();$m->close();}
+                    if (!$m) throw new Exception('Unable to prepare the laboratory stock movement audit record: ' . $conn->error);
+                    $ref="PO-$poId-GRN";
+                    $note="Supplier Invoice $supplierInvoice";
+                    $uid=(int)$_SESSION['user_id'];
+                    $movementQty=(float)$qty;
+                    $movementBalance=(float)$newBalance;
+                    $m->bind_param('iddssi',$inventoryId,$movementQty,$movementBalance,$ref,$note,$uid);
+                    if (!$m->execute()) {
+                        $movementError=$m->error;
+                        $m->close();
+                        throw new Exception('Unable to record the laboratory stock movement: ' . $movementError);
+                    }
+                    $m->close();
                 } else {
                     // Central Stores receipts enter the same movement ledger used for departmental stock control.
                     $storeItem=$conn->prepare("SELECT id,item_name FROM stores_items WHERE id=? AND active=1 FOR UPDATE");
