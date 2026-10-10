@@ -77,7 +77,7 @@ function isParentActive($paths) {
 
 
         <?php if (can_access_module($conn, 'clinical')): ?>
-        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php', 'clinical/admit_patient.php', 'clinical/inpatient_charges.php', 'clinical/ward_configuration.php', 'vitals/vitals_add.php', 'prescriptions/view_prescriptions.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'theatre/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php', 'clinical/admit_patient.php', 'clinical/inpatient_charges.php', 'clinical/ward_configuration.php', 'vitals/vitals_add.php', 'prescriptions/view_prescriptions.php']) ?>">
             <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-stethoscope icon-main"></i> Clinical
                 <i class="fas fa-chevron-down caret"></i>
@@ -85,6 +85,7 @@ function isParentActive($paths) {
             <div class="submenu">
                 <a href="/hospital_system/clinical/index.php" class="<?= isActive('clinical/index.php') ?>"><i class="fas fa-th-large"></i> Clinical Dashboard</a>
                 <?php if (can_access_module($conn, 'emergency')): ?><a href="/hospital_system/emergency/index.php" class="<?= isActive('emergency/index.php') ?>"><i class="fas fa-truck-medical"></i> Emergency / Casualty</a><?php endif; ?>
+                <?php if (can_access_module($conn, 'theatre')): ?><a href="/hospital_system/theatre/index.php" class="<?= isActive('theatre/index.php') ?>"><i class="fas fa-procedures"></i> Theatre &amp; Surgery</a><?php endif; ?>
                 <a href="/hospital_system/patients/patient_dashboard.php" class="<?= isActive('patients/patient_dashboard.php') ?>"><i class="fas fa-columns"></i> Patient Dashboard</a>
                 <a href="/hospital_system/patients/patient_list.php" class="<?= isActive('patients/patient_list.php') ?>"><i class="fas fa-address-book"></i> Patient List</a>
                 <a href="/hospital_system/patients/appointments.php" class="<?= isActive('patients/appointments.php') ?>"><i class="fas fa-calendar-check"></i> Patient Appointments</a>

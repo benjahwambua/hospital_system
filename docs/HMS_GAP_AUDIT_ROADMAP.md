@@ -54,7 +54,7 @@ Highest-priority gaps:
 | Ward/bed management | Adequate | Occupancy and discharge, configurable ward/bed master, active-bed capacity, transfer history and manual duplicate-protected daily ward charges linked to canonical invoices exist; discharge readiness and end-to-end financial reconciliation require UAT |
 | Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, structured shift handover with separate-user acknowledgement, and a prescription/dispense-linked MAR with scheduled-dose timestamps, duplicate-slot protection, and required allergy-review status/user/time accountability; real order scheduling, automated allergy/interaction checks, staff roster integration, overdue escalation and UAT remain |
 | Emergency / casualty | First implementation | Emergency intake, linked visit, acuity triage, initial observations, active queue, clinician assignment and disposition workflow implemented; resuscitation protocols, repeat observations, alerts, transfers/bed integration and UAT remain |
-| Theatre / surgery | Missing | Theatre scheduling and peri-operative workflow needed |
+| Theatre / surgery | First implementation | `theatre/index.php` supports case scheduling, a six-item pre-operative safety gate, lifecycle status control, intra-operative/anaesthesia notes and recovery outcome capture; full surgical safety checklist, detailed operative/anaesthesia records, implants/lot traceability, PACU observations, billing/stock integration and UAT remain |
 | Referrals | Partial | Orders/referrals area exists; dedicated lifecycle is not established |
 | Diagnosis coding / ICD-10 | Missing | Structured coding needed |
 | Procedure coding | Missing | Structured procedure coding needed |
@@ -139,7 +139,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 ### Phase 2 — Clinical expansion
 
 5. Emergency/Casualty.
-6. Theatre/Surgery.
+6. Theatre/Surgery (first workflow increment implemented; clinical validation and integrations remain).
 7. Referral management.
 8. Structured diagnosis and procedure coding.
 9. Clinical documentation expansion.
@@ -222,3 +222,8 @@ The current feature branch adds an auditable inpatient bed-transfer workflow and
 ## Nursing task assignment expansion (2026-10-09)
 
 Task assignment now selects from eligible nurse, doctor and admin accounts and validates the assignee on submission. Open/in-progress tasks with past due times display an overdue flag. The current users table is used until a dedicated staff master and roster are implemented. No functional/UAT checks have been performed.
+
+
+## Theatre / Surgery implementation note (2026-10-10)
+
+`database/theatre_surgery_migration.sql` adds a patient-linked theatre case register. `theatre/index.php` provides planned-case scheduling, optional surgeon/anaesthesia assignment, a six-part pre-op gate, guarded lifecycle transitions (Planned → Pre-op → In Theatre → Recovery → Completed), intra-operative/anaesthesia notes, recovery notes and outcome, cancellation reason, case counts, CSRF checks, permission checks and audit-hook calls when the shared audit function is available. The migration is not applied to the target database and the workflow has not had live XAMPP/UAT validation. This is not a replacement for the approved surgical safety checklist, anaesthesia chart, operative report, implant traceability or PACU monitoring.
