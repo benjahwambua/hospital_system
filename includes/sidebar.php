@@ -280,6 +280,9 @@ function isParentActive($paths) {
         <a href="/hospital_system/hr/credentials.php" class="<?= isActive('hr/credentials.php') ?>">
             <i class="fas fa-certificate icon-main"></i> Professional Credentials
         </a>
+        <a href="/hospital_system/hr/contracts.php" class="<?= isActive('hr/contracts.php') ?>">
+            <i class="fas fa-file-contract icon-main"></i> Contract Register
+        </a>
         <?php endif; ?>
         <?php if (can_access_module($conn, 'staff_leave')): ?>
         <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>">

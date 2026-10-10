@@ -28,6 +28,8 @@ These are supporting actions, print views, callbacks, or context-dependent pages
 - Maternity edit/view/print, bill, admission, delivery registration, and SMS actions where the Maternity workflow should launch them.
 - Leave request/action pages, which should be reachable from the Staff Leave workflow.
 - HR staff directory entry point: `hr/index.php` (employee master; migration and explicit permission assignment required).
+- HR professional credentials: `hr/credentials.php` (expiry monitoring; apply `database/hr_staff_credentials_migration.sql`).
+- HR contract register: `hr/contracts.php` (contract metadata and renewal monitoring; apply `database/hr_staff_contracts_migration.sql`).
 - Clinical discharge action, which should be available from the admission/ward workflow with its required patient/admission context.
 
 These routes still need direct-access permission and CSRF review; hiding an action from the sidebar is not an access-control measure.
