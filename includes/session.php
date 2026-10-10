@@ -41,6 +41,7 @@ function require_login(): void {
             'users/' => ['administration','view'],
             'hr/' => ['hr_staff','view'],
             'emergency/' => ['emergency','view'],
+            'theatre/' => ['theatre','view'],
             'settings/' => ['administration','view'],
             'reports/' => ['administration','view']
         ];
