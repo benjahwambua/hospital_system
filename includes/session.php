@@ -43,6 +43,7 @@ function require_login(): void {
             'emergency/' => ['emergency','view'],
             'theatre/' => ['theatre','view'],
             'referrals/' => ['referrals','view'],
+            'diagnosis/' => ['diagnosis','view'],
             'settings/' => ['administration','view'],
             'reports/' => ['administration','view']
         ];
