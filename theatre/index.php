@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'Unable to prepare the theatre case. Confirm the theatre migration has been applied.';
                 } else {
                     $uid = (int)($_SESSION['user_id'] ?? 0);
-                    $stmt->bind_param('issssiisii', $caseNumber, $patientId, $procedure, $urgency, $scheduleSql, $surgeonId, $anesthetistId, $notes, $uid, $uid);
+                    $stmt->bind_param('sisssiisii', $caseNumber, $patientId, $procedure, $urgency, $scheduleSql, $surgeonId, $anesthetistId, $notes, $uid, $uid);
                     if ($stmt->execute()) {
                         $newId = (int)$stmt->insert_id;
                         if (function_exists('audit')) audit('theatre_case_created', 'case_id='.$newId.',case_number='.$caseNumber.',patient_id='.$patientId);
