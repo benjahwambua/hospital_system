@@ -1,6 +1,6 @@
 # HMS Gap Closure Progress
 
-Last updated: 2026-10-09
+Last updated: 2026-10-10
 
 These percentages are **engineering completion estimates**, not UAT certification. A module only reaches 100% after its workflow is implemented, authorized, audited, reported, error-handled and verified in UAT.
 
@@ -12,8 +12,8 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Inpatient / Ward | 85% | Admission, bed allocation, occupancy, transactional/audited transfers, configurable ward/bed register, transfer history, daily-charge posting ledger and discharge-readiness confirmations are implemented in code | Apply/reconcile required migrations in the target database, validate ward/bed mapping and daily-charge tariffs, confirm discharge controls in UAT, and complete operational reporting |
 | Nursing | 85% | Active inpatient nursing station, observations, notes, assigned/overdue tasks, approval-controlled care plans with overdue-review flags, distinct-shift handover validation with separate-user acknowledgement audit display, and prescription/dispense-linked MAR with scheduled-dose timestamps, duplicate-slot guard, and required allergy-review status/time/user accountability are implemented in code | A real medication-order schedule and due-dose queue, automated allergy/interaction decision support, staff roster and shift coverage, escalation/notifications, MAR migrations applied/reconciled in target DB, and UAT |
 | Central Stores | 72% | Item/location register, movement ledger, multi-item requisitions, procurement GRN receipts, independent physical-count approval, lot-level count snapshots and variances, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balances | Reconcile legacy untracked stock and historic lot gaps, valuation, wider department integration, automated regression tests and UAT |
-| Emergency / Casualty | 0% | Not implemented as a dedicated lifecycle | Triage, emergency encounter, acuity, treatment, disposition and billing |
-| Theatre / Surgery | 0% | Not implemented | Theatre scheduling, pre-op, intra-op, implants, anesthesia, recovery and billing |
+| Emergency / Casualty | 35% | First intake and triage queue merged; linked visit, acuity, initial observations, clinician assignment and disposition are implemented in code | Clinical protocols, repeat-observation escalation, admission/bed and billing integration, and UAT |
+| Theatre / Surgery | 30% | First scheduling and peri-operative tracking increment implemented in code with a six-item safety gate, guarded lifecycle, intra-op/anaesthesia notes and recovery outcome | Full surgical checklist and documentation, implant/lot tracking, PACU observations, admission/billing/stock integration, and UAT |
 | Referral management | 30% | Orders/referrals foundation exists | Referral lifecycle, receiving facility/provider, status, attachments and closure |
 | Diagnosis coding / ICD-10 | 0% | Not implemented | Diagnosis master, coding UI and encounter/claim linkage |
 | Procedure coding | 0% | Not implemented | Procedure master, coding UI, tariff/claim linkage |
@@ -126,3 +126,8 @@ A wider shared-include search found two additional authenticated pages that used
 ## Hospital Command Centre visual standard (2026-10-09)
 
 Dashboard layout refinement keeps the established blue-to-teal hero, four headline metrics, Quick Access, Operational Pulse, low-stock watch, service activity and Super User-only financial overview. Refined spacing, fluid heading sizing and min-width-safe responsive grid columns to reduce overflow risk on narrower screens; chart canvases now have accessible labels. Central Stores remains linked through the canonical `stores/index.php` route. This formalizes the Command Centre as the visual reference for page-header hierarchy, typography, spacing, cards and responsive layout; module pages should reuse shared shell includes and `hms-module-*` styling rather than inventing local variants. PHP syntax CI is the code-quality gate; no browser screenshot comparison or functional UAT has been performed.
+
+
+## Emergency / Theatre build-out note (2026-10-10)
+
+Emergency/Casualty first increment is merged in PR #91. Theatre/Surgery first increment is being developed on `feature/theatre-surgery-workflow`; the PR and PHP Syntax Audit must pass before merge. Both completion figures above are engineering estimates, not evidence of clinical readiness. No local XAMPP database or end-to-end tests have been run.
