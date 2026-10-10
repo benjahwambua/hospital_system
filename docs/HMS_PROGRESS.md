@@ -14,7 +14,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Central Stores | 72% | Item/location register, movement ledger, multi-item requisitions, procurement GRN receipts, independent physical-count approval, lot-level count snapshots and variances, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balances | Reconcile legacy untracked stock and historic lot gaps, valuation, wider department integration, automated regression tests and UAT |
 | Emergency / Casualty | 35% | First intake and triage queue merged; linked visit, acuity, initial observations, clinician assignment and disposition are implemented in code | Clinical protocols, repeat-observation escalation, admission/bed and billing integration, and UAT |
 | Theatre / Surgery | 30% | First scheduling and peri-operative tracking increment implemented in code with a six-item safety gate, guarded lifecycle, intra-op/anaesthesia notes and recovery outcome | Full surgical checklist and documentation, implant/lot tracking, PACU observations, admission/billing/stock integration, and UAT |
-| Referral management | 30% | Orders/referrals foundation exists | Referral lifecycle, receiving facility/provider, status, attachments and closure |
+| Referral management | 50% | Dedicated incoming/outgoing register with destination/provider, urgency, optional visit linkage, guarded response lifecycle and closure notes implemented in code | Secure document exchange, transfer coordination, reminders, interoperability, claims links and UAT |
 | Diagnosis coding / ICD-10 | 0% | Not implemented | Diagnosis master, coding UI and encounter/claim linkage |
 | Procedure coding | 0% | Not implemented | Procedure master, coding UI, tariff/claim linkage |
 | Clinical documentation | 55% | Encounters, vitals, orders and departmental records exist | Structured assessment, diagnosis, plans, progress notes and templates |
@@ -131,3 +131,8 @@ Dashboard layout refinement keeps the established blue-to-teal hero, four headli
 ## Emergency / Theatre build-out note (2026-10-10)
 
 Emergency/Casualty first increment is merged in PR #91. Theatre/Surgery first increment is being developed on `feature/theatre-surgery-workflow`; the PR and PHP Syntax Audit must pass before merge. Both completion figures above are engineering estimates, not evidence of clinical readiness. No local XAMPP database or end-to-end tests have been run.
+
+
+## Referral build-out note (2026-10-10)
+
+Referral Management first increment is on `feature/referral-management-lifecycle`. Its PHP Syntax Audit must pass before merge. It remains an engineering increment only: target DB migration, receiving-facility workflow validation, and end-to-end tests remain outstanding.
