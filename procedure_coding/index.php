@@ -28,7 +28,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             $stmt=$conn->prepare('INSERT INTO procedure_codes (code_system,code,description,category,standard_fee,created_by,updated_by) VALUES (?,?,?,?,?,?,?)');
             if(!$stmt)$error='Unable to prepare the catalogue entry. Confirm the procedure coding migration.';
             else{
-                $stmt->bind_param('ssss dii',$system,$code,$description,$category,$fee,$uid,$uid);
+                $stmt->bind_param('ssssdii',$system,$code,$description,$category,$fee,$uid,$uid);
                 if($stmt->execute()){
                     $newId=(int)$stmt->insert_id;if(function_exists('audit'))audit('procedure_code_created','procedure_code_id='.$newId.',system='.$system.',code='.$code);
                     $message='Procedure code added to the local catalogue.';
