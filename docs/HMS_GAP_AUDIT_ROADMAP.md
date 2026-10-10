@@ -80,7 +80,7 @@ Highest-priority gaps:
 | Audit history UI | Partial | Needs searchable actor/before-after history |
 | Notifications | Missing | Event-driven alerts and work queues needed |
 | Staff leave | Adequate | Correctly separate from Administration |
-| HR / staff master | Partial | Staff directory, professional credential tracking and contract register with 60-day renewal monitoring implemented; protected document storage, payroll, roster integration, separation checklist and UAT remain |
+| HR / staff master | Partial | Employee directory, professional credentials, contract register and offboarding checklist implemented; protected document storage, payroll, rostering integration and UAT remain |
 | Staff rostering | Missing | Needed for wards, nursing, theatre and shifts |
 | Management dashboard | Adequate | Should evolve into a hospital command centre |
 | Operational KPIs | Partial | Reporting exists; KPI depth needs expansion |
