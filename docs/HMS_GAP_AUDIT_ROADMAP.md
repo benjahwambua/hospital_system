@@ -57,7 +57,7 @@ Highest-priority gaps:
 | Theatre / surgery | First implementation | `theatre/index.php` supports case scheduling, a six-item pre-operative safety gate, lifecycle status control, intra-operative/anaesthesia notes and recovery outcome capture; full surgical safety checklist, detailed operative/anaesthesia records, implants/lot traceability, PACU observations, billing/stock integration and UAT remain |
 | Referrals | First implementation | `referrals/index.php` provides incoming/outgoing referral register, urgency, destination/provider, optional visit linkage, response/appointment tracking, report receipt, follow-up and guarded closure; secure document exchange, transport coordination, automated reminders and UAT remain |
 | Diagnosis coding / ICD-10 | First implementation | `diagnosis/index.php` supports a maintainable code catalogue and visit-linked primary/secondary/differential/complication diagnoses, status history and primary-diagnosis guard; approved code-set import, coding governance, claim linkage and UAT remain |
-| Procedure coding | Missing | Structured procedure coding needed |
+| Procedure coding | First implementation | `procedure_coding/index.php` supports a procedure catalogue and visit-linked planned/performed/cancelled procedure records with laterality, provider, timestamp and correction reasons; approved code-set import, operative documentation, billing/claim integration and UAT remain |
 | Insurance/SHA data model | Partial | Strong schema foundation exists in insurance_migration.sql |
 | Insurance/SHA operational UI | Partial | Coverage, preauthorizations, claims, remittances and a denial/appeal register exist in code; deeper eligibility/tariff rules, denial/appeal UAT and reconciliation controls remain |
 | Claims | Partial | Schema exists; end-to-end workflow missing |
@@ -141,7 +141,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 5. Emergency/Casualty.
 6. Theatre/Surgery (first workflow increment implemented; clinical validation and integrations remain).
 7. Referral management (dedicated lifecycle register implemented; integrations and UAT remain).
-8. Structured diagnosis and procedure coding (diagnosis coding foundation implemented; approved catalog and UAT remain).
+8. Structured diagnosis and procedure coding (both coding foundations implemented; approved catalogues and UAT remain).
 9. Clinical documentation expansion.
 10. Department work queues.
 
@@ -237,3 +237,8 @@ Task assignment now selects from eligible nurse, doctor and admin accounts and v
 ## Diagnosis coding implementation note (2026-10-10)
 
 `database/diagnosis_coding_migration.sql` adds `diagnosis_codes` and visit-linked `visit_diagnoses`. `diagnosis/index.php` supports code catalogue maintenance, visit diagnosis assignment, diagnosis classification, onset date, clinical notes, status changes and reason capture for entered-in-error records. The assignment workflow allows one active primary diagnosis per visit by demoting a previous primary diagnosis to secondary. The migration creates an empty catalogue; an approved current ICD-10/national code set must be loaded and coding rules reviewed before operational use. Target database rollout and clinical/billing UAT remain outstanding.
+
+
+## Procedure coding implementation note (2026-10-10)
+
+`database/procedure_coding_migration.sql` adds a procedure catalogue and visit-linked procedure register. `procedure_coding/index.php` supports catalogue maintenance, optional informational standard fee, planned/performed/cancelled/entered-in-error states, laterality, provider, performed date/time, clinical notes and reason capture. The standard fee is not posted to billing. The catalogue starts empty; load and validate an approved current procedure code set and tariff before production use. The migration is not applied to the target database and no live XAMPP/UAT testing has been performed.

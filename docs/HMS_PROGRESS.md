@@ -16,7 +16,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Theatre / Surgery | 30% | First scheduling and peri-operative tracking increment implemented in code with a six-item safety gate, guarded lifecycle, intra-op/anaesthesia notes and recovery outcome | Full surgical checklist and documentation, implant/lot tracking, PACU observations, admission/billing/stock integration, and UAT |
 | Referral management | 50% | Dedicated incoming/outgoing register with destination/provider, urgency, optional visit linkage, guarded response lifecycle and closure notes implemented in code | Secure document exchange, transfer coordination, reminders, interoperability, claims links and UAT |
 | Diagnosis coding / ICD-10 | 35% | Visit-linked diagnosis coding, local code catalogue, primary/secondary/differential classification, status/reason tracking and primary-diagnosis guard implemented in code | Load approved current code set, governance/validation, claims linkage, coding reports, migration rollout and UAT |
-| Procedure coding | 0% | Not implemented | Procedure master, coding UI, tariff/claim linkage |
+| Procedure coding | 30% | Visit-linked procedure catalogue and planned/performed status tracking, laterality, provider, timestamp and correction reason implemented in code; standard fee is informational only | Load approved procedure code set, tariff validation, operative-note and claim linkage, migration rollout and UAT |
 | Clinical documentation | 55% | Encounters, vitals, orders and departmental records exist | Structured assessment, diagnosis, plans, progress notes and templates |
 | Department work queues | 60% | Lab/radiology/pharmacy queues exist | Unified queue model, SLA/priority controls and cross-department visibility |
 | Enterprise audit history | 35% | Central audit function and audit calls exist | Search/filter UI, actor/action/entity filters, before/after values and export |
@@ -141,3 +141,8 @@ Referral Management first increment is on `feature/referral-management-lifecycle
 ## Diagnosis coding build-out note (2026-10-10)
 
 Diagnosis Coding first increment is on `feature/diagnosis-coding`; PHP Syntax Audit must pass before merge. The schema seeds no diagnosis codes, so it must not be treated as a usable ICD-10 catalogue until an approved current code set is imported and verified. No local XAMPP or end-to-end testing has been performed.
+
+
+## Procedure coding build-out note (2026-10-10)
+
+Procedure Coding first increment is on `feature/procedure-coding`; PHP Syntax Audit must pass before merge. The code catalogue is empty by design, and standard fees do not trigger billing. Official code-set import, tariff governance, and live database/UAT verification remain outstanding.
