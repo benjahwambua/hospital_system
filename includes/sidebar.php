@@ -91,6 +91,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/patients/appointments.php" class="<?= isActive('patients/appointments.php') ?>"><i class="fas fa-calendar-check"></i> Patient Appointments</a>
                 <a href="/hospital_system/appointments/appointments.php" class="<?= isActive('appointments/appointments.php') ?>"><i class="fas fa-calendar-alt"></i> Appointment Management</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
+                <?php if (can_access_module($conn, 'procedure_coding')): ?><a href="/hospital_system/procedure_coding/index.php" class="<?= isActive('procedure_coding/index.php') ?>"><i class="fas fa-clipboard-list"></i> Procedure Coding</a><?php endif; ?>
                 <?php if (can_access_module($conn, 'diagnosis')): ?><a href="/hospital_system/diagnosis/index.php" class="<?= isActive('diagnosis/index.php') ?>"><i class="fas fa-notes-medical"></i> Diagnosis Coding</a><?php endif; ?>
                 <?php if (can_access_module($conn, 'referrals')): ?><a href="/hospital_system/referrals/index.php" class="<?= isActive('referrals/index.php') ?>"><i class="fas fa-share-square"></i> Referral Management</a><?php endif; ?>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
