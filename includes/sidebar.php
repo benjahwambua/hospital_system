@@ -271,11 +271,18 @@ function isParentActive($paths) {
         </div>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'hr_staff') || can_access_module($conn, 'staff_leave')): ?>
+        <div class="menu-title">Staff &amp; HR</div>
+        <?php if (can_access_module($conn, 'hr_staff')): ?>
+        <a href="/hospital_system/hr/index.php" class="<?= isActive('hr/index.php') ?>">
+            <i class="fas fa-id-badge icon-main"></i> Staff Directory
+        </a>
+        <?php endif; ?>
         <?php if (can_access_module($conn, 'staff_leave')): ?>
-        <div class="menu-title">Staff</div>
         <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>">
             <i class="fas fa-calendar-alt icon-main"></i> Staff Leave
         </a>
+        <?php endif; ?>
         <?php endif; ?>
 
         <div class="menu-title">Exit</div>
