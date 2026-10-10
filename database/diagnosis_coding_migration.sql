@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS visit_diagnoses (
     clinical_notes TEXT NULL,
     onset_date DATE NULL,
     status ENUM('Active','Resolved','Entered in Error') NOT NULL DEFAULT 'Active',
+    status_reason TEXT NULL,
     coded_by INT NULL,
     updated_by INT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
