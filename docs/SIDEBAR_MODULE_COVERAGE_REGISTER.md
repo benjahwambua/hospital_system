@@ -27,6 +27,7 @@ These are supporting actions, print views, callbacks, or context-dependent pages
 - Purchase-order create/edit/delete/process/detail actions where the Procurement Purchase Orders workflow should be the entry point.
 - Maternity edit/view/print, bill, admission, delivery registration, and SMS actions where the Maternity workflow should launch them.
 - Leave request/action pages, which should be reachable from the Staff Leave workflow.
+- HR staff directory entry point: `hr/index.php` (employee master; migration and explicit permission assignment required).
 - Clinical discharge action, which should be available from the admission/ward workflow with its required patient/admission context.
 
 These routes still need direct-access permission and CSRF review; hiding an action from the sidebar is not an access-control measure.
@@ -42,7 +43,7 @@ The following capabilities were identified in the project planning register as m
 | Referral management | Partial | Keep current clinical referral workflow visible; expand when dedicated module is built |
 | Diagnosis / ICD-10 coding | Not implemented | Add dedicated clinical coding entry when built |
 | Procedure coding | Not implemented | Add dedicated entry when built |
-| Staff master / HR | Partial | Add dedicated Staff section as staff records become functional |
+| Staff master / HR | In progress | `hr/index.php` provides a permission-gated employee register; run `database/hr_staff_master_migration.sql`, then assign `hr_staff` permissions to authorized users. Credentials, documents, payroll and rostering are not implemented yet |
 | Staff rostering | Not implemented | Add roster page when workflow exists |
 | Notifications and escalation | Not implemented | Add notification centre when functional |
 | Patient portal | Not implemented | Keep out of staff navigation until implemented and access model is defined |
