@@ -30,6 +30,7 @@ These are supporting actions, print views, callbacks, or context-dependent pages
 - HR staff directory entry point: `hr/index.php` (employee master; migration and explicit permission assignment required).
 - HR professional credentials: `hr/credentials.php` (expiry monitoring; apply `database/hr_staff_credentials_migration.sql`).
 - HR contract register: `hr/contracts.php` (contract metadata and renewal monitoring; apply `database/hr_staff_contracts_migration.sql`).
+- HR offboarding: `hr/offboarding.php` (separation cases and mandatory five-part clearance checklist; apply `database/hr_staff_separations_migration.sql`).
 - Clinical discharge action, which should be available from the admission/ward workflow with its required patient/admission context.
 
 These routes still need direct-access permission and CSRF review; hiding an action from the sidebar is not an access-control measure.
