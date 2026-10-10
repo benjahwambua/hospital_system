@@ -30,6 +30,7 @@ These are supporting actions, print views, callbacks, or context-dependent pages
 - HR staff directory entry point: `hr/index.php` (employee master; migration and explicit permission assignment required).
 - HR professional credentials: `hr/credentials.php` (expiry monitoring; apply `database/hr_staff_credentials_migration.sql`).
 - HR contract register: `hr/contracts.php` (contract metadata and renewal monitoring; apply `database/hr_staff_contracts_migration.sql`).
+- Emergency/Casualty: `emergency/index.php` (triage-linked visit and disposition queue; apply `database/emergency_casualty_migration.sql`).
 - HR offboarding: `hr/offboarding.php` (separation cases and mandatory five-part clearance checklist; apply `database/hr_staff_separations_migration.sql`).
 - Clinical discharge action, which should be available from the admission/ward workflow with its required patient/admission context.
 
@@ -41,7 +42,7 @@ The following capabilities were identified in the project planning register as m
 
 | Capability | Status at review | Navigation expectation |
 |---|---|---|
-| Emergency / Casualty | Not implemented | Add module entry when a functional landing page exists |
+| Emergency / Casualty | First implementation | `emergency/index.php` provides intake, triage observations, acuity queue and case disposition; apply `database/emergency_casualty_migration.sql` and assign emergency permissions |
 | Theatre / Surgery | Not implemented | Add module entry when a functional landing page exists |
 | Referral management | Partial | Keep current clinical referral workflow visible; expand when dedicated module is built |
 | Diagnosis / ICD-10 coding | Not implemented | Add dedicated clinical coding entry when built |

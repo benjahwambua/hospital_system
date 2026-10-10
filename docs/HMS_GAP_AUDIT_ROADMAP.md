@@ -53,7 +53,7 @@ Highest-priority gaps:
 | Inpatient admission | Adequate | Admission and active stay records exist; transfer is now transactional and auditable |
 | Ward/bed management | Adequate | Occupancy and discharge, configurable ward/bed master, active-bed capacity, transfer history and manual duplicate-protected daily ward charges linked to canonical invoices exist; discharge readiness and end-to-end financial reconciliation require UAT |
 | Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, structured shift handover with separate-user acknowledgement, and a prescription/dispense-linked MAR with scheduled-dose timestamps, duplicate-slot protection, and required allergy-review status/user/time accountability; real order scheduling, automated allergy/interaction checks, staff roster integration, overdue escalation and UAT remain |
-| Emergency / casualty | Missing | ED lifecycle and triage workflow needed |
+| Emergency / casualty | First implementation | Emergency intake, linked visit, acuity triage, initial observations, active queue, clinician assignment and disposition workflow implemented; resuscitation protocols, repeat observations, alerts, transfers/bed integration and UAT remain |
 | Theatre / surgery | Missing | Theatre scheduling and peri-operative workflow needed |
 | Referrals | Partial | Orders/referrals area exists; dedicated lifecycle is not established |
 | Diagnosis coding / ICD-10 | Missing | Structured coding needed |

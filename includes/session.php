@@ -40,6 +40,7 @@ function require_login(): void {
             'expenses/' => ['finance_admin','view'],
             'users/' => ['administration','view'],
             'hr/' => ['hr_staff','view'],
+            'emergency/' => ['emergency','view'],
             'settings/' => ['administration','view'],
             'reports/' => ['administration','view']
         ];
