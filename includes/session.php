@@ -39,6 +39,7 @@ function require_login(): void {
             'accounting/' => ['finance_admin','view'],
             'expenses/' => ['finance_admin','view'],
             'users/' => ['administration','view'],
+            'hr/' => ['hr_staff','view'],
             'settings/' => ['administration','view'],
             'reports/' => ['administration','view']
         ];
