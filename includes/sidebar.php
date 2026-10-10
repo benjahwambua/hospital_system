@@ -77,7 +77,7 @@ function isParentActive($paths) {
 
 
         <?php if (can_access_module($conn, 'clinical')): ?>
-        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'theatre/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php', 'clinical/admit_patient.php', 'clinical/inpatient_charges.php', 'clinical/ward_configuration.php', 'vitals/vitals_add.php', 'prescriptions/view_prescriptions.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['clinical/index.php', 'theatre/index.php', 'referrals/index.php', 'patient_list.php', 'appointments.php', 'orders.php', 'ward_management.php', 'clinical/admit_patient.php', 'clinical/inpatient_charges.php', 'clinical/ward_configuration.php', 'vitals/vitals_add.php', 'prescriptions/view_prescriptions.php']) ?>">
             <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-stethoscope icon-main"></i> Clinical
                 <i class="fas fa-chevron-down caret"></i>
@@ -91,6 +91,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/patients/appointments.php" class="<?= isActive('patients/appointments.php') ?>"><i class="fas fa-calendar-check"></i> Patient Appointments</a>
                 <a href="/hospital_system/appointments/appointments.php" class="<?= isActive('appointments/appointments.php') ?>"><i class="fas fa-calendar-alt"></i> Appointment Management</a>
                 <a href="/hospital_system/clinical/orders.php" class="<?= isActive('clinical/orders.php') ?>"><i class="fas fa-flask"></i> Orders & Referrals</a>
+                <?php if (can_access_module($conn, 'referrals')): ?><a href="/hospital_system/referrals/index.php" class="<?= isActive('referrals/index.php') ?>"><i class="fas fa-share-square"></i> Referral Management</a><?php endif; ?>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
                 <a href="/hospital_system/clinical/admit_patient.php" class="<?= isActive('clinical/admit_patient.php') ?>"><i class="fas fa-procedures"></i> Admit Patient</a>
                 <a href="/hospital_system/clinical/inpatient_charges.php" class="<?= isActive('clinical/inpatient_charges.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Inpatient Charges</a>

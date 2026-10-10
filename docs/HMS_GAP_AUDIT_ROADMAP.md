@@ -55,7 +55,7 @@ Highest-priority gaps:
 | Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, structured shift handover with separate-user acknowledgement, and a prescription/dispense-linked MAR with scheduled-dose timestamps, duplicate-slot protection, and required allergy-review status/user/time accountability; real order scheduling, automated allergy/interaction checks, staff roster integration, overdue escalation and UAT remain |
 | Emergency / casualty | First implementation | Emergency intake, linked visit, acuity triage, initial observations, active queue, clinician assignment and disposition workflow implemented; resuscitation protocols, repeat observations, alerts, transfers/bed integration and UAT remain |
 | Theatre / surgery | First implementation | `theatre/index.php` supports case scheduling, a six-item pre-operative safety gate, lifecycle status control, intra-operative/anaesthesia notes and recovery outcome capture; full surgical safety checklist, detailed operative/anaesthesia records, implants/lot traceability, PACU observations, billing/stock integration and UAT remain |
-| Referrals | Partial | Orders/referrals area exists; dedicated lifecycle is not established |
+| Referrals | First implementation | `referrals/index.php` provides incoming/outgoing referral register, urgency, destination/provider, optional visit linkage, response/appointment tracking, report receipt, follow-up and guarded closure; secure document exchange, transport coordination, automated reminders and UAT remain |
 | Diagnosis coding / ICD-10 | Missing | Structured coding needed |
 | Procedure coding | Missing | Structured procedure coding needed |
 | Insurance/SHA data model | Partial | Strong schema foundation exists in insurance_migration.sql |
@@ -140,7 +140,7 @@ Billing, cashier, payment, M-Pesa, refunds, reconciliation and aged receivables 
 
 5. Emergency/Casualty.
 6. Theatre/Surgery (first workflow increment implemented; clinical validation and integrations remain).
-7. Referral management.
+7. Referral management (dedicated lifecycle register implemented; integrations and UAT remain).
 8. Structured diagnosis and procedure coding.
 9. Clinical documentation expansion.
 10. Department work queues.
@@ -227,3 +227,8 @@ Task assignment now selects from eligible nurse, doctor and admin accounts and v
 ## Theatre / Surgery implementation note (2026-10-10)
 
 `database/theatre_surgery_migration.sql` adds a patient-linked theatre case register. `theatre/index.php` provides planned-case scheduling, optional surgeon/anaesthesia assignment, a six-part pre-op gate, guarded lifecycle transitions (Planned → Pre-op → In Theatre → Recovery → Completed), intra-operative/anaesthesia notes, recovery notes and outcome, cancellation reason, case counts, CSRF checks, permission checks and audit-hook calls when the shared audit function is available. The migration is not applied to the target database and the workflow has not had live XAMPP/UAT validation. This is not a replacement for the approved surgical safety checklist, anaesthesia chart, operative report, implant traceability or PACU monitoring.
+
+
+## Referral management implementation note (2026-10-10)
+
+`database/referral_management_migration.sql` adds a patient-linked incoming/outgoing referral register with optional visit linkage. `referrals/index.php` records referral direction, urgency, destination facility/provider, specialty, originating department/clinician, reason and clinical handover; authorized staff can progress status through acceptance, scheduling, seen, report received and closure. Closing requires follow-up/outcome notes; cancellation requires a reason. The migration is not applied to the target database and this workflow has not had live XAMPP/UAT validation. Secure attachments, referral letter generation, ambulance/transfer coordination, reminders, receiving-facility interoperability and billing/claims links remain future work.
