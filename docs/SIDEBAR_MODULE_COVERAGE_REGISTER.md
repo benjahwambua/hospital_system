@@ -32,6 +32,7 @@ These are supporting actions, print views, callbacks, or context-dependent pages
 - HR contract register: `hr/contracts.php` (contract metadata and renewal monitoring; apply `database/hr_staff_contracts_migration.sql`).
 - Emergency/Casualty: `emergency/index.php` (triage-linked visit and disposition queue; apply `database/emergency_casualty_migration.sql`).
 - Theatre & Surgery: `theatre/index.php` (case scheduling, pre-op safety gate, intra-operative/anaesthesia notes and recovery tracking; apply `database/theatre_surgery_migration.sql`).
+- Referral Management: `referrals/index.php` (incoming/outgoing lifecycle, destination and response tracking, report receipt and guarded closure; apply `database/referral_management_migration.sql`).
 - HR offboarding: `hr/offboarding.php` (separation cases and mandatory five-part clearance checklist; apply `database/hr_staff_separations_migration.sql`).
 - Clinical discharge action, which should be available from the admission/ward workflow with its required patient/admission context.
 
@@ -45,7 +46,7 @@ The following capabilities were identified in the project planning register as m
 |---|---|---|
 | Emergency / Casualty | First implementation | `emergency/index.php` provides intake, triage observations, acuity queue and case disposition; apply `database/emergency_casualty_migration.sql` and assign emergency permissions |
 | Theatre / Surgery | First implementation | `theatre/index.php` provides scheduling, pre-op gate and guarded case lifecycle; apply `database/theatre_surgery_migration.sql`, assign Theatre view/create/edit permissions and complete clinical validation |
-| Referral management | Partial | Keep current clinical referral workflow visible; expand when dedicated module is built |
+| Referral management | First implementation | `referrals/index.php` provides the dedicated referral lifecycle; apply `database/referral_management_migration.sql`, assign `referrals` view/create/edit permissions and complete workflow/UAT validation |
 | Diagnosis / ICD-10 coding | Not implemented | Add dedicated clinical coding entry when built |
 | Procedure coding | Not implemented | Add dedicated entry when built |
 | Staff master / HR | In progress | `hr/index.php` provides a permission-gated employee register; run `database/hr_staff_master_migration.sql`, then assign `hr_staff` permissions to authorized users. Credentials, documents, payroll and rostering are not implemented yet |
