@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_login();
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/notifications.php';
 require_module_access($conn, 'nursing', 'view');
 
 $canCreate = can_module_action($conn, 'nursing', 'create');
@@ -60,11 +61,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'shift_handover_ack') {
             $handoverId = (int)($_POST['handover_id'] ?? 0);
             $ackNotes = trim((string)($_POST['acknowledgement_notes'] ?? ''));
+            $handoverCreatorId = 0;
+            $handoverCheck = $conn->prepare("SELECT handed_over_by FROM nursing_shift_handovers WHERE id=? AND admission_id=? AND status='Pending' LIMIT 1");
+            if ($handoverCheck) {
+                $handoverCheck->bind_param('ii', $handoverId, $admissionId);
+                if ($handoverCheck->execute()) {
+                    $handoverRow = $handoverCheck->get_result()->fetch_assoc();
+                    $handoverCreatorId = (int)($handoverRow['handed_over_by'] ?? 0);
+                }
+                $handoverCheck->close();
+            }
             $s = $conn->prepare("UPDATE nursing_shift_handovers SET status='Acknowledged',acknowledged_by=?,acknowledged_at=NOW(),acknowledgement_notes=? WHERE id=? AND admission_id=? AND status='Pending' AND handed_over_by<>?");
             if ($s) {
                 $s->bind_param('isiii', $userId, $ackNotes, $handoverId, $admissionId, $userId);
                 if ($s->execute() && $s->affected_rows === 1) {
                     if (function_exists('audit')) audit('nursing_shift_handover_acknowledged', "admission_id={$admissionId},handover_id={$handoverId}");
+                    if ($handoverCreatorId > 0 && $handoverCreatorId !== $userId) {
+                        hms_notify_user(
+                            $conn,
+                            $handoverCreatorId,
+                            'Nursing handover acknowledged',
+                            'A nursing shift handover you submitted has been acknowledged.',
+                            'nursing_handover',
+                            'success',
+                            '/hospital_system/nursing/index.php?admission_id=' . $admissionId,
+                            'nursing_handover',
+                            $handoverId,
+                            'nursing-handover-acknowledged-' . $handoverId
+                        );
+                    }
                     $message = '<div class="alert alert-success">Shift handover acknowledged.</div>';
                 } else $message = '<div class="alert alert-warning">Handover was not acknowledged. It may already be closed or must be acknowledged by a different user.</div>';
                 $s->close();
