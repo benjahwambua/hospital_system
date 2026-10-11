@@ -45,6 +45,7 @@ function require_login(): void {
             'referrals/' => ['referrals','view'],
             'diagnosis/' => ['diagnosis','view'],
             'procedure_coding/' => ['procedure_coding','view'],
+            'notifications/' => ['notifications','view'],
             'settings/' => ['administration','view'],
             'reports/' => ['administration','view']
         ];
