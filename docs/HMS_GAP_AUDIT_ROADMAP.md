@@ -78,7 +78,7 @@ Highest-priority gaps:
 | Financial approvals | Adequate | Permission model supports approval |
 | Audit logging | Adequate | Central audit function exists |
 | Audit history UI | Partial | Needs searchable actor/before-after history |
-| Notifications | Missing | Event-driven alerts and work queues needed |
+| Notifications | First implementation | `notifications/index.php` provides a permission-gated personal inbox, unread badge, CSRF-protected read actions and safe internal navigation; roster assignment/update events can notify linked staff accounts. Broader clinical/finance triggers, escalation policies, email/SMS delivery, expiry management and UAT remain |
 | Staff leave | Adequate | Correctly separate from Administration |
 | HR / staff master | Partial | Employee directory, professional credentials, contract register and offboarding checklist implemented; protected document storage, payroll, and UAT remain |
 | Staff rostering | First implementation | `hr/rostering.php` schedules active employees, validates overlapping shift times, supports guarded status transitions and is permission-gated; roster migration, staffing coverage rules, attendance, nursing/theatre integration, notifications and UAT remain |
@@ -247,3 +247,8 @@ Task assignment now selects from eligible nurse, doctor and admin accounts and v
 ## Staff rostering first implementation (2026-10-11)
 
 A first roster register is available at `hr/rostering.php`. It uses the dedicated `staff_roster` ACL module, references the HR staff master, rejects overlapping non-cancelled assignments for the same employee, and tracks Scheduled, Confirmed, Completed and Cancelled states. Apply `database/hr_staff_rostering_migration.sql` only after `database/hr_staff_master_migration.sql` has been reviewed/applied in a backed-up test environment. The first increment does not yet determine minimum staffing per ward/shift, integrate clock-in attendance, auto-notify staff, or enforce clinical staffing policy. No runtime or UAT testing has been performed.
+
+
+## Notifications and work alerts first implementation (2026-10-11)
+
+The first in-app notifications increment is implemented on `feature/notifications-work-queues`: persistent user-scoped inbox, unread count in the shared topbar, mark-read/mark-all-read actions, per-user ownership checks, CSRF protection and safe local destination handling. Roster assignment and update events now send best-effort alerts to employees linked to login accounts. Apply `database/notifications_migration.sql` after the access-control migration, then explicitly grant Notifications view permission. This is not yet a complete enterprise work queue: cross-module event coverage, escalation and delivery-channel integrations remain unbuilt. No live database or UAT testing has been performed.
