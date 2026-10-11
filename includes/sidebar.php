@@ -323,34 +323,62 @@ function isParentActive($paths) {
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const sidebar = document.querySelector(".sidebar");
-        const toggles = document.querySelectorAll(".menu-toggle");
+        const toggles = Array.from(document.querySelectorAll(".menu-toggle"));
         const scrollKey = "hmsSidebarScrollTop";
+        const openKey = "hmsSidebarOpenSections";
 
-        // Restore the sidebar's position after navigating to another module.
+        const sectionKey = toggle => {
+            const firstLink = toggle.parentElement.querySelector(".submenu a[href]");
+            return firstLink ? firstLink.getAttribute("href") : (toggle.textContent || "").trim();
+        };
+
+        let savedOpenSections = [];
+        try {
+            savedOpenSections = JSON.parse(sessionStorage.getItem(openKey) || "[]");
+            if (!Array.isArray(savedOpenSections)) savedOpenSections = [];
+        } catch (error) {
+            savedOpenSections = [];
+        }
+
+        // Restore expanded groups before restoring scroll, so the menu layout
+        // remains stable when the selected module loads.
+        toggles.forEach(toggle => {
+            const parent = toggle.parentElement;
+            if (savedOpenSections.includes(sectionKey(toggle))) parent.classList.add("open");
+            toggle.setAttribute("aria-expanded", parent.classList.contains("open") ? "true" : "false");
+        });
+
+        const saveSidebarState = () => {
+            try {
+                sessionStorage.setItem(openKey, JSON.stringify(
+                    toggles.filter(toggle => toggle.parentElement.classList.contains("open")).map(sectionKey)
+                ));
+                if (sidebar) sessionStorage.setItem(scrollKey, String(sidebar.scrollTop));
+            } catch (error) {
+                // Navigation should still work if browser storage is unavailable.
+            }
+        };
+
         if (sidebar) {
             const savedScroll = sessionStorage.getItem(scrollKey);
-            if (savedScroll !== null) {
-                sidebar.scrollTop = Number(savedScroll) || 0;
-            }
+            if (savedScroll !== null) sidebar.scrollTop = Number(savedScroll) || 0;
 
-            // Save the current position before following a sidebar module link.
             sidebar.querySelectorAll('a[href]').forEach(link => {
                 link.addEventListener("click", function() {
                     if (this.classList.contains("menu-toggle") || this.getAttribute("href") === "#") return;
-                    sessionStorage.setItem(scrollKey, String(sidebar.scrollTop));
+                    saveSidebarState();
                 });
             });
         }
 
-        // Keep each section independently collapsible. Opening one section must
-        // not close other sections and cause the sidebar items to jump vertically.
+        // Sections operate independently; expanding one will not collapse others
+        // and pull the remaining modules upward.
         toggles.forEach(toggle => {
-            const parent = toggle.parentElement;
-            toggle.setAttribute("aria-expanded", parent.classList.contains("open") ? "true" : "false");
-            toggle.addEventListener("click", function(e) {
-                e.preventDefault();
-                const isOpen = parent.classList.toggle("open");
-                this.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            toggle.addEventListener("click", function(event) {
+                event.preventDefault();
+                this.parentElement.classList.toggle("open");
+                this.setAttribute("aria-expanded", this.parentElement.classList.contains("open") ? "true" : "false");
+                saveSidebarState();
             });
         });
     });
