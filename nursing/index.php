@@ -183,12 +183,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'task_complete') {
             $taskId = (int)($_POST['task_id'] ?? 0);
             $completionNotes = trim((string)($_POST['completion_notes'] ?? ''));
+            $taskCreatorId = 0;
+            $creatorCheck = $conn->prepare('SELECT created_by FROM nursing_tasks WHERE id=? AND admission_id=? LIMIT 1');
+            if ($creatorCheck) {
+                $creatorCheck->bind_param('ii', $taskId, $admissionId);
+                if ($creatorCheck->execute()) {
+                    $creatorRow = $creatorCheck->get_result()->fetch_assoc();
+                    $taskCreatorId = (int)($creatorRow['created_by'] ?? 0);
+                }
+                $creatorCheck->close();
+            }
             $s = $conn->prepare("UPDATE nursing_tasks SET status='Completed',completed_by=?,completed_at=NOW(),completion_notes=? WHERE id=? AND admission_id=? AND status IN ('Open','In Progress') AND (assigned_to=? OR ?=1)");
             if ($s) {
                 $approveFlag = $canApprove ? 1 : 0;
                 $s->bind_param('isiiii', $userId, $completionNotes, $taskId, $admissionId, $userId, $approveFlag);
                 if ($s->execute() && $s->affected_rows === 1) {
                     if (function_exists('audit')) audit('nursing_task_completed', "admission_id={$admissionId},task_id={$taskId}");
+                    if ($taskCreatorId > 0 && $taskCreatorId !== $userId) {
+                        hms_notify_user(
+                            $conn,
+                            $taskCreatorId,
+                            'Nursing task completed',
+                            'A nursing task you created has been marked complete.',
+                            'nursing_task',
+                            'success',
+                            '/hospital_system/nursing/index.php?admission_id=' . $admissionId,
+                            'nursing_task',
+                            $taskId,
+                            'nursing-task-completed-' . $taskId
+                        );
+                    }
                     $message = '<div class="alert alert-success">Nursing task marked complete.</div>';
                 } else $message = '<div class="alert alert-warning">Task was not updated; it may already be completed or no longer active.</div>';
                 $s->close();
