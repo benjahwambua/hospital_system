@@ -1,6 +1,6 @@
 # Sidebar and Module Coverage Register
 
-Last reviewed: 2026-10-10
+Last reviewed: 2026-10-11
 
 ## Purpose
 
@@ -8,14 +8,15 @@ Use this register to distinguish existing pages that need navigation from module
 
 ## Navigation coverage checks
 
-- Repository tree contains 147 PHP files at the time of review.
-- 87 explicit sidebar destinations were checked against the repository tree.
+- Repository tree contained 147 PHP files at the previous review; the staff rostering entry point adds one PHP page.
+- 87 explicit sidebar destinations were checked at the previous review; the Staff Rostering destination was added in this increment.
 - No explicit sidebar destination was missing at the time of review.
 - Existing workflow entry points added during this review:
   - Patient Dashboard: `patients/patient_dashboard.php`
   - Laboratory Inventory Movement History: `lab/inventory/stock_movements.php`
   - Add Laboratory Inventory Item: `lab/inventory/add_item.php` (Laboratory edit permission)
   - Pharmacy Medicine Catalogue: `pharmacy/add_medication.php` (Pharmacy edit permission)
+  - Staff Rostering: `hr/rostering.php` (dedicated `staff_roster` permission; apply `database/hr_staff_rostering_migration.sql` after the HR staff master migration)
 
 ## Existing pages intentionally not promoted to top-level navigation
 

@@ -276,7 +276,7 @@ function isParentActive($paths) {
         </div>
         <?php endif; ?>
 
-        <?php if (can_access_module($conn, 'hr_staff') || can_access_module($conn, 'staff_leave')): ?>
+        <?php if (can_access_module($conn, 'hr_staff') || can_access_module($conn, 'staff_leave') || can_access_module($conn, 'staff_roster')): ?>
         <div class="menu-title">Staff &amp; HR</div>
         <?php if (can_access_module($conn, 'hr_staff')): ?>
         <a href="/hospital_system/hr/index.php" class="<?= isActive('hr/index.php') ?>">
@@ -288,6 +288,11 @@ function isParentActive($paths) {
         <a href="/hospital_system/hr/contracts.php" class="<?= isActive('hr/contracts.php') ?>">
             <i class="fas fa-file-contract icon-main"></i> Contract Register
         </a>
+        <?php if (can_access_module($conn, 'staff_roster')): ?>
+        <a href="/hospital_system/hr/rostering.php" class="<?= isActive('hr/rostering.php') ?>">
+            <i class="fas fa-calendar-alt icon-main"></i> Staff Rostering
+        </a>
+        <?php endif; ?>
         <a href="/hospital_system/hr/offboarding.php" class="<?= isActive('hr/offboarding.php') ?>">
             <i class="fas fa-user-check icon-main"></i> Staff Offboarding
         </a>
