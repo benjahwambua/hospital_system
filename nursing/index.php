@@ -147,7 +147,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($s) {
                     $s->bind_param('iissssii', $admissionId, $admission['patient_id'], $title, $details, $priority, $dueAt, $assignedTo, $userId);
                     if ($s->execute()) {
-                        if (function_exists('audit')) audit('nursing_task_created', "admission_id={$admissionId},task_id={$s->insert_id},priority={$priority}");
+                        $newTaskId = (int)$s->insert_id;
+                        if (function_exists('audit')) audit('nursing_task_created', "admission_id={$admissionId},task_id={$newTaskId},priority={$priority}");
+                        if ($assignedTo > 0) {
+                            // Keep patient identifiers and clinical details out of notification text.
+                            hms_notify_user(
+                                $conn,
+                                $assignedTo,
+                                'Nursing task assigned',
+                                'A nursing task has been assigned to you. Open Nursing Station to review your work.',
+                                'nursing_task',
+                                $priority === 'Urgent' ? 'urgent' : ($priority === 'High' ? 'warning' : 'info'),
+                                '/hospital_system/nursing/index.php?admission_id=' . $admissionId,
+                                'nursing_task',
+                                $newTaskId,
+                                'nursing-task-assigned-' . $newTaskId
+                            );
+                        }
                         $message = '<div class="alert alert-success">Nursing task assigned to the inpatient record.</div>';
                     } else $message = '<div class="alert alert-danger">Unable to create nursing task.</div>';
                     $s->close();
