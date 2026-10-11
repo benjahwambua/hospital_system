@@ -52,7 +52,7 @@ Highest-priority gaps:
 | Maternity | Strong | ANC, labour, PNC, deliveries and admissions exist |
 | Inpatient admission | Adequate | Admission and active stay records exist; transfer is now transactional and auditable |
 | Ward/bed management | Adequate | Occupancy and discharge, configurable ward/bed master, active-bed capacity, transfer history and manual duplicate-protected daily ward charges linked to canonical invoices exist; discharge readiness and end-to-end financial reconciliation require UAT |
-| Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, structured shift handover with separate-user acknowledgement, and a prescription/dispense-linked MAR with scheduled-dose timestamps, duplicate-slot protection, and required allergy-review status/user/time accountability; real order scheduling, automated allergy/interaction checks, staff roster integration, overdue escalation and UAT remain |
+| Nursing | Partial | Nursing station supports observations, notes, tasks, structured care plans with approval-controlled closure, structured shift handover with separate-user acknowledgement, and a prescription/dispense-linked MAR with scheduled-dose timestamps and allergy-review accountability; real medication-order scheduling, roster-to-nursing assignment integration, automated allergy/interaction checks, overdue escalation and UAT remain |
 | Emergency / casualty | First implementation | Emergency intake, linked visit, acuity triage, initial observations, active queue, clinician assignment and disposition workflow implemented; resuscitation protocols, repeat observations, alerts, transfers/bed integration and UAT remain |
 | Theatre / surgery | First implementation | `theatre/index.php` supports case scheduling, a six-item pre-operative safety gate, lifecycle status control, intra-operative/anaesthesia notes and recovery outcome capture; full surgical safety checklist, detailed operative/anaesthesia records, implants/lot traceability, PACU observations, billing/stock integration and UAT remain |
 | Referrals | First implementation | `referrals/index.php` provides incoming/outgoing referral register, urgency, destination/provider, optional visit linkage, response/appointment tracking, report receipt, follow-up and guarded closure; secure document exchange, transport coordination, automated reminders and UAT remain |
@@ -80,8 +80,8 @@ Highest-priority gaps:
 | Audit history UI | Partial | Needs searchable actor/before-after history |
 | Notifications | Missing | Event-driven alerts and work queues needed |
 | Staff leave | Adequate | Correctly separate from Administration |
-| HR / staff master | Partial | Employee directory, professional credentials, contract register and offboarding checklist implemented; protected document storage, payroll, rostering integration and UAT remain |
-| Staff rostering | Missing | Needed for wards, nursing, theatre and shifts |
+| HR / staff master | Partial | Employee directory, professional credentials, contract register and offboarding checklist implemented; protected document storage, payroll, and UAT remain |
+| Staff rostering | First implementation | `hr/rostering.php` schedules active employees, validates overlapping shift times, supports guarded status transitions and is permission-gated; roster migration, staffing coverage rules, attendance, nursing/theatre integration, notifications and UAT remain |
 | Management dashboard | Adequate | Should evolve into a hospital command centre |
 | Operational KPIs | Partial | Reporting exists; KPI depth needs expansion |
 | Patient portal | Missing | Later-phase capability |
@@ -242,3 +242,8 @@ Task assignment now selects from eligible nurse, doctor and admin accounts and v
 ## Procedure coding implementation note (2026-10-10)
 
 `database/procedure_coding_migration.sql` adds a procedure catalogue and visit-linked procedure register. `procedure_coding/index.php` supports catalogue maintenance, optional informational standard fee, planned/performed/cancelled/entered-in-error states, laterality, provider, performed date/time, clinical notes and reason capture. The standard fee is not posted to billing. The catalogue starts empty; load and validate an approved current procedure code set and tariff before production use. The migration is not applied to the target database and no live XAMPP/UAT testing has been performed.
+
+
+## Staff rostering first implementation (2026-10-11)
+
+A first roster register is available at `hr/rostering.php`. It uses the dedicated `staff_roster` ACL module, references the HR staff master, rejects overlapping non-cancelled assignments for the same employee, and tracks Scheduled, Confirmed, Completed and Cancelled states. Apply `database/hr_staff_rostering_migration.sql` only after `database/hr_staff_master_migration.sql` has been reviewed/applied in a backed-up test environment. The first increment does not yet determine minimum staffing per ward/shift, integrate clock-in attendance, auto-notify staff, or enforce clinical staffing policy. No runtime or UAT testing has been performed.
