@@ -21,11 +21,10 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Clinical documentation | 55% | Encounters, vitals, orders and departmental records exist | Structured assessment, diagnosis, plans, progress notes and templates |
 | Department work queues | 60% | Lab/radiology/pharmacy queues exist | Unified queue model, SLA/priority controls and cross-department visibility |
 | Enterprise audit history | 35% | Central audit function and audit calls exist | Search/filter UI, actor/action/entity filters, before/after values and export |
-| Notifications / work queues | 0% | No central event-driven notification engine | Alerts, assignments, reminders, escalation and in-app notification centre |
 | Management command centre | 50% | Dashboards and reports exist | Executive KPIs, operational drill-down and exception monitoring |
 | Operational KPI analytics | 45% | Core reports exist | Bed occupancy, LOS, revenue cycle, lab TAT, pharmacy, claims and staffing KPIs |
-| HR / staff master | 20% | User/staff identity foundations exist | Employee master, credentials, departments, licences and employment records |
-| Staff rostering | 0% | Not implemented | Shift templates, rosters, coverage, swaps and attendance |
+| HR / staff master | 35% | Employee directory, professional credentials, contract register and offboarding checklist have first implementations | Protected document storage, payroll, wider workflow integration and UAT |
+| Staff rostering | 35% | `hr/rostering.php` supports active staff shift assignments, overlap checks and guarded status transitions | Coverage rules, attendance, nursing/theatre integration, migration rollout and UAT |
 | Patient portal | 0% | Not implemented | Patient access, appointments, results, statements and secure messaging |
 | SMS / Email | 0% | Not implemented | Provider abstraction, templates, consent, queues and delivery logs |
 | Payment integrations | 45% | M-Pesa foundation and payment workflows exist | Harden callbacks, reconciliation, idempotency and broader provider abstraction |
