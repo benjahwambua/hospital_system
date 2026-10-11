@@ -31,6 +31,7 @@ Use non-production test accounts and test inpatient records. Do not place patien
 - [ ] Retry or reload the relevant workflow and confirm dedupe keys prevent duplicate notification rows for the same event.
 - [ ] With the notifications table absent in a disposable test database, confirm notification helpers fail best-effort and do not block the underlying Nursing/rostering transaction.
 - [ ] Confirm existing Nursing permissions and task/handover status guards still apply; notifications must not grant clinical access.
+- [ ] Nursing observation entry rejects malformed timestamps, out-of-range measurements, negative intake/output and systolic BP below diastolic BP; verify valid values and blank optional measurements still save.
 - [ ] Review PHP error logs and the audit trail after the test sequence.
 
 ## Rollback and safeguards
