@@ -304,6 +304,13 @@ function isParentActive($paths) {
         <?php endif; ?>
         <?php endif; ?>
 
+        <?php if (can_access_module($conn, 'notifications')): ?>
+        <div class="menu-title">Communications</div>
+        <a href="/hospital_system/notifications/index.php" class="<?= isActive('notifications/index.php') ?>">
+            <i class="fas fa-bell icon-main"></i> Notifications &amp; Alerts
+        </a>
+        <?php endif; ?>
+
         <div class="menu-title">Exit</div>
         <a href="/hospital_system/auth/logout.php" class="logout-link">
             <i class="fas fa-power-off icon-main"></i> Logout
