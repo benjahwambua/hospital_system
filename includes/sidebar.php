@@ -277,30 +277,38 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'hr_staff') || can_access_module($conn, 'staff_leave') || can_access_module($conn, 'staff_roster')): ?>
-        <div class="menu-title">Staff &amp; HR</div>
+        <div class="menu-title">People &amp; Workforce</div>
+
         <?php if (can_access_module($conn, 'hr_staff')): ?>
-        <a href="/hospital_system/hr/index.php" class="<?= isActive('hr/index.php') ?>">
-            <i class="fas fa-id-badge icon-main"></i> Staff Directory
-        </a>
-        <a href="/hospital_system/hr/credentials.php" class="<?= isActive('hr/credentials.php') ?>">
-            <i class="fas fa-certificate icon-main"></i> Professional Credentials
-        </a>
-        <a href="/hospital_system/hr/contracts.php" class="<?= isActive('hr/contracts.php') ?>">
-            <i class="fas fa-file-contract icon-main"></i> Contract Register
-        </a>
-        <?php if (can_access_module($conn, 'staff_roster')): ?>
-        <a href="/hospital_system/hr/rostering.php" class="<?= isActive('hr/rostering.php') ?>">
-            <i class="fas fa-calendar-alt icon-main"></i> Staff Rostering
-        </a>
+        <div class="has-submenu <?= isParentActive(['hr/']) ?>">
+            <a href="#" class="menu-toggle" aria-expanded="<?= isParentActive(['hr/']) === 'open' ? 'true' : 'false' ?>">
+                <i class="fas fa-id-card icon-main"></i> HR
+                <i class="fas fa-chevron-down caret"></i>
+            </a>
+            <div class="submenu">
+                <a href="/hospital_system/hr/index.php" class="<?= isActive('hr/index.php') ?>"><i class="fas fa-id-badge"></i> Staff Directory</a>
+                <a href="/hospital_system/hr/credentials.php" class="<?= isActive('hr/credentials.php') ?>"><i class="fas fa-certificate"></i> Professional Credentials</a>
+                <a href="/hospital_system/hr/contracts.php" class="<?= isActive('hr/contracts.php') ?>"><i class="fas fa-file-contract"></i> Contract Register</a>
+                <a href="/hospital_system/hr/offboarding.php" class="<?= isActive('hr/offboarding.php') ?>"><i class="fas fa-user-check"></i> Staff Offboarding</a>
+            </div>
+        </div>
         <?php endif; ?>
-        <a href="/hospital_system/hr/offboarding.php" class="<?= isActive('hr/offboarding.php') ?>">
-            <i class="fas fa-user-check icon-main"></i> Staff Offboarding
-        </a>
-        <?php endif; ?>
-        <?php if (can_access_module($conn, 'staff_leave')): ?>
-        <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>">
-            <i class="fas fa-calendar-alt icon-main"></i> Staff Leave
-        </a>
+
+        <?php if (can_access_module($conn, 'staff_leave') || can_access_module($conn, 'staff_roster')): ?>
+        <div class="has-submenu <?= isParentActive(['hr/rostering.php', 'leave/']) ?>">
+            <a href="#" class="menu-toggle" aria-expanded="<?= isParentActive(['hr/rostering.php', 'leave/']) === 'open' ? 'true' : 'false' ?>">
+                <i class="fas fa-users icon-main"></i> Staff
+                <i class="fas fa-chevron-down caret"></i>
+            </a>
+            <div class="submenu">
+                <?php if (can_access_module($conn, 'staff_roster')): ?>
+                <a href="/hospital_system/hr/rostering.php" class="<?= isActive('hr/rostering.php') ?>"><i class="fas fa-calendar-alt"></i> Staff Rostering</a>
+                <?php endif; ?>
+                <?php if (can_access_module($conn, 'staff_leave')): ?>
+                <a href="/hospital_system/leave/index.php" class="<?= isActive('leave/index.php') ?>"><i class="fas fa-calendar-check"></i> Staff Leave</a>
+                <?php endif; ?>
+            </div>
+        </div>
         <?php endif; ?>
         <?php endif; ?>
 
@@ -314,26 +322,38 @@ function isParentActive($paths) {
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        const sidebar = document.querySelector(".sidebar");
         const toggles = document.querySelectorAll(".menu-toggle");
+        const scrollKey = "hmsSidebarScrollTop";
 
+        // Restore the sidebar's position after navigating to another module.
+        if (sidebar) {
+            const savedScroll = sessionStorage.getItem(scrollKey);
+            if (savedScroll !== null) {
+                sidebar.scrollTop = Number(savedScroll) || 0;
+            }
+
+            // Save the current position before following a sidebar module link.
+            sidebar.querySelectorAll('a[href]').forEach(link => {
+                link.addEventListener("click", function() {
+                    if (this.classList.contains("menu-toggle") || this.getAttribute("href") === "#") return;
+                    sessionStorage.setItem(scrollKey, String(sidebar.scrollTop));
+                });
+            });
+        }
+
+        // Keep each section independently collapsible. Opening one section must
+        // not close other sections and cause the sidebar items to jump vertically.
         toggles.forEach(toggle => {
+            const parent = toggle.parentElement;
+            toggle.setAttribute("aria-expanded", parent.classList.contains("open") ? "true" : "false");
             toggle.addEventListener("click", function(e) {
                 e.preventDefault();
-                const parent = this.parentElement;
-                
-                document.querySelectorAll(".has-submenu").forEach(item => {
-                    if (item !== parent) {
-                        item.classList.remove("open");
-                        const trigger = item.querySelector(".menu-toggle");
-                        if (trigger) trigger.setAttribute("aria-expanded", "false");
-                    }
-                });
-
                 const isOpen = parent.classList.toggle("open");
                 this.setAttribute("aria-expanded", isOpen ? "true" : "false");
             });
         });
     });
-</script>
+</script>>
 
 <main class="content">
