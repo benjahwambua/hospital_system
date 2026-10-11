@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/notifications.php';
 require_login();
 require_module_access($conn, 'staff_roster', 'view');
 
@@ -102,16 +103,21 @@ if ($tablesReady && $_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $stmt = $conn->prepare("UPDATE hr_staff_roster SET staff_id=?, shift_type=?, start_at=?, end_at=?, notes=?, updated_by=? WHERE id=?");
                                     if ($stmt) {
                                         $stmt->bind_param('issssii', $staffId, $shiftType, $start, $end, $notesValue, $actor, $id);
-                                        if ($stmt->execute()) $message = 'Staff shift updated.';
-                                        else $error = 'Unable to update the staff shift.';
+                                        if ($stmt->execute()) {
+                                            $message = 'Staff shift updated.';
+                                            hms_notify_staff_member($conn, $staffId, 'Shift assignment updated', 'Your ' . $shiftType . ' shift has been updated to ' . date('D, d M Y H:i', strtotime($start)) . ' – ' . date('D, d M Y H:i', strtotime($end)) . '.', 'staff_roster', 'info', '/hospital_system/hr/rostering.php', 'roster-update-' . $id . '-' . date('YmdHis'));
+                                        } else $error = 'Unable to update the staff shift.';
                                         $stmt->close();
                                     } else $error = 'Unable to prepare the shift update.';
                                 } else {
                                     $stmt = $conn->prepare("INSERT INTO hr_staff_roster (staff_id, shift_type, start_at, end_at, notes, created_by, updated_by) VALUES (?,?,?,?,?,?,?)");
                                     if ($stmt) {
                                         $stmt->bind_param('issssii', $staffId, $shiftType, $start, $end, $notesValue, $actor, $actor);
-                                        if ($stmt->execute()) $message = 'Staff shift scheduled.';
-                                        else $error = 'Unable to schedule the staff shift.';
+                                        if ($stmt->execute()) {
+                                            $newRosterId = (int)$stmt->insert_id;
+                                            $message = 'Staff shift scheduled.';
+                                            hms_notify_staff_member($conn, $staffId, 'New shift assigned', 'You have been assigned a ' . $shiftType . ' shift from ' . date('D, d M Y H:i', strtotime($start)) . ' to ' . date('D, d M Y H:i', strtotime($end)) . '.', 'staff_roster', 'info', '/hospital_system/hr/rostering.php', 'roster-new-' . $newRosterId);
+                                        } else $error = 'Unable to schedule the staff shift.';
                                         $stmt->close();
                                     } else $error = 'Unable to prepare the shift schedule.';
                                 }
