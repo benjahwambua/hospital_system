@@ -280,7 +280,7 @@ function isParentActive($paths) {
         <div class="menu-title">People &amp; Workforce</div>
 
         <?php if (can_access_module($conn, 'hr_staff')): ?>
-        <div class="has-submenu <?= isParentActive(['hr/']) ?>">
+        <div class="has-submenu <?= isParentActive(['hr/index.php', 'hr/credentials.php', 'hr/contracts.php', 'hr/offboarding.php']) ?>">
             <a href="#" class="menu-toggle" aria-expanded="<?= isParentActive(['hr/']) === 'open' ? 'true' : 'false' ?>">
                 <i class="fas fa-id-card icon-main"></i> HR
                 <i class="fas fa-chevron-down caret"></i>
@@ -354,6 +354,6 @@ function isParentActive($paths) {
             });
         });
     });
-</script>>
+</script>
 
 <main class="content">
