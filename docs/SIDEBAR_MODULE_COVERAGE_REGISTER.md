@@ -18,7 +18,7 @@ Use this register to distinguish existing pages that need navigation from module
   - Add Laboratory Inventory Item: `lab/inventory/add_item.php` (Laboratory edit permission)
   - Pharmacy Medicine Catalogue: `pharmacy/add_medication.php` (Pharmacy edit permission)
   - Staff Rostering: `hr/rostering.php` (dedicated `staff_roster` permission; apply `database/hr_staff_rostering_migration.sql` after the HR staff master migration)
-  - Notifications & Alerts: `notifications/index.php` (dedicated `notifications` permission; apply `database/notifications_migration.sql` after access control)
+  - Notifications & Alerts: `notifications/index.php` (dedicated `notifications` permission; apply `database/notifications_migration.sql` after access control); follow `docs/NOTIFICATIONS_DEPLOYMENT_UAT.md` for release checks
 
 ## Existing pages intentionally not promoted to top-level navigation
 
