@@ -127,11 +127,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $intake = ($_POST['intake_ml'] ?? '') === '' ? null : (int)$_POST['intake_ml'];
             $output = ($_POST['output_ml'] ?? '') === '' ? null : (int)$_POST['output_ml'];
             $obsNotes = trim((string)($_POST['observation_notes'] ?? ''));
-            $obsTime = trim((string)($_POST['observation_time'] ?? ''));
-            $obsTime = $obsTime !== '' ? date('Y-m-d H:i:s', strtotime($obsTime)) : date('Y-m-d H:i:s');
+            $obsTimeRaw = trim((string)($_POST['observation_time'] ?? ''));
+            $obsTime = date('Y-m-d H:i:s');
+            $obsTimeValid = true;
+            if ($obsTimeRaw !== '') {
+                $parsedObservationTime = DateTime::createFromFormat('Y-m-d\\TH:i', $obsTimeRaw);
+                $timeErrors = DateTime::getLastErrors();
+                $obsTimeValid = $parsedObservationTime instanceof DateTime
+                    && (!$timeErrors || (!$timeErrors['warning_count'] && !$timeErrors['error_count']))
+                    && $parsedObservationTime->format('Y-m-d\\TH:i') === $obsTimeRaw;
+                if ($obsTimeValid) $obsTime = $parsedObservationTime->format('Y-m-d H:i:s');
+            }
 
-            if (($pain !== null && ($pain < 0 || $pain > 10)) || ($spo2 !== null && ($spo2 < 0 || $spo2 > 100))) {
-                $message='<div class="alert alert-danger">Pain score must be 0–10 and SpO₂ must be 0–100.</div>';
+            $invalidObservation = !$obsTimeValid
+                || ($temperature !== null && ($temperature < 20 || $temperature > 50))
+                || ($systolic !== null && ($systolic < 0 || $systolic > 350))
+                || ($diastolic !== null && ($diastolic < 0 || $diastolic > 250))
+                || ($systolic !== null && $diastolic !== null && $systolic < $diastolic)
+                || ($pulse !== null && ($pulse < 0 || $pulse > 300))
+                || ($resp !== null && ($resp < 0 || $resp > 100))
+                || ($spo2 !== null && ($spo2 < 0 || $spo2 > 100))
+                || ($pain !== null && ($pain < 0 || $pain > 10))
+                || ($intake !== null && ($intake < 0 || $intake > 100000))
+                || ($output !== null && ($output < 0 || $output > 100000));
+
+            if ($invalidObservation) {
+                $message='<div class="alert alert-danger">Check the observation time and measurement ranges: temperature 20–50°C, systolic BP 0–350, diastolic BP 0–250 (systolic must not be below diastolic), pulse 0–300, respiration 0–100, SpO₂ 0–100, pain 0–10, and intake/output 0–100000 ml.</div>';
             } else {
                 $s=$conn->prepare("INSERT INTO nursing_observations(admission_id,patient_id,observation_time,temperature,systolic_bp,diastolic_bp,pulse,respiration,spo2,pain_score,consciousness,intake_ml,output_ml,observation_notes,recorded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 if($s){
