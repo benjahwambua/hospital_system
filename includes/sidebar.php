@@ -249,11 +249,19 @@ function isParentActive($paths) {
 
         <?php if (can_access_module($conn, 'finance')): ?>
         <div class="menu-title">Finance</div>
-        <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register icon-main"></i> Central Cashier</a>
-        <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>"><i class="fas fa-clock icon-main"></i> Cashier Shift</a>
-        <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock icon-main"></i> Aged Receivables</a>
-        <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt icon-main"></i> Payment History</a>
-        <a href="/hospital_system/cashier/refund.php" class="<?= isActive('cashier/refund.php') ?>"><i class="fas fa-undo icon-main"></i> Refunds</a>
+        <div class="has-submenu <?= isParentActive(['cashier/']) ?>">
+            <a href="#" class="menu-toggle" aria-expanded="<?= isParentActive(['cashier/']) === 'open' ? 'true' : 'false' ?>">
+                <i class="fas fa-cash-register icon-main"></i> Finance
+                <i class="fas fa-chevron-down caret"></i>
+            </a>
+            <div class="submenu">
+                <a href="/hospital_system/cashier/index.php" class="<?= isActive('cashier/index.php') ?>"><i class="fas fa-cash-register"></i> Central Cashier</a>
+                <a href="/hospital_system/cashier/shifts.php" class="<?= isActive('cashier/shifts.php') ?>"><i class="fas fa-clock"></i> Cashier Shift</a>
+                <a href="/hospital_system/cashier/aged_receivables.php" class="<?= isActive('cashier/aged_receivables.php') ?>"><i class="fas fa-user-clock"></i> Aged Receivables</a>
+                <a href="/hospital_system/cashier/payment_history.php" class="<?= isActive('cashier/payment_history.php') ?>"><i class="fas fa-receipt"></i> Payment History</a>
+                <a href="/hospital_system/cashier/refund.php" class="<?= isActive('cashier/refund.php') ?>"><i class="fas fa-undo"></i> Refunds</a>
+            </div>
+        </div>
         <?php endif; ?>
         <?php if (can_access_module($conn, 'administration')): ?>
         <div class="menu-title">Administration</div>
