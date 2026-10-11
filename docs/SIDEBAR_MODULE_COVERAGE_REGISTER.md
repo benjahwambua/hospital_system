@@ -10,6 +10,7 @@ Use this register to distinguish existing pages that need navigation from module
 
 - Repository tree contained 147 PHP files at the previous review; the Staff Rostering and Notifications increments add two PHP pages.
 - 87 explicit sidebar destinations were checked at the previous review; Staff Rostering and Notifications destinations have since been added.
+- Nursing task assignment/completion and shift-handover acknowledgement events now call the notification helper best-effort; inbox migration, permission assignment and runtime verification remain pending.
 - No explicit sidebar destination was missing at the time of review.
 - Existing workflow entry points added during this review:
   - Patient Dashboard: `patients/patient_dashboard.php`
