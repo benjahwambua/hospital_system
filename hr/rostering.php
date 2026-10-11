@@ -16,6 +16,7 @@ $staffCheck = $conn->query("SHOW TABLES LIKE 'hr_staff'");
 $tablesReady = $tableCheck && $tableCheck->num_rows > 0 && $staffCheck && $staffCheck->num_rows > 0;
 $shiftTypes = ['Day','Evening','Night','On-call','Weekend','Other'];
 $statuses = ['Scheduled','Confirmed','Completed','Cancelled'];
+$statusTransitions = ['Scheduled' => ['Confirmed' => 'Confirm', 'Cancelled' => 'Cancel'], 'Confirmed' => ['Completed' => 'Complete', 'Cancelled' => 'Cancel']];
 $e = static fn($value): string => htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
 $parseDateTime = static function(string $value): ?string {
     $date = DateTime::createFromFormat('!Y-m-d\\TH:i', $value);
@@ -33,15 +34,27 @@ if ($tablesReady && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'status') {
             if (!$canEdit) { http_response_code(403); exit('Forbidden: Staff roster edit permission is required.'); }
             $newStatus = (string)($_POST['status'] ?? '');
-            if ($id < 1 || !in_array($newStatus, ['Confirmed','Completed','Cancelled'], true)) {
-                $error = 'The requested roster status is invalid.';
+            $currentStatus = '';
+            if ($id > 0) {
+                $currentStmt = $conn->prepare('SELECT status FROM hr_staff_roster WHERE id=? LIMIT 1');
+                if ($currentStmt) {
+                    $currentStmt->bind_param('i', $id);
+                    $currentStmt->execute();
+                    $currentRow = $currentStmt->get_result()->fetch_assoc();
+                    $currentStmt->close();
+                    $currentStatus = (string)($currentRow['status'] ?? '');
+                }
+            }
+            $allowedTransitions = ['Scheduled' => ['Confirmed','Cancelled'], 'Confirmed' => ['Completed','Cancelled']];
+            if ($id < 1 || !isset($allowedTransitions[$currentStatus]) || !in_array($newStatus, $allowedTransitions[$currentStatus], true)) {
+                $error = 'That roster status transition is not allowed. Refresh the register and try again.';
             } else {
-                $stmt = $conn->prepare("UPDATE hr_staff_roster SET status=?, updated_by=? WHERE id=? AND status <> 'Cancelled'");
+                $stmt = $conn->prepare('UPDATE hr_staff_roster SET status=?, updated_by=? WHERE id=? AND status=?');
                 if ($stmt) {
                     $actor = (int)($_SESSION['user_id'] ?? 0);
-                    $stmt->bind_param('sii', $newStatus, $actor, $id);
-                    if ($stmt->execute() && $stmt->affected_rows >= 0) $message = 'Roster status updated.';
-                    else $error = 'Unable to update the roster status.';
+                    $stmt->bind_param('siis', $newStatus, $actor, $id, $currentStatus);
+                    if ($stmt->execute() && $stmt->affected_rows === 1) $message = 'Roster status updated.';
+                    else $error = 'The roster status changed before this action could be saved. Refresh and try again.';
                     $stmt->close();
                 } else $error = 'Unable to prepare the roster status update.';
             }
@@ -175,7 +188,7 @@ include __DIR__ . '/../includes/sidebar.php';
 </form></section>
 <?php endif; ?>
 <section class="roster-panel"><h2>Roster Register</h2><p class="roster-sub">Shows shifts from the past 30 days through the next 90 days. Overlapping assignments are blocked for the same employee. This register does not replace clock-in attendance capture or clinical staffing approval.</p><div class="roster-table-wrap"><table class="roster-table"><thead><tr><th>Employee</th><th>Department / Role</th><th>Shift</th><th>Start</th><th>End</th><th>Status</th><th>Notes / Actions</th></tr></thead><tbody>
-<?php if ($rosterRows && $rosterRows->num_rows): while($row=$rosterRows->fetch_assoc()): ?><tr><td><span class="roster-name"><?= $e(trim($row['first_name'].' '.$row['middle_name'].' '.$row['last_name'])) ?></span><span class="roster-sub"><?= $e($row['staff_no'] ?: 'No staff number') ?></span></td><td><?= $e($row['department']) ?><span class="roster-sub"><?= $e($row['job_title']) ?></span></td><td><?= $e($row['shift_type']) ?></td><td><?= $e(date('D, d M Y H:i',strtotime($row['start_at']))) ?></td><td><?= $e(date('D, d M Y H:i',strtotime($row['end_at']))) ?></td><td><span class="roster-pill roster-pill-<?= $e($row['status']) ?>"><?= $e($row['status']) ?></span></td><td><?= $e($row['notes'] ?: '—') ?><?php if($canEdit && $row['status']!=='Cancelled'): ?><div class="roster-actions" style="margin-top:8px"><?php if($row['status']!=='Completed'): ?><a class="roster-btn roster-muted" href="?edit=<?= (int)$row['id'] ?>#shift-form">Edit</a><?php endif; ?><?php foreach((['Scheduled'=>['Confirmed','Confirm'],'Confirmed'=>['Completed','Complete'],'Completed'=>['Cancelled','Cancel'],'Cancelled'=>null][$row['status']] ?? null) ? [(['Scheduled'=>['Confirmed','Confirm'],'Confirmed'=>['Completed','Complete'],'Completed'=>['Cancelled','Cancel']][$row['status']])] : [] as $next): ?><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><input type="hidden" name="status" value="<?= $e($next[0]) ?>"><button class="roster-btn roster-muted" type="submit"><?= $e($next[1]) ?></button></form><?php endforeach; ?></div><?php endif; ?></td></tr><?php endwhile; else: ?><tr><td colspan="7">No roster shifts found in this date range. Schedule the first shift above.</td></tr><?php endif; ?>
+<?php if ($rosterRows && $rosterRows->num_rows): while($row=$rosterRows->fetch_assoc()): ?><tr><td><span class="roster-name"><?= $e(trim($row['first_name'].' '.$row['middle_name'].' '.$row['last_name'])) ?></span><span class="roster-sub"><?= $e($row['staff_no'] ?: 'No staff number') ?></span></td><td><?= $e($row['department']) ?><span class="roster-sub"><?= $e($row['job_title']) ?></span></td><td><?= $e($row['shift_type']) ?></td><td><?= $e(date('D, d M Y H:i',strtotime($row['start_at']))) ?></td><td><?= $e(date('D, d M Y H:i',strtotime($row['end_at']))) ?></td><td><span class="roster-pill roster-pill-<?= $e($row['status']) ?>"><?= $e($row['status']) ?></span></td><td><?= $e($row['notes'] ?: '—') ?><?php if($canEdit && $row['status']!=='Cancelled'): ?><div class="roster-actions" style="margin-top:8px"><?php if($row['status']!=='Completed'): ?><a class="roster-btn roster-muted" href="?edit=<?= (int)$row['id'] ?>#shift-form">Edit</a><?php endif; ?><?php if(isset($statusTransitions[$row['status']])): foreach($statusTransitions[$row['status']] as $targetStatus=>$targetLabel): ?><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><input type="hidden" name="status" value="<?= $e($targetStatus) ?>"><button class="roster-btn roster-muted" type="submit"><?= $e($targetLabel) ?></button></form><?php endforeach; endif; ?></div><?php endif; ?></td></tr><?php endwhile; else: ?><tr><td colspan="7">No roster shifts found in this date range. Schedule the first shift above.</td></tr><?php endif; ?>
 </tbody></table></div></section>
 <?php endif; ?>
 </main></div>
