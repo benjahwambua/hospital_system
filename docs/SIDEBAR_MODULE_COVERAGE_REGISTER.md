@@ -53,9 +53,9 @@ The following capabilities were identified in the project planning register as m
 | Referral management | First implementation | `referrals/index.php` provides the dedicated referral lifecycle; apply `database/referral_management_migration.sql`, assign `referrals` view/create/edit permissions and complete workflow/UAT validation |
 | Diagnosis / ICD-10 coding | First implementation | `diagnosis/index.php` provides visit-linked coded diagnoses and catalogue maintenance; apply `database/diagnosis_coding_migration.sql`, load an approved code set and assign `diagnosis` view/create/edit permissions |
 | Procedure coding | First implementation | `procedure_coding/index.php` provides visit-linked procedure records and catalogue maintenance; apply `database/procedure_coding_migration.sql`, load approved code set and assign `procedure_coding` view/create/edit permissions |
-| Staff master / HR | In progress | `hr/index.php` provides a permission-gated employee register; run `database/hr_staff_master_migration.sql`, then assign `hr_staff` permissions to authorized users. Credentials, documents, payroll and rostering are not implemented yet |
-| Staff rostering | Not implemented | Add roster page when workflow exists |
-| Notifications and escalation | Not implemented | Add notification centre when functional |
+| Staff master / HR | In progress | `hr/index.php` provides a permission-gated employee register; run `database/hr_staff_master_migration.sql`, then assign `hr_staff` permissions to authorized users. Credentials, contracts, offboarding and rostering have first implementations; protected document storage, payroll and UAT remain |
+| Staff rostering | First implementation | `hr/rostering.php` schedules shifts and checks overlaps; migration, coverage rules, integrations and UAT remain |
+| Notifications and escalation | First implementation | `notifications/index.php` provides a permission-gated personal inbox; roster alerts and assigned nursing-task alerts are implemented on `feature/notifications-work-queues`. Apply `database/notifications_migration.sql` after access control; broader event coverage and UAT remain |
 | Patient portal | Not implemented | Keep out of staff navigation until implemented and access model is defined |
 | SMS / Email communications | Not implemented as a governed module | Add communications centre when built |
 | External healthcare integrations / governed API | Not implemented | Admin-only integration settings and API status when built |
