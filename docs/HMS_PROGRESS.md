@@ -1,6 +1,6 @@
 # HMS Gap Closure Progress
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 These percentages are **engineering completion estimates**, not UAT certification. A module only reaches 100% after its workflow is implemented, authorized, audited, reported, error-handled and verified in UAT.
 
@@ -10,7 +10,7 @@ These percentages are **engineering completion estimates**, not UAT certificatio
 | Explicit per-user permissions | 90% | View/Create/Edit/Delete/Approve engine active; legacy role gates largely retired | Verify every existing user assignment; remove remaining compatibility assumptions |
 | Insurance & SHA | 87% | Coverage, verification, preauthorization, claims, submission, remittances/reconciliation and an auditable denial/appeal register are implemented in code | Deeper eligibility/tariff validation, automated claim/payment reconciliation controls, target database migration rollout and UAT |
 | Inpatient / Ward | 85% | Admission, bed allocation, occupancy, transactional/audited transfers, configurable ward/bed register, transfer history, daily-charge posting ledger and discharge-readiness confirmations are implemented in code | Apply/reconcile required migrations in the target database, validate ward/bed mapping and daily-charge tariffs, confirm discharge controls in UAT, and complete operational reporting |
-| Nursing | 85% | Active inpatient nursing station, observations, notes, assigned/overdue tasks, approval-controlled care plans with overdue-review flags, distinct-shift handover validation with separate-user acknowledgement audit display, and prescription/dispense-linked MAR with scheduled-dose timestamps, duplicate-slot guard, and required allergy-review status/time/user accountability are implemented in code | A real medication-order schedule and due-dose queue, automated allergy/interaction decision support, staff roster and shift coverage, escalation/notifications, MAR migrations applied/reconciled in target DB, and UAT |
+| Nursing | 85% | Active inpatient nursing station, observations, notes, assigned/overdue tasks, approval-controlled care plans, structured shift handover and prescription/dispense-linked MAR with scheduled-dose and allergy-review accountability are implemented in code | Medication-order schedule and due-dose queue, roster-to-nursing assignment integration, automated allergy/interaction decision support, escalation/notifications, target DB migration reconciliation and UAT |
 | Central Stores | 72% | Item/location register, movement ledger, multi-item requisitions, procurement GRN receipts, independent physical-count approval, lot-level count snapshots and variances, FEFO requisition issues, lot-aware transfers and signed batch/expiry on-hand balances | Reconcile legacy untracked stock and historic lot gaps, valuation, wider department integration, automated regression tests and UAT |
 | Emergency / Casualty | 35% | First intake and triage queue merged; linked visit, acuity, initial observations, clinician assignment and disposition are implemented in code | Clinical protocols, repeat-observation escalation, admission/bed and billing integration, and UAT |
 | Theatre / Surgery | 30% | First scheduling and peri-operative tracking increment implemented in code with a six-item safety gate, guarded lifecycle, intra-op/anaesthesia notes and recovery outcome | Full surgical checklist and documentation, implant/lot tracking, PACU observations, admission/billing/stock integration, and UAT |
@@ -146,3 +146,8 @@ Diagnosis Coding first increment is on `feature/diagnosis-coding`; PHP Syntax Au
 ## Procedure coding build-out note (2026-10-10)
 
 Procedure Coding first increment is on `feature/procedure-coding`; PHP Syntax Audit must pass before merge. The code catalogue is empty by design, and standard fees do not trigger billing. Official code-set import, tariff governance, and live database/UAT verification remain outstanding.
+
+
+## Staff rostering first implementation (2026-10-11)
+
+Added `hr/rostering.php` using the shared header/sidebar/footer shell and a permission-gated `staff_roster` module. The register schedules shifts for active HR staff, captures shift type and handover/coverage notes, supports editing, and exposes guarded Scheduled → Confirmed → Completed or Cancelled transitions. Server-side validation rejects invalid date ranges and overlapping non-cancelled shifts for the same employee. Migration: `database/hr_staff_rostering_migration.sql`, applied after `database/hr_staff_master_migration.sql`; assign per-user access explicitly after reviewing the permission matrix. This is a first engineering increment, not proof of minimum staffing, ward coverage, attendance, or clinical approval. No PHP runtime, database migration, functional test or UAT has been performed in this session.
