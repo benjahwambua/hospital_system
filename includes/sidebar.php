@@ -163,7 +163,7 @@ function isParentActive($paths) {
         <?php endif; ?>
 
         <?php if (can_access_module($conn, 'maternity')): ?>
-        <div class="has-submenu <?= isParentActive(['maternity/index.php','maternity/add.php','maternity/antenatal.php','maternity/postnatal.php','maternity/deliveries.php','maternity/delivery_records.php','maternity/visit_history.php','maternity/admissions.php','maternity/stats.php']) ?>">
+        <div class="has-submenu <?= isParentActive(['maternity/index.php','maternity/add.php','maternity/antenatal.php','maternity/postnatal.php','maternity/deliveries.php','maternity/delivery_records.php','maternity/visit_history.php','maternity/admissions.php','maternity/stats.php','maternity/partograph.php']) ?>">
             <a href="#" class="menu-toggle" aria-expanded="false">
                 <i class="fas fa-baby icon-main"></i> Maternity
                 <i class="fas fa-chevron-down caret"></i>
@@ -177,6 +177,7 @@ function isParentActive($paths) {
                 <a href="/hospital_system/maternity/delivery_records.php" class="<?= isActive('maternity/delivery_records.php') ?>"><i class="fas fa-clipboard-list"></i> Delivery Records</a>
                 <a href="/hospital_system/maternity/visit_history.php" class="<?= isActive('maternity/visit_history.php') ?>"><i class="fas fa-history"></i> Maternity Visit History</a>
                 <a href="/hospital_system/maternity/admissions.php" class="<?= isActive('maternity/admissions.php') ?>"><i class="fas fa-procedures"></i> Admissions</a>
+                <a href="/hospital_system/maternity/partograph.php" class="<?= isActive('maternity/partograph.php') ?>"><i class="fas fa-chart-line"></i> Labour Partograph</a>
                 <a href="/hospital_system/maternity/stats.php" class="<?= isActive('maternity/stats.php') ?>"><i class="fas fa-chart-bar"></i> Reports</a>
             </div>
         </div>
