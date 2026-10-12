@@ -5,9 +5,12 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'maternity', 'view');
 
-$total=(int)($conn->query("SELECT COUNT(*) c FROM maternity")?->fetch_assoc()['c']??0);
-$deliveries=(int)($conn->query("SELECT COUNT(*) c FROM maternity_delivery")?->fetch_assoc()['c']??0);
-$babies=(int)($conn->query("SELECT COUNT(*) c FROM maternity_baby")?->fetch_assoc()['c']??0);
+$totalResult=$conn->query("SELECT COUNT(*) c FROM maternity");
+$total=(int)($totalResult ? ($totalResult->fetch_assoc()['c']??0) : 0);
+$deliveryCountResult=$conn->query("SELECT COUNT(*) c FROM maternity_delivery");
+$deliveries=(int)($deliveryCountResult ? ($deliveryCountResult->fetch_assoc()['c']??0) : 0);
+$babyCountResult=$conn->query("SELECT COUNT(*) c FROM maternity_baby");
+$babies=(int)($babyCountResult ? ($babyCountResult->fetch_assoc()['c']??0) : 0);
 $monthlyLabels=[];$monthlyValues=[];
 $monthly=$conn->query("SELECT DATE_FORMAT(created_at,'%b %Y') label,DATE_FORMAT(created_at,'%Y-%m') sort_key,COUNT(*) total FROM maternity_delivery GROUP BY sort_key,label ORDER BY sort_key DESC LIMIT 12");
 if($monthly){$rows=[];while($row=$monthly->fetch_assoc())$rows[]=$row;foreach(array_reverse($rows) as $row){$monthlyLabels[]=$row['label'];$monthlyValues[]=(int)$row['total'];}}
