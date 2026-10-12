@@ -25,7 +25,7 @@ foreach ($matRows as $matRow) if ((int)$matRow['id'] === $maternityId) { $select
 if ($maternityId > 0 && !$selected) { http_response_code(404); exit('Registered maternity record not found.'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!$canCreate && !$canEdit) { http_response_code(403); exit('You do not have permission to record labour observations.'); }
+    if (!$canCreate) { http_response_code(403); exit('You do not have permission to record labour observations.'); }
     if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
         $error = 'Security token mismatch. Refresh the page and try again.';
     } elseif (!$selected) {
@@ -100,7 +100,8 @@ if ($selected) {
 }
 $chartLabels = []; $dilatation = []; $fhrValues = []; $contractionValues = [];
 foreach ($observations as $o) {
-    $chartLabels[] = date('d M H:i', strtotime($o['observed_at']));
+    $elapsedMinutes = max(0, (int)floor((strtotime($o['observed_at']) - strtotime($o['labour_start'])) / 60));
+    $chartLabels[] = sprintf('%dh %02dm', intdiv($elapsedMinutes, 60), $elapsedMinutes % 60);
     $dilatation[] = $o['cervical_dilatation'] === null ? null : (float)$o['cervical_dilatation'];
     $fhrValues[] = $o['fetal_heart_rate'] === null ? null : (int)$o['fetal_heart_rate'];
     $contractionValues[] = $o['contractions_per_10min'] === null ? null : (int)$o['contractions_per_10min'];
