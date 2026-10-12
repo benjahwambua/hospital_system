@@ -59,6 +59,7 @@ include __DIR__ . '/../includes/sidebar.php';
       <a href="admissions.php<?= $patientId ? "?patient_id=".$patientId : "" ?>"><i class="fas fa-procedures"></i><span>Maternity Admissions</span></a>
       <a href="antenatal.php<?= $patientId ? "?patient_id=".$patientId : "" ?>"><i class="fas fa-heartbeat"></i><span>ANC Clinic</span></a>
       <a href="postnatal.php<?= $patientId ? "?patient_id=".$patientId : "" ?>"><i class="fas fa-female"></i><span>PNC Clinic</span></a>
+      <a href="partograph.php<?= $patientId ? "?maternity_id=".$patientId : "" ?>"><i class="fas fa-chart-line"></i><span>Labour Partograph</span></a>
       <a href="stats.php"><i class="fas fa-chart-bar"></i><span>Maternity Reports</span></a>
     </div></div></div>
   </div>
