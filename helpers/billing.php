@@ -310,9 +310,9 @@ function get_or_create_current_visit($conn, int $patient_id, string $visitType =
         return 0;
     }
 
-    $stmt = $conn->prepare("SELECT id FROM visits WHERE patient_id = ? AND visit_date = CURDATE() AND status IN ('Open','In Progress') ORDER BY id DESC LIMIT 1");
+    $stmt = $conn->prepare("SELECT id FROM visits WHERE patient_id = ? AND visit_date = CURDATE() AND status IN ('Open','In Progress') AND visit_type = ? AND clinic_category = ? ORDER BY id DESC LIMIT 1");
     if ($stmt) {
-        $stmt->bind_param('i', $patient_id);
+        $stmt->bind_param('iss', $patient_id, $visitType, $clinicCategory);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
