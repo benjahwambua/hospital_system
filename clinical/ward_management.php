@@ -150,10 +150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
 
                     $cols = [];
                     $has = $conn->query("SHOW COLUMNS FROM admissions");
-                    if ($has) {
-                        while ($col = $has->fetch_assoc()) {
-                            $cols[$col['Field']] = true;
-                        }
+                    if (!$has) throw new Exception('Unable to inspect admission discharge fields.');
+                    while ($col = $has->fetch_assoc()) {
+                        $cols[$col['Field']] = true;
                     }
 
                     $set = ["status='Discharged'"];
@@ -216,7 +215,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
 
                     $visitId = (int)($dischargeAdmission['visit_id'] ?? 0);
                     $appointmentCols = $conn->query("SHOW COLUMNS FROM appointments LIKE 'visit_id'");
-                    if ($visitId > 0 && $appointmentCols && $appointmentCols->num_rows > 0) {
+                    if (!$appointmentCols) throw new Exception('Unable to inspect appointment linkage for discharge.');
+                    if ($visitId > 0 && $appointmentCols->num_rows > 0) {
                         $a = $conn->prepare("UPDATE appointments SET status='Closed' WHERE patient_id=? AND visit_id=? AND status NOT IN ('Closed','Cancelled','Completed')");
                         if (!$a) throw new Exception('Unable to prepare linked appointment closure.');
                         $a->bind_param('ii', $dischargeAdmission['patient_id'], $visitId);
@@ -229,7 +229,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
                     }
 
                     $mcol = $conn->query("SHOW COLUMNS FROM maternity_admissions LIKE 'admission_id'");
-                    if ($mcol && $mcol->num_rows > 0) {
+                    if (!$mcol) throw new Exception('Unable to inspect maternity linkage for discharge.');
+                    if ($mcol->num_rows > 0) {
                         $m = $conn->prepare("UPDATE maternity_admissions SET status='Discharged' WHERE admission_id=? AND status<>'Discharged'");
                         if (!$m) throw new Exception('Unable to prepare linked maternity discharge update.');
                         $m->bind_param('i', $dischargeId);
