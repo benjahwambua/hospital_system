@@ -29,7 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $conn->begin_transaction();
     $lock=$conn->prepare('SELECT status FROM emergency_cases WHERE id=? FOR UPDATE');
     if(!$lock) throw new RuntimeException('Could not prepare case lock.');
-    $lock->bind_param('i',$caseId); $lock->execute(); $state=$lock->get_result()->fetch_assoc(); $lock->close();
+    $lock->bind_param('i',$caseId);
+    if(!$lock->execute()) { $lockError=$lock->error; $lock->close(); throw new RuntimeException('Could not verify emergency case status: '.$lockError); }
+    $state=$lock->get_result()->fetch_assoc(); $lock->close();
     if(!$state) throw new InvalidArgumentException('Emergency case not found.');
     if(in_array($state['status'],['Admitted','Discharged','Transferred','Left Before Assessment','Cancelled'],true)) throw new InvalidArgumentException('Repeat observations cannot be added to a closed case.');
     $tv=$temp!==''?(float)$temp:null; $sv=$sys!==''?(int)$sys:null; $dv=$dia!==''?(int)$dia:null;
@@ -37,7 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ins=$conn->prepare('INSERT INTO emergency_observations (case_id,temperature_c,systolic_bp,diastolic_bp,pulse_bpm,respiratory_rate,oxygen_saturation,pain_score,notes,recorded_by) VALUES (?,?,?,?,?,?,?,?,?,?)');
     if(!$ins) throw new RuntimeException('Could not prepare observation insert.');
     $ins->bind_param('idiiiidisi',$caseId,$tv,$sv,$dv,$pv,$rv,$ov,$painv,$nv,$actor);
-    $ins->execute(); $ins->close();
+    if(!$ins->execute()) { $insertError=$ins->error; $ins->close(); throw new RuntimeException('Could not save emergency observations: '.$insertError); }
+    $ins->close();
     if(function_exists('audit')) audit('emergency_observation_recorded','case_id='.$caseId);
     $conn->commit(); $message='Repeat observations recorded.';
    } catch(Throwable $ex) {
