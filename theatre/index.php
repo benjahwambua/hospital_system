@@ -100,8 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Invalid theatre case or status.';
         } elseif ($targetStatus === 'In Theatre' && in_array(0, $checks, true)) {
             $error = 'The patient-safety gate is incomplete. Confirm consent, identity, site, allergies, fasting and anesthesia review before starting theatre.';
-        } elseif ($targetStatus === 'Completed' && ($recovery === '' || !in_array($outcome, ['Recovered','Transferred','Admitted','Other'], true))) {
-            $error = 'To complete a case, record recovery notes and a valid post-operative outcome.';
+        } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($recovery === '' || !in_array($outcome, ['Recovered','Transferred','Admitted','Other'], true))) {
+            $error = 'Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.';
         } elseif ($targetStatus === 'Cancelled' && $cancelReason === '') {
             $error = 'A cancellation reason is required.';
         } else {
@@ -212,7 +212,7 @@ include __DIR__ . '/../includes/sidebar.php';
           </div>
           <label for="status_<?= (int)$c['id'] ?>">Case status</label><select id="status_<?= (int)$c['id'] ?>" name="status"><?php foreach(['Planned','Pre-op','In Theatre','Recovery','Completed','Cancelled'] as $st): if($st===$c['status'] || in_array($st,(['Planned'=>['Planned','Pre-op','Cancelled'],'Pre-op'=>['Pre-op','Planned','In Theatre','Cancelled'],'In Theatre'=>['In Theatre','Recovery'],'Recovery'=>['Recovery','Completed']][$c['status']]??[]),true)): ?><option value="<?= theatre_h($st) ?>" <?= $st===$c['status']?'selected':'' ?>><?= theatre_h($st) ?></option><?php endif; endforeach; ?></select>
           <label>Intra-operative notes</label><textarea name="intraoperative_notes" maxlength="5000"><?= theatre_h($c['intraoperative_notes']) ?></textarea><label>Anaesthesia notes</label><textarea name="anesthesia_notes" maxlength="3000"><?= theatre_h($c['anesthesia_notes']) ?></textarea>
-          <label>Recovery notes (required to complete)</label><textarea name="recovery_notes" maxlength="4000"><?= theatre_h($c['recovery_notes']) ?></textarea><label>Post-operative outcome</label><select name="outcome"><option value="">Select outcome</option><?php foreach(['Recovered','Transferred','Admitted','Other'] as $o): ?><option value="<?= theatre_h($o) ?>" <?= $c['outcome']===$o?'selected':'' ?>><?= theatre_h($o) ?></option><?php endforeach; ?></select>
+          <label>Recovery / handover notes (required for recovery and completion)</label><textarea name="recovery_notes" maxlength="4000"><?= theatre_h($c['recovery_notes']) ?></textarea><label>Post-operative outcome</label><select name="outcome"><option value="">Select outcome</option><?php foreach(['Recovered','Transferred','Admitted','Other'] as $o): ?><option value="<?= theatre_h($o) ?>" <?= $c['outcome']===$o?'selected':'' ?>><?= theatre_h($o) ?></option><?php endforeach; ?></select>
           <label>Cancellation reason (required to cancel)</label><textarea name="cancellation_reason" maxlength="1000"><?= theatre_h($c['cancellation_reason']) ?></textarea><button class="theatre-btn" type="submit">Save case update</button>
         </form></details><?php else: ?><span class="theatre-muted"><?= in_array($c['status'],['Completed','Cancelled'],true)?'Case closed':($canEdit?'':'Edit permission required') ?></span><?php endif; ?>
       </td></tr>
