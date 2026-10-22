@@ -138,6 +138,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
             } else {
                 $conn->begin_transaction();
                 try {
+                    // Re-read and lock the admission inside the transaction to prevent concurrent discharge/transfer races.
+                    $lock = $conn->prepare("SELECT a.*, p.full_name, p.patient_number FROM admissions a JOIN patients p ON p.id=a.patient_id WHERE a.id=? LIMIT 1 FOR UPDATE");
+                    if (!$lock) throw new Exception('Unable to lock admission for discharge.');
+                    $lock->bind_param('i', $dischargeId);
+                    if (!$lock->execute()) throw new Exception('Unable to verify admission before discharge.');
+                    $lockedAdmission = $lock->get_result()->fetch_assoc();
+                    $lock->close();
+                    if (!$lockedAdmission || ($lockedAdmission['status'] ?? '') !== 'Admitted') throw new Exception('This admission is no longer active. Refresh and try again.');
+                    $dischargeAdmission = $lockedAdmission;
+
                     $cols = [];
                     $has = $conn->query("SHOW COLUMNS FROM admissions");
                     if ($has) {
@@ -194,32 +204,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_discharge']))
 
                     if (!empty($dischargeAdmission['visit_id'])) {
                         $v = $conn->prepare("UPDATE visits SET status='Completed', updated_at=NOW() WHERE id=? AND patient_id=? AND status<>'Cancelled'");
-                        if ($v) {
-                            $v->bind_param('ii', $dischargeAdmission['visit_id'], $dischargeAdmission['patient_id']);
-                            $v->execute();
+                        if (!$v) throw new Exception('Unable to prepare linked visit completion.');
+                        $v->bind_param('ii', $dischargeAdmission['visit_id'], $dischargeAdmission['patient_id']);
+                        if (!$v->execute()) {
+                            $error = $v->error;
                             $v->close();
+                            throw new Exception('Unable to complete linked visit: ' . $error);
                         }
+                        $v->close();
                     }
 
                     $visitId = (int)($dischargeAdmission['visit_id'] ?? 0);
                     $appointmentCols = $conn->query("SHOW COLUMNS FROM appointments LIKE 'visit_id'");
                     if ($visitId > 0 && $appointmentCols && $appointmentCols->num_rows > 0) {
                         $a = $conn->prepare("UPDATE appointments SET status='Closed' WHERE patient_id=? AND visit_id=? AND status NOT IN ('Closed','Cancelled','Completed')");
-                        if ($a) {
-                            $a->bind_param('ii', $dischargeAdmission['patient_id'], $visitId);
-                            $a->execute();
+                        if (!$a) throw new Exception('Unable to prepare linked appointment closure.');
+                        $a->bind_param('ii', $dischargeAdmission['patient_id'], $visitId);
+                        if (!$a->execute()) {
+                            $error = $a->error;
                             $a->close();
+                            throw new Exception('Unable to close linked appointments: ' . $error);
                         }
+                        $a->close();
                     }
 
                     $mcol = $conn->query("SHOW COLUMNS FROM maternity_admissions LIKE 'admission_id'");
                     if ($mcol && $mcol->num_rows > 0) {
                         $m = $conn->prepare("UPDATE maternity_admissions SET status='Discharged' WHERE admission_id=? AND status<>'Discharged'");
-                        if ($m) {
-                            $m->bind_param('i', $dischargeId);
-                            $m->execute();
+                        if (!$m) throw new Exception('Unable to prepare linked maternity discharge update.');
+                        $m->bind_param('i', $dischargeId);
+                        if (!$m->execute()) {
+                            $error = $m->error;
                             $m->close();
+                            throw new Exception('Unable to update linked maternity admission: ' . $error);
                         }
+                        $m->close();
                     }
 
                     if (function_exists('audit')) {
