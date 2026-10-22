@@ -62,19 +62,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: ward_configuration.php'); exit;
             } elseif ($action === 'toggle_bed') {
                 $bedId = (int)($_POST['bed_id'] ?? 0);
-                $stmt = $conn->prepare("SELECT b.id,b.bed_number,b.is_active,w.name AS ward_name FROM inpatient_beds b JOIN inpatient_wards w ON w.id=b.ward_id WHERE b.id=? LIMIT 1");
-                $stmt->bind_param('i', $bedId); $stmt->execute(); $bed = $stmt->get_result()->fetch_assoc(); $stmt->close();
-                if (!$bed) throw new RuntimeException('Bed not found.');
-                if ((int)$bed['is_active'] === 1) {
-                    $stmt = $conn->prepare("SELECT id FROM admissions WHERE status='Admitted' AND ward_name=? AND bed_number=? LIMIT 1");
-                    $stmt->bind_param('si', $bed['ward_name'], $bed['bed_number']); $stmt->execute(); $occupied = $stmt->get_result()->fetch_assoc(); $stmt->close();
-                    if ($occupied) throw new RuntimeException('An occupied bed cannot be deactivated. Transfer or discharge the patient first.');
+                if ($bedId <= 0) throw new RuntimeException('Select a valid bed.');
+                $conn->begin_transaction();
+                try {
+                    // Lock the canonical bed row first, matching the admission and transfer workflows.
+                    $stmt = $conn->prepare("SELECT b.id,b.bed_number,b.is_active,w.name AS ward_name,w.is_active AS ward_active FROM inpatient_beds b JOIN inpatient_wards w ON w.id=b.ward_id WHERE b.id=? LIMIT 1 FOR UPDATE");
+                    if (!$stmt) throw new RuntimeException('Unable to lock bed configuration.');
+                    $stmt->bind_param('i', $bedId);
+                    if (!$stmt->execute()) throw new RuntimeException('Unable to load bed configuration.');
+                    $bed = $stmt->get_result()->fetch_assoc();
+                    $stmt->close();
+                    if (!$bed) throw new RuntimeException('Bed not found.');
+
+                    $next = (int)$bed['is_active'] === 1 ? 0 : 1;
+                    if ($next === 1 && (int)$bed['ward_active'] !== 1) {
+                        throw new RuntimeException('Activate the ward before activating one of its beds.');
+                    }
+                    if ($next === 0) {
+                        $stmt = $conn->prepare("SELECT id FROM admissions WHERE status='Admitted' AND ward_name=? AND bed_number=? LIMIT 1 FOR UPDATE");
+                        if (!$stmt) throw new RuntimeException('Unable to verify bed occupancy.');
+                        $stmt->bind_param('si', $bed['ward_name'], $bed['bed_number']);
+                        if (!$stmt->execute()) throw new RuntimeException('Unable to verify bed occupancy.');
+                        $occupied = $stmt->get_result()->fetch_assoc();
+                        $stmt->close();
+                        if ($occupied) throw new RuntimeException('An occupied bed cannot be deactivated. Transfer or discharge the patient first.');
+                    }
+                    $stmt = $conn->prepare("UPDATE inpatient_beds SET is_active=? WHERE id=?");
+                    if (!$stmt) throw new RuntimeException('Unable to prepare bed status update.');
+                    $stmt->bind_param('ii', $next, $bedId);
+                    if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+                        $stmt->close();
+                        throw new RuntimeException('Unable to update bed status.');
+                    }
+                    $stmt->close();
+                    $conn->commit();
+                } catch (Throwable $e) {
+                    $conn->rollback();
+                    throw $e;
                 }
-                $next = (int)$bed['is_active'] === 1 ? 0 : 1;
-                $stmt = $conn->prepare("UPDATE inpatient_beds SET is_active=? WHERE id=?");
-                $stmt->bind_param('ii', $next, $bedId);
-                if (!$stmt->execute()) throw new RuntimeException('Unable to update bed status.');
-                $stmt->close();
                 if (function_exists('audit')) audit('inpatient_bed_status_changed', "ward={$bed['ward_name']},bed={$bed['bed_number']},active={$next}");
                 $_SESSION['msg_success'] = 'Bed status updated.';
                 header('Location: ward_configuration.php'); exit;
