@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $conn->prepare($sql);
                 if (!$stmt) throw new RuntimeException('Unable to prepare the case update. Confirm the theatre migration.');
                 $stmt->bind_param('iiiiiissssssssii', $checks['consent_confirmed'],$checks['identity_confirmed'],$checks['site_marked'],$checks['allergies_reviewed'],$checks['fasting_confirmed'],$checks['anesthesia_reviewed'],$intraop,$anesthesia,$recoverySql,$outcomeSql,$cancelSql,$targetStatus,$startSql,$endSql,$uid,$caseId);
-                if (!$stmt->execute()) throw new RuntimeException('The theatre case update failed.');
+                if (!$stmt->execute()) { $dbError = $stmt->error; $stmt->close(); throw new RuntimeException('The theatre case update failed. ' . $dbError); }
                 $stmt->close();
                 $conn->commit();
                 if (function_exists('audit')) audit('theatre_case_updated', 'case_id='.$caseId.',from='.$oldStatus.',to='.$targetStatus);
