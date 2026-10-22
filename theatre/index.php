@@ -97,6 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lock->bind_param('i', $caseId); $lock->execute(); $current = $lock->get_result()->fetch_assoc(); $lock->close();
                 if (!$current) throw new RuntimeException('Theatre case was not found.');
                 $oldStatus = (string)$current['status'];
+                if (in_array($oldStatus, ['Completed','Cancelled'], true)) {
+                    throw new RuntimeException('This theatre case is closed and cannot be edited. Create a documented follow-up workflow if further action is required.');
+                }
                 $transitions = [
                     'Planned' => ['Planned','Pre-op','Cancelled'],
                     'Pre-op' => ['Pre-op','Planned','In Theatre','Cancelled'],
