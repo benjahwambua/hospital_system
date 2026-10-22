@@ -100,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Invalid theatre case or status.';
         } elseif ($targetStatus === 'In Theatre' && in_array(0, $checks, true)) {
             $error = 'The patient-safety gate is incomplete. Confirm consent, identity, site, allergies, fasting and anesthesia review before starting theatre.';
+        } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($intraop === '' || $anesthesia === '')) {
+            $error = 'Before handing over to recovery or completing the case, record both intra-operative findings and anaesthesia notes.';
         } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($recovery === '' || !in_array($outcome, ['Recovered','Transferred','Admitted','Other'], true))) {
             $error = 'Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.';
         } elseif ($targetStatus === 'Cancelled' && $cancelReason === '') {
