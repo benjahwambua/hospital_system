@@ -24,7 +24,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     try{
      $active=$conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1 FOR UPDATE");$active->bind_param('i',$pid);$active->execute();$activeAdmission=$active->get_result()->fetch_assoc();$active->close();
      if($activeAdmission)throw new Exception('This patient already has an active inpatient admission.');
-     $bedCheck=$conn->prepare("SELECT id FROM admissions WHERE ward_name='Maternity Ward' AND bed_number=? AND status='Admitted' LIMIT 1 FOR UPDATE");$bedCheck->bind_param('i',$bed);$bedCheck->execute();$occupied=$bedCheck->get_result()->fetch_assoc();$bedCheck->close();
+     $bedLock=$conn->prepare("SELECT b.id FROM inpatient_beds b JOIN inpatient_wards w ON w.id=b.ward_id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1 FOR UPDATE");if(!$bedLock)throw new Exception('Unable to lock the selected maternity bed.');$bedLock->bind_param('si',$ward,$bed);$bedLock->execute();$lockedBed=$bedLock->get_result()->fetch_assoc();$bedLock->close();if(!$lockedBed)throw new Exception('The selected maternity bed is no longer active. Refresh and try again.');
+     $bedCheck=$conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' LIMIT 1 FOR UPDATE");if(!$bedCheck)throw new Exception('Unable to check maternity bed occupancy.');$bedCheck->bind_param('si',$ward,$bed);$bedCheck->execute();$occupied=$bedCheck->get_result()->fetch_assoc();$bedCheck->close();
      if($occupied)throw new Exception('That maternity bed is already occupied.');
      $visitId=get_or_create_current_visit($conn,$pid,'Inpatient','Maternity',0);if($visitId<=0)throw new Exception('Unable to create the inpatient patient visit.');
      $status='Admitted';$wardCanonical='Maternity Ward';$admitDate=date('Y-m-d H:i:s');$userId=(int)($_SESSION['user_id']??0);
@@ -35,7 +36,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
      $matStmt=$conn->prepare("INSERT INTO maternity_admissions (patient_id,admission_id,visit_id,admission_date,ward,status,note) VALUES (?,?,?,NOW(),?,'Admitted',?)");
      if(!$matStmt)throw new Exception('Maternity linkage is unavailable. Run the clinical IPD migration first.');$matStmt->bind_param('iiiss',$pid,$admissionId,$visitId,$ward,$note);if(!$matStmt->execute())throw new Exception('Unable to create maternity admission.');$matStmt->close();
      $visitStmt=$conn->prepare("UPDATE visits SET visit_type='Inpatient',clinic_category='Maternity',status='In Progress',updated_at=NOW() WHERE id=? AND patient_id=?");
-     if($visitStmt){$visitStmt->bind_param('ii',$visitId,$pid);if(!$visitStmt->execute())throw new Exception('Unable to update the inpatient visit.');$visitStmt->close();}
+     if(!$visitStmt)throw new Exception('Unable to prepare the inpatient visit update.');$visitStmt->bind_param('ii',$visitId,$pid);if(!$visitStmt->execute())throw new Exception('Unable to update the inpatient visit.');$visitStmt->close();
      if(function_exists('audit'))audit('maternity_admission',"admission_id={$admissionId},visit_id={$visitId},patient_id={$pid},ward={$ward},bed={$bed}");
      $conn->commit();header('Location: admissions.php?success=1');exit;
     }catch(Throwable $e){$conn->rollback();error_log('HMS maternity admission error: '.$e->getMessage());$error='Unable to admit the patient right now. Please verify the admission details and try again.';}
