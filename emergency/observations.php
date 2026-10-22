@@ -65,7 +65,7 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
   <?php if($error!==''): ?><div class="alert alert-danger"><?= $e($error) ?></div><?php endif; ?>
   <?php if($message!==''): ?><div class="alert alert-success"><?= $e($message) ?></div><?php endif; ?>
  </div></div>
- <?php if($canRecord&&!in_array($case['status'],['Discharged','Transferred','Left Before Assessment','Cancelled'],true)): ?>
+ <?php if($canRecord&&!in_array($case['status'],['Admitted','Discharged','Transferred','Left Before Assessment','Cancelled'],true)): ?>
  <div class="card mb-3"><div class="card-header font-weight-bold">Record follow-up observations</div><div class="card-body">
   <form method="post"><input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>"><input type="hidden" name="case_id" value="<?= (int)$caseId ?>">
    <div class="form-row">
