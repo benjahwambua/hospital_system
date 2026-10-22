@@ -34,6 +34,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   else{
    $conn->begin_transaction();
    try{
+    // Lock the canonical bed row first. This serializes concurrent admissions targeting the same bed.
+    $bedLock=$conn->prepare("SELECT b.id FROM inpatient_wards w JOIN inpatient_beds b ON b.ward_id=w.id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1 FOR UPDATE");
+    if(!$bedLock)throw new Exception('Unable to lock the selected bed.');
+    $bedLock->bind_param('si',$ward,$bed);$bedLock->execute();$lockedBed=$bedLock->get_result()->fetch_assoc();$bedLock->close();
+    if(!$lockedBed)throw new Exception('The selected bed is no longer active or available. Refresh the ward register and try again.');
     $s=$conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' LIMIT 1 FOR UPDATE");if(!$s)throw new Exception('Unable to check bed availability.');$s->bind_param('si',$ward,$bed);$s->execute();$occupied=$s->get_result()->fetch_assoc();$s->close();if($occupied)throw new Exception("Bed {$bed} in {$ward} is occupied.");
     $s=$conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1 FOR UPDATE");if(!$s)throw new Exception('Unable to check existing admission.');$s->bind_param('i',$patientId);$s->execute();$already=$s->get_result()->fetch_assoc();$s->close();if($already)throw new Exception('This patient already has an active admission.');
     $visitId=get_or_create_current_visit($conn,$patientId,'Inpatient',$ward);$hasVisitColumn=false;$vc=$conn->query("SHOW COLUMNS FROM admissions LIKE 'visit_id'");if($vc&&$vc->num_rows)$hasVisitColumn=true;
