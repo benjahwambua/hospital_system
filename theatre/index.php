@@ -131,7 +131,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $lock = $conn->prepare('SELECT id,status,surgeon_id,anesthetist_id FROM theatre_cases WHERE id=? FOR UPDATE');
                 if (!$lock) throw new RuntimeException('Unable to lock the theatre case.');
-                $lock->bind_param('i', $caseId); $lock->execute(); $current = $lock->get_result()->fetch_assoc(); $lock->close();
+                $lock->bind_param('i', $caseId);
+                if (!$lock->execute()) {
+                    $dbError = $lock->error;
+                    $lock->close();
+                    throw new RuntimeException('Unable to load and lock the theatre case. ' . $dbError);
+                }
+                $current = $lock->get_result()->fetch_assoc();
+                $lock->close();
                 if (!$current) throw new RuntimeException('Theatre case was not found.');
                 $oldStatus = (string)$current['status'];
                 if ($targetStatus === 'In Theatre') {
@@ -143,7 +150,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $staffCheck = $conn->prepare("SELECT COUNT(*) active_count FROM users WHERE id IN (?,?) AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled')");
                     if (!$staffCheck) throw new RuntimeException('Unable to verify the assigned theatre team.');
                     $staffCheck->bind_param('ii', $surgeonId, $anesthetistId);
-                    $staffCheck->execute();
+                    if (!$staffCheck->execute()) {
+                        $dbError = $staffCheck->error;
+                        $staffCheck->close();
+                        throw new RuntimeException('Unable to verify the assigned theatre team. ' . $dbError);
+                    }
                     $staffRow = $staffCheck->get_result()->fetch_assoc();
                     $staffCheck->close();
                     if ((int)($staffRow['active_count'] ?? 0) !== 2) {
