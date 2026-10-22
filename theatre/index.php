@@ -29,19 +29,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Select a valid theatre urgency.';
         } else {
             $check = $conn->prepare('SELECT id FROM patients WHERE id=? LIMIT 1');
-            $check->bind_param('i', $patientId); $check->execute();
-            $patientExists = (bool)$check->get_result()->fetch_assoc(); $check->close();
+            if (!$check) {
+                $error = 'Unable to validate the selected patient. Please try again.';
+                $patientExists = false;
+            } else {
+                $check->bind_param('i', $patientId);
+                if (!$check->execute()) {
+                    $check->close();
+                    $error = 'Unable to validate the selected patient. Please try again.';
+                    $patientExists = false;
+                } else {
+                    $patientExists = (bool)$check->get_result()->fetch_assoc();
+                    $check->close();
+                }
+            }
             $validSurgeon = true;
             if ($surgeonId && $surgeonId > 0) {
                 $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
                 if (!$staffCheck) { $validSurgeon = false; }
-                else { $staffCheck->bind_param('i', $surgeonId); $staffCheck->execute(); $validSurgeon = (bool)$staffCheck->get_result()->fetch_assoc(); $staffCheck->close(); }
+                else {
+                    $staffCheck->bind_param('i', $surgeonId);
+                    $validSurgeon = $staffCheck->execute() && (bool)$staffCheck->get_result()->fetch_assoc();
+                    $staffCheck->close();
+                }
             }
             $validAnesthetist = true;
             if ($anesthetistId && $anesthetistId > 0) {
                 $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
                 if (!$staffCheck) { $validAnesthetist = false; }
-                else { $staffCheck->bind_param('i', $anesthetistId); $staffCheck->execute(); $validAnesthetist = (bool)$staffCheck->get_result()->fetch_assoc(); $staffCheck->close(); }
+                else {
+                    $staffCheck->bind_param('i', $anesthetistId);
+                    $validAnesthetist = $staffCheck->execute() && (bool)$staffCheck->get_result()->fetch_assoc();
+                    $staffCheck->close();
+                }
             }
             $validSchedule = DateTime::createFromFormat('!Y-m-d\TH:i', $scheduled);
             $dateErrors = DateTime::getLastErrors();
