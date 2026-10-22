@@ -12,6 +12,9 @@ require_module_access($conn,'clinical','create');
 
 $csrfToken=csrf_token();$message='';
 $preWard=trim((string)($_GET['ward']??''));$preBed=(int)($_GET['bed']??0);
+$emergencyCaseId=(int)($_POST['emergency_case_id']??$_GET['emergency_case_id']??0);
+$prePatientId=(int)($_POST['patient_id']??$_GET['patient_id']??0);
+if($emergencyCaseId>0){$ec=$conn->prepare("SELECT patient_id,status FROM emergency_cases WHERE id=? LIMIT 1");if($ec){$ec->bind_param('i',$emergencyCaseId);$ec->execute();$erow=$ec->get_result()->fetch_assoc();$ec->close();if(!$erow||!in_array($erow['status'],['Waiting','Under Assessment','Treatment'],true)){http_response_code(400);exit('This emergency case is unavailable for admission.');}if($prePatientId>0&&(int)$erow['patient_id']!==$prePatientId){http_response_code(400);exit('The selected patient does not match the emergency case.');}$prePatientId=(int)$erow['patient_id'];}else{http_response_code(500);exit('Unable to validate emergency admission.');}}
 $wards=[];
 $wardQuery=$conn->query("SELECT name FROM inpatient_wards WHERE is_active=1 ORDER BY name");
 if($wardQuery)while($wardRow=$wardQuery->fetch_assoc())$wards[]=$wardRow['name'];
@@ -27,7 +30,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $check=$conn->prepare("SELECT b.id FROM inpatient_wards w JOIN inpatient_beds b ON b.ward_id=w.id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1");
    if($check){$check->bind_param('si',$ward,$bed);$check->execute();$validBed=(bool)$check->get_result()->fetch_assoc();$check->close();}
   }
-  if($patientId<=0||!in_array($ward,$wards,true)||!$validBed||$reason===''||$doctor===''||!$parsedDate)$message="<div class='alert alert-danger'>Complete all required admission details and select an active bed from the ward register.</div>";
+  if($patientId<=0||($prePatientId>0&&$patientId!==$prePatientId)||!in_array($ward,$wards,true)||!$validBed||$reason===''||$doctor===''||!$parsedDate)$message="<div class='alert alert-danger'>Complete all required admission details and select an active bed from the ward register.</div>";
   else{
    $conn->begin_transaction();
    try{
@@ -39,7 +42,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     else{$s=$conn->prepare("INSERT INTO admissions (patient_id,ward_name,bed_number,admit_date,reason,admitted_by,attending_doctor,created_by,status) VALUES (?,?,?,?,?,?,?,?,?)");$s->bind_param('isisisiss',$patientId,$ward,$bed,$admitDateSql,$reason,$userId,$doctor,$userId,$status);}
     if(!$s||!$s->execute())throw new Exception('Unable to complete admission: '.($s?$s->error:$conn->error));$admissionId=(int)$s->insert_id;$s->close();
     if($visitId>0){$v=$conn->prepare("UPDATE visits SET visit_type='Inpatient',clinic_category=?,status='In Progress',updated_at=NOW() WHERE id=? AND patient_id=?");if(!$v||!$v->execute())throw new Exception('Admission was created but the inpatient visit could not be updated.');if($v)$v->close();}
-    if(function_exists('audit'))audit('patient_admission',"admission_id={$admissionId},patient_id={$patientId},ward={$ward},bed={$bed},visit_id={$visitId}");
+    if($emergencyCaseId>0){
+     $ec=$conn->prepare("SELECT patient_id,visit_id,status FROM emergency_cases WHERE id=? FOR UPDATE");if(!$ec)throw new Exception('Unable to lock emergency case.');$ec->bind_param('i',$emergencyCaseId);$ec->execute();$erow=$ec->get_result()->fetch_assoc();$ec->close();
+     if(!$erow||(int)$erow['patient_id']!==$patientId||!in_array($erow['status'],['Waiting','Under Assessment','Treatment'],true))throw new Exception('Emergency case changed or no longer qualifies for admission.');
+     $caseStatus='Admitted';$upCase=$conn->prepare("UPDATE emergency_cases SET status=?,disposition_notes=?,updated_by=?,closed_at=NULL WHERE id=?");if(!$upCase)throw new Exception('Unable to update emergency case disposition.');$handover='Admitted to ward '.$ward.', bed '.$bed.'. Admission ID '.$admissionId.'.';$upCase->bind_param('ssii',$caseStatus,$handover,$userId,$emergencyCaseId);if(!$upCase->execute())throw new Exception('Unable to complete emergency case disposition.');$upCase->close();
+     $emergencyVisitId=(int)$erow['visit_id'];$completeVisit=$conn->prepare("UPDATE visits SET status='Completed' WHERE id=?");if(!$completeVisit)throw new Exception('Unable to complete emergency visit.');$completeVisit->bind_param('i',$emergencyVisitId);if(!$completeVisit->execute())throw new Exception('Unable to complete emergency visit.');$completeVisit->close();
+    }
+    if(function_exists('audit'))audit('patient_admission',"admission_id={$admissionId},patient_id={$patientId},ward={$ward},bed={$bed},visit_id={$visitId},emergency_case_id={$emergencyCaseId}");
     $conn->commit();header('Location: ward_management.php?admitted=1');exit;
    }catch(Throwable $e){$conn->rollback();error_log('Admission Error: '.$e->getMessage());$message="<div class='alert alert-danger'>Unable to complete the admission. Please review the admission details and try again.</div>";}
   }
@@ -56,7 +65,7 @@ include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.
 <?=$message?>
 <div class="admit-card"><form method="post" autocomplete="off"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>">
 <div class="admit-section"><h3><i class="fas fa-user-injured"></i>Patient & Clinician</h3><div class="row">
-<div class="col-lg-7 mb-3"><label class="admit-label">Patient</label><select name="patient_id" class="form-control admit-field select2" required><option value="">Search patient</option><?php if($patients):while($p=$patients->fetch_assoc()):?><option value="<?=$p['id']?>"><?=htmlspecialchars($p['full_name'])?> — <?=htmlspecialchars($p['patient_number'])?><?=!empty($p['phone'])?' · '.htmlspecialchars($p['phone']):''?></option><?php endwhile;endif;?></select></div>
+<div class="col-lg-7 mb-3"><label class="admit-label">Patient</label><select name="patient_id" class="form-control admit-field select2" required <?= $prePatientId>0?'disabled':'' ?>><option value="">Search patient</option><?php if($patients):while($p=$patients->fetch_assoc()):?><option value="<?=$p['id']?>" <?=((int)$p['id']===$prePatientId)?'selected':''?>><?=htmlspecialchars($p['full_name'])?> — <?=htmlspecialchars($p['patient_number'])?><?=!empty($p['phone'])?' · '.htmlspecialchars($p['phone']):''?></option><?php endwhile;endif;?></select><?php if($prePatientId>0): ?><input type="hidden" name="patient_id" value="<?= $prePatientId ?>"><?php endif; ?><?php if($emergencyCaseId>0): ?><input type="hidden" name="emergency_case_id" value="<?= $emergencyCaseId ?>"><?php endif; ?></div>
 <div class="col-lg-5 mb-3"><label class="admit-label">Attending Clinician</label><input name="attending_doctor" class="form-control admit-field" value="<?=htmlspecialchars($_POST['attending_doctor']??'')?>" placeholder="Physician / clinician name" required></div></div></div>
 <div class="admit-section"><h3><i class="fas fa-bed"></i>Ward & Bed Allocation</h3><div class="row">
 <div class="col-md-6 mb-3"><label class="admit-label">Ward</label><select name="ward_name" class="form-control admit-field" required><?php foreach($wards as $w):?><option value="<?=htmlspecialchars($w)?>" <?=($preWard===$w?'selected':'')?>><?=htmlspecialchars($w)?></option><?php endforeach;?></select></div>
