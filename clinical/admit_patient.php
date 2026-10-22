@@ -24,7 +24,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  else{
   $patientId=(int)($_POST['patient_id']??0);$ward=trim((string)($_POST['ward_name']??''));$bed=(int)($_POST['bed_number']??0);
   $admitDate=trim((string)($_POST['admit_date']??''));$reason=trim((string)($_POST['reason']??''));$doctor=trim((string)($_POST['attending_doctor']??''));$userId=(int)($_SESSION['user_id']??0);
-  $parsedDate=DateTime::createFromFormat('Y-m-d\TH:i',$admitDate);$dateErrors=DateTime::getLastErrors();$validAdmissionDate=$parsedDate instanceof DateTime&&$parsedDate->format('Y-m-d\\TH:i')===$admitDate&&($dateErrors===false||($dateErrors['warning_count']===0&&$dateErrors['error_count']===0));
+  $parsedDate=DateTime::createFromFormat('Y-m-d\TH:i',$admitDate);$dateErrors=DateTime::getLastErrors();$validAdmissionDate=$parsedDate instanceof DateTime&&$parsedDate->format('Y-m-d\TH:i')===$admitDate&&($dateErrors===false||($dateErrors['warning_count']===0&&$dateErrors['error_count']===0));
   $validBed=false;
   if($ward!==''&&$bed>0){
    $check=$conn->prepare("SELECT b.id FROM inpatient_wards w JOIN inpatient_beds b ON b.ward_id=w.id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1");
