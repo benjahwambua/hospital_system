@@ -31,6 +31,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check = $conn->prepare('SELECT id FROM patients WHERE id=? LIMIT 1');
             $check->bind_param('i', $patientId); $check->execute();
             $patientExists = (bool)$check->get_result()->fetch_assoc(); $check->close();
+            $validSurgeon = true;
+            if ($surgeonId && $surgeonId > 0) {
+                $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
+                if (!$staffCheck) { $validSurgeon = false; }
+                else { $staffCheck->bind_param('i', $surgeonId); $staffCheck->execute(); $validSurgeon = (bool)$staffCheck->get_result()->fetch_assoc(); $staffCheck->close(); }
+            }
+            $validAnesthetist = true;
+            if ($anesthetistId && $anesthetistId > 0) {
+                $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
+                if (!$staffCheck) { $validAnesthetist = false; }
+                else { $staffCheck->bind_param('i', $anesthetistId); $staffCheck->execute(); $validAnesthetist = (bool)$staffCheck->get_result()->fetch_assoc(); $staffCheck->close(); }
+            }
             $validSchedule = DateTime::createFromFormat('!Y-m-d\TH:i', $scheduled);
             $dateErrors = DateTime::getLastErrors();
             $scheduleIsValid = $validSchedule instanceof DateTime
@@ -38,6 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0));
             if (!$patientExists) {
                 $error = 'The selected patient was not found.';
+            } elseif (!$validSurgeon || !$validAnesthetist) {
+                $error = 'Select active surgeon and anesthetist accounts, or leave the assignments unassigned.';
             } elseif (strlen($procedure) > 180) {
                 $error = 'The planned procedure name must not exceed 180 characters.';
             } elseif (!$scheduleIsValid) {
