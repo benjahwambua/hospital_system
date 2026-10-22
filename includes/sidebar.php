@@ -320,43 +320,6 @@ function isParentActive($paths) {
         <?php endif; ?>
         <?php endif; ?>
 
-        <?php if ($isSuperUser): ?>
-        <div class="menu-title">Module Roadmap</div>
-        <div class="has-submenu <?= isParentActive(['modules/planned.php']) ?>">
-            <a href="#" class="menu-toggle" aria-expanded="<?= isParentActive(['modules/planned.php']) === 'open' ? 'true' : 'false' ?>">
-                <i class="fas fa-layer-group icon-main"></i> Modules to Build
-                <i class="fas fa-chevron-down caret"></i>
-            </a>
-            <div class="submenu">
-                <?php
-                $plannedSidebarModules = [
-                    'icu' => 'ICU / HDU',
-                    'neonatal' => 'Neonatal Care',
-                    'blood-bank' => 'Blood Bank & Transfusion',
-                    'physiotherapy' => 'Physiotherapy & Rehab',
-                    'nutrition' => 'Nutrition & Dietetics',
-                    'infection-control' => 'Infection Prevention',
-                    'assets' => 'Asset & Equipment',
-                    'facilities' => 'Facilities & Maintenance',
-                    'mortuary' => 'Mortuary',
-                    'ambulance' => 'Ambulance & Transport',
-                    'payroll' => 'Payroll & Attendance',
-                    'notifications' => 'Notifications & Escalations',
-                    'patient-portal' => 'Patient Portal',
-                    'communications' => 'Communications Centre',
-                    'integrations' => 'Healthcare Integrations / API',
-                ];
-                $selectedPlannedModule = isset($_GET['module']) && is_string($_GET['module']) ? $_GET['module'] : '';
-                foreach ($plannedSidebarModules as $plannedKey => $plannedLabel):
-                ?>
-                <a href="/hospital_system/modules/planned.php?module=<?= rawurlencode($plannedKey) ?>" class="<?= ($selectedPlannedModule === $plannedKey && str_contains($_SERVER['REQUEST_URI'] ?? '', 'modules/planned.php')) ? 'active' : '' ?>">
-                    <i class="fas fa-hourglass-half"></i> <?= htmlspecialchars($plannedLabel, ENT_QUOTES, 'UTF-8') ?>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <div class="menu-title">Exit</div>
         <a href="/hospital_system/auth/logout.php" class="logout-link">
             <i class="fas fa-power-off icon-main"></i> Logout
