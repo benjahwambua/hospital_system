@@ -31,10 +31,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check = $conn->prepare('SELECT id FROM patients WHERE id=? LIMIT 1');
             $check->bind_param('i', $patientId); $check->execute();
             $patientExists = (bool)$check->get_result()->fetch_assoc(); $check->close();
-            $validSchedule = DateTime::createFromFormat('Y-m-d\TH:i', $scheduled);
+            $validSchedule = DateTime::createFromFormat('!Y-m-d\TH:i', $scheduled);
+            $dateErrors = DateTime::getLastErrors();
+            $scheduleIsValid = $validSchedule instanceof DateTime
+                && $validSchedule->format('Y-m-d\TH:i') === $scheduled
+                && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0));
             if (!$patientExists) {
                 $error = 'The selected patient was not found.';
-            } elseif (!$validSchedule) {
+            } elseif (strlen($procedure) > 180) {
+                $error = 'The planned procedure name must not exceed 180 characters.';
+            } elseif (!$scheduleIsValid) {
                 $error = 'Enter a valid scheduled date and time.';
             } else {
                 $scheduleSql = $validSchedule->format('Y-m-d H:i:s');
