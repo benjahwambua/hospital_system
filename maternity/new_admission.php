@@ -8,7 +8,7 @@ require_module_access($conn, 'maternity', 'create');
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token'];$error='';
 $selectedPatient=(int)($_POST['patient_id']??$_GET['patient_id']??0);$selectedWard=trim((string)($_POST['ward']??$_GET['ward']??''));$selectedBed=(int)($_POST['bed_number']??$_GET['bed']??0);$selectedDoctor=trim((string)($_POST['attending_doctor']??''));$selectedNote=trim((string)($_POST['note']??''));
-$wards=['Maternity Ward A','Maternity Ward B','Labour Ward'];$bedCount=6;
+$wards=['Maternity Ward'];$bedCount=6;
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!hash_equals($csrfToken,(string)($_POST['csrf_token']??'')))$error='Security token mismatch. Please refresh and try again.';
  else{
