@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if(!$lock) throw new RuntimeException('Could not prepare case lock.');
     $lock->bind_param('i',$caseId); $lock->execute(); $state=$lock->get_result()->fetch_assoc(); $lock->close();
     if(!$state) throw new InvalidArgumentException('Emergency case not found.');
-    if(in_array($state['status'],['Discharged','Transferred','Left Before Assessment','Cancelled'],true)) throw new InvalidArgumentException('Repeat observations cannot be added to a closed case.');
+    if(in_array($state['status'],['Admitted','Discharged','Transferred','Left Before Assessment','Cancelled'],true)) throw new InvalidArgumentException('Repeat observations cannot be added to a closed case.');
     $tv=$temp!==''?(float)$temp:null; $sv=$sys!==''?(int)$sys:null; $dv=$dia!==''?(int)$dia:null;
     $pv=$pulse!==''?(int)$pulse:null; $rv=$resp!==''?(int)$resp:null; $ov=$spo2!==''?(float)$spo2:null; $painv=$pain!==''?(int)$pain:null; $nv=$notes!==''?$notes:null; $actor=(int)($_SESSION['user_id']??0);
     $ins=$conn->prepare('INSERT INTO emergency_observations (case_id,temperature_c,systolic_bp,diastolic_bp,pulse_bpm,respiratory_rate,oxygen_saturation,pain_score,notes,recorded_by) VALUES (?,?,?,?,?,?,?,?,?,?)');
