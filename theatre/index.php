@@ -107,10 +107,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $conn->begin_transaction();
             try {
-                $lock = $conn->prepare('SELECT id,status FROM theatre_cases WHERE id=? FOR UPDATE');
+                $lock = $conn->prepare('SELECT id,status,surgeon_id,anesthetist_id FROM theatre_cases WHERE id=? FOR UPDATE');
+                if (!$lock) throw new RuntimeException('Unable to lock the theatre case.');
                 $lock->bind_param('i', $caseId); $lock->execute(); $current = $lock->get_result()->fetch_assoc(); $lock->close();
                 if (!$current) throw new RuntimeException('Theatre case was not found.');
                 $oldStatus = (string)$current['status'];
+                if ($targetStatus === 'In Theatre') {
+                    $surgeonId = (int)($current['surgeon_id'] ?? 0);
+                    $anesthetistId = (int)($current['anesthetist_id'] ?? 0);
+                    if ($surgeonId <= 0 || $anesthetistId <= 0) {
+                        throw new RuntimeException('Assign both a lead surgeon and an anaesthesia provider before starting the operation.');
+                    }
+                    $staffCheck = $conn->prepare("SELECT COUNT(*) active_count FROM users WHERE id IN (?,?) AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled')");
+                    if (!$staffCheck) throw new RuntimeException('Unable to verify the assigned theatre team.');
+                    $staffCheck->bind_param('ii', $surgeonId, $anesthetistId);
+                    $staffCheck->execute();
+                    $staffRow = $staffCheck->get_result()->fetch_assoc();
+                    $staffCheck->close();
+                    if ((int)($staffRow['active_count'] ?? 0) !== 2) {
+                        throw new RuntimeException('The assigned surgeon and anaesthesia provider must both be active user accounts before the operation can start.');
+                    }
+                }
                 if (in_array($oldStatus, ['Completed','Cancelled'], true)) {
                     throw new RuntimeException('This theatre case is closed and cannot be edited. Create a documented follow-up workflow if further action is required.');
                 }
