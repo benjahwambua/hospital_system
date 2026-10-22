@@ -41,14 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'trans
         } else {
             $conn->begin_transaction();
             try {
-                $s = $conn->prepare("SELECT id,patient_id,ward_name,bed_number FROM admissions WHERE id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
-                if (!$s) throw new Exception('Unable to load active admission.');
-                $s->bind_param('i', $transferId);
-                $s->execute();
-                $source = $s->get_result()->fetch_assoc();
-                $s->close();
-                if (!$source) throw new Exception('Active admission not found.');
-                if ($source['ward_name'] === $toWard && (int)$source['bed_number'] === $toBed) throw new Exception('Choose a different destination bed.');
                 // Lock the canonical destination bed row so concurrent transfers/admissions serialize on the same bed.
                 $bedLock = $conn->prepare("SELECT b.id FROM inpatient_wards w JOIN inpatient_beds b ON b.ward_id=w.id WHERE w.name=? AND w.is_active=1 AND b.bed_number=? AND b.is_active=1 LIMIT 1 FOR UPDATE");
                 if (!$bedLock) throw new Exception('Unable to lock destination bed.');
@@ -57,6 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'trans
                 $lockedBed = $bedLock->get_result()->fetch_assoc();
                 $bedLock->close();
                 if (!$lockedBed) throw new Exception('The destination bed is no longer active. Refresh the ward register and try again.');
+                $s = $conn->prepare("SELECT id,patient_id,ward_name,bed_number FROM admissions WHERE id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
+                if (!$s) throw new Exception('Unable to load active admission.');
+                $s->bind_param('i', $transferId);
+                $s->execute();
+                $source = $s->get_result()->fetch_assoc();
+                $s->close();
+                if (!$source) throw new Exception('Active admission not found.');
+                if ($source['ward_name'] === $toWard && (int)$source['bed_number'] === $toBed) throw new Exception('Choose a different destination bed.');
                 $s = $conn->prepare("SELECT id FROM admissions WHERE ward_name=? AND bed_number=? AND status='Admitted' AND id<>? LIMIT 1 FOR UPDATE");
                 if (!$s) throw new Exception('Unable to verify destination bed.');
                 $s->bind_param('sii', $toWard, $toBed, $transferId);
