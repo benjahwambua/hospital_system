@@ -125,15 +125,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (strlen($intraop) > 5000 || strlen($anesthesia) > 3000 || strlen($recovery) > 4000 || strlen($cancelReason) > 1000) {
             $error = 'The submitted theatre notes exceed the allowed length. Shorten the notes and try again.';
         } else {
-            $conn->begin_transaction();
+            $transactionStarted = false;
             try {
+                if (!$conn->begin_transaction()) {
+                    error_log('Theatre transaction could not start for case id '.$caseId.': '.$conn->error);
+                    throw new RuntimeException('The theatre case update could not start. Please retry.');
+                }
+                $transactionStarted = true;
                 $lock = $conn->prepare('SELECT id,patient_id,status,outcome,surgeon_id,anesthetist_id,consent_confirmed,identity_confirmed,site_marked,allergies_reviewed,fasting_confirmed,anesthesia_reviewed,intraoperative_notes,anesthesia_notes,recovery_notes FROM theatre_cases WHERE id=? FOR UPDATE');
                 if (!$lock) throw new RuntimeException('Unable to lock the theatre case.');
                 $lock->bind_param('i', $caseId);
                 if (!$lock->execute()) {
-                    $dbError = $lock->error;
+                    error_log('Theatre case lock query failed for case id '.$caseId.': '.$lock->error);
                     $lock->close();
-                    throw new RuntimeException('Unable to load and lock the theatre case. ' . $dbError);
+                    throw new RuntimeException('Unable to load and lock the theatre case. Please retry.');
                 }
                 $current = $lock->get_result()->fetch_assoc();
                 $lock->close();
@@ -157,9 +162,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$admissionCheck) throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case.');
                     $admissionCheck->bind_param('i', $patientId);
                     if (!$admissionCheck->execute()) {
-                        $admissionError = $admissionCheck->error;
+                        error_log('Theatre admission verification failed for case id '.$caseId.': '.$admissionCheck->error);
                         $admissionCheck->close();
-                        throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case. ' . $admissionError);
+                        throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case. Please retry.');
                     }
                     $activeAdmission = $admissionCheck->get_result()->fetch_assoc();
                     $admissionCheck->close();
@@ -184,9 +189,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$staffCheck) throw new RuntimeException('Unable to verify the assigned theatre team.');
                     $staffCheck->bind_param('ii', $surgeonId, $anesthetistId);
                     if (!$staffCheck->execute()) {
-                        $dbError = $staffCheck->error;
+                        error_log('Theatre team verification failed for case id '.$caseId.': '.$staffCheck->error);
                         $staffCheck->close();
-                        throw new RuntimeException('Unable to verify the assigned theatre team. ' . $dbError);
+                        throw new RuntimeException('Unable to verify the assigned theatre team. Please retry.');
                     }
                     $staffRow = $staffCheck->get_result()->fetch_assoc();
                     $staffCheck->close();
@@ -218,13 +223,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $conn->prepare($sql);
                 if (!$stmt) throw new RuntimeException('Unable to prepare the case update. Confirm the theatre migration.');
                 $stmt->bind_param('iiiiiissssssssii', $checks['consent_confirmed'],$checks['identity_confirmed'],$checks['site_marked'],$checks['allergies_reviewed'],$checks['fasting_confirmed'],$checks['anesthesia_reviewed'],$intraop,$anesthesia,$recoverySql,$outcomeSql,$cancelSql,$targetStatus,$startSql,$endSql,$uid,$caseId);
-                if (!$stmt->execute()) { $dbError = $stmt->error; $stmt->close(); throw new RuntimeException('The theatre case update failed. ' . $dbError); }
+                if (!$stmt->execute()) {
+                    error_log('Theatre case update failed for case id '.$caseId.': '.$stmt->error);
+                    $stmt->close();
+                    throw new RuntimeException('The theatre case update failed. Please retry.');
+                }
                 $stmt->close();
-                $conn->commit();
+                if (!$conn->commit()) {
+                    error_log('Theatre transaction commit failed for case id '.$caseId.': '.$conn->error);
+                    throw new RuntimeException('The theatre case update could not be confirmed. Refresh the case before retrying.');
+                }
+                $transactionStarted = false;
                 if (function_exists('audit')) audit('theatre_case_updated', 'case_id='.$caseId.',from='.$oldStatus.',to='.$targetStatus);
                 $message = 'Theatre case updated successfully.';
             } catch (Throwable $e) {
-                $conn->rollback();
+                if ($transactionStarted) {
+                    if (!$conn->rollback()) error_log('Theatre transaction rollback failed for case id '.$caseId.': '.$conn->error);
+                }
+                if (!($e instanceof RuntimeException)) error_log('Unexpected theatre update error for case id '.$caseId.': '.$e->getMessage());
                 $error = $e instanceof RuntimeException ? $e->getMessage() : 'The theatre case could not be updated.';
             }
         }
