@@ -121,7 +121,7 @@ $lab_jobs = $conn->query($query);
 /* HMS unified laboratory visual system */
 body{background:#f5f7fb!important}.container{max-width:1500px!important;padding:28px 24px 44px!important}.worklist-card{border:1px solid #e5e9f0!important;border-radius:14px!important;box-shadow:0 6px 20px rgba(31,45,61,.05)!important}.header-flex{border-bottom:1px solid #edf0f4!important;padding-bottom:16px!important}.page-title{color:#25324a!important;font-weight:800!important}.filter-bar{border:1px solid #e5e9f0!important;box-shadow:0 5px 18px rgba(31,45,61,.045)!important}.stats-flex{gap:14px!important}.stat-card{border:1px solid #e5e9f0!important;border-left:0!important;position:relative!important;overflow:hidden!important}.stat-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#075b9d}.stat-value{color:#25324a!important}.lab-table th{background:#fafbfc!important;color:#7b8798!important;border-bottom:1px solid #e5e9ef!important;font-size:10px!important;letter-spacing:.6px!important}.lab-table td{border-color:#edf0f4!important;font-size:12px!important}.patient-info{color:#25324a!important;font-weight:800!important}.patient-no{background:#f1f4f8!important;color:#7b8798!important}.test-name{color:#344054!important}.btn-filter,.btn-save{border-radius:8px!important;font-weight:800!important}.search-input{border:1px solid #d7dee8!important;border-radius:9px!important}.search-input:focus{border-color:#075b9d!important;box-shadow:0 0 0 3px rgba(7,91,157,.08)!important}.status-badge{border-radius:20px!important}.worklist-card textarea{border:1px solid #d7dee8!important;border-radius:9px!important}.worklist-card textarea:focus{border-color:#075b9d!important;box-shadow:0 0 0 3px rgba(7,91,157,.08)!important}@media(max-width:800px){.container{padding:18px 12px 32px!important}.stats-flex{flex-direction:column!important}.filter-form{width:100%!important;flex-wrap:wrap!important}.search-input{width:100%!important}.worklist-card{overflow-x:auto!important}.lab-table{min-width:950px!important}}
 /* Results worklist */
-.lab-table{margin-top:18px!important}.row-pending td{background:#fff!important}.row-completed td{background:#fbfcfd!important}.btn-action{border-radius:8px!important;font-weight:800!important}.btn-save{background:#19713a!important}.btn-print{background:#344054!important}.patient-name{font-weight:800!important;color:#25324a!important}.patient-id{font-size:10px!important;color:#7b8798!important}</style>
+.lab-table{margin-top:18px!important}.row-pending td{background:#fff!important}.row-completed td{background:#fbfcfd!important}.btn-action{border-radius:8px!important;font-weight:800!important}.btn-save{background:#19713a!important}.btn-print{background:#344054!important}.result-readonly{white-space:pre-wrap;overflow-wrap:anywhere;padding:8px 0;color:#344054}.patient-name{font-weight:800!important;color:#25324a!important}.patient-id{font-size:10px!important;color:#7b8798!important}</style>
 
 <div class="container">
     <div class="worklist-card">
@@ -173,22 +173,22 @@ body{background:#f5f7fb!important}.container{max-width:1500px!important;padding:
                             <small class="text-muted"><?= htmlspecialchars($job['materials_used'] ?? 'Not yet consumed') ?></small>
                         </td>
                         <td>
-                            <form method="post">
-                                <textarea name="findings" rows="2" placeholder="Enter results..."><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
+                            <?php if ($is_done): ?>
+                                <div class="result-readonly"><?= nl2br(htmlspecialchars($job['results'] ?? '')) ?></div>
+                            <?php else: ?>
+                                <form method="post">
+                                    <textarea name="findings" rows="2" placeholder="Enter results..." required><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
                         </td>
                         <td>
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                                <input type="hidden" name="record_id" value="<?= $job['id'] ?>">
-                                <input type="hidden" name="result_action" value="complete">
-                                <button type="submit" name="save_lab_result" class="btn-action btn-save">
-                                    <?= $is_done ? 'Update Result' : 'Save & Close' ?>
-                                </button>
-                                <?php if($is_done): ?>
-                                    <a href="print_result.php?id=<?= $job['id'] ?>" target="_blank" class="btn-action btn-print">
-                                        🖨️ Print Report
-                                    </a>
-                                <?php endif; ?>
-                            </form>
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                    <input type="hidden" name="record_id" value="<?= (int)$job['id'] ?>">
+                                    <input type="hidden" name="result_action" value="complete">
+                                    <button type="submit" name="save_lab_result" class="btn-action btn-save">Save &amp; Close</button>
+                                </form>
+                            <?php endif; ?>
+                            <?php if ($is_done): ?>
+                                <a href="print_result.php?id=<?= (int)$job['id'] ?>" target="_blank" class="btn-action btn-print">🖨️ Print Report</a>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endwhile; ?>
