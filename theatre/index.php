@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $check = $conn->prepare('SELECT id FROM patients WHERE id=? LIMIT 1');
             if (!$check) {
+                error_log('Theatre patient validation prepare failed for patient id '.$patientId.': '.$conn->error);
                 $error = 'Unable to validate the selected patient. Please try again.';
                 $patientExists = false;
             } else {
@@ -48,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $validSurgeon = true;
             if ($surgeonId && $surgeonId > 0) {
                 $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
-                if (!$staffCheck) { $validSurgeon = false; }
+                if (!$staffCheck) { error_log('Theatre surgeon validation prepare failed for user id '.$surgeonId.': '.$conn->error); $validSurgeon = false; }
                 else {
                     $staffCheck->bind_param('i', $surgeonId);
                     $validSurgeon = $staffCheck->execute() && (bool)$staffCheck->get_result()->fetch_assoc();
@@ -58,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $validAnesthetist = true;
             if ($anesthetistId && $anesthetistId > 0) {
                 $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
-                if (!$staffCheck) { $validAnesthetist = false; }
+                if (!$staffCheck) { error_log('Theatre anaesthesia validation prepare failed for user id '.$anesthetistId.': '.$conn->error); $validAnesthetist = false; }
                 else {
                     $staffCheck->bind_param('i', $anesthetistId);
                     $validAnesthetist = $staffCheck->execute() && (bool)$staffCheck->get_result()->fetch_assoc();
@@ -85,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $caseNumber = 'TH-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
                 $stmt = $conn->prepare("INSERT INTO theatre_cases (case_number,patient_id,procedure_name,urgency,scheduled_at,surgeon_id,anesthetist_id,clinical_notes,status,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?, 'Planned',?,?)");
                 if (!$stmt) {
+                    error_log('Theatre case insert prepare failed for patient id '.$patientId.': '.$conn->error);
                     $error = 'Unable to prepare the theatre case. Confirm the theatre migration has been applied.';
                 } else {
                     $uid = (int)($_SESSION['user_id'] ?? 0);
@@ -94,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (function_exists('audit')) audit('theatre_case_created', 'case_id='.$newId.',case_number='.$caseNumber.',patient_id='.$patientId);
                         $message = 'Theatre case ' . $caseNumber . ' was scheduled.';
                     } else {
+                        error_log('Theatre case insert failed for patient id '.$patientId.': '.$stmt->error);
                         $error = 'Theatre case could not be saved. Check that the schema migration is applied and required fields are valid.';
                     }
                     $stmt->close();
