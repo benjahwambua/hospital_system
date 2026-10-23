@@ -11,6 +11,7 @@ $caseId = filter_input(INPUT_GET, 'case_id', FILTER_VALIDATE_INT);
 if (!$caseId && $_SERVER['REQUEST_METHOD'] === 'POST') $caseId = filter_input(INPUT_POST, 'case_id', FILTER_VALIDATE_INT);
 $e = static fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 $valid = static fn($v,$min,$max): bool => $v === '' || (is_numeric($v) && (float)$v >= $min && (float)$v <= $max);
+$validInteger = static fn($v,$min,$max): bool => $v === '' || (filter_var($v,FILTER_VALIDATE_INT) !== false && (int)$v >= $min && (int)$v <= $max);
 if (!$caseId || $caseId < 1) { http_response_code(400); exit('A valid emergency case is required.'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (strlen($notes)>1500) $error='Observation notes must be 1,500 characters or fewer.';
   elseif ($temp==='' && $sys==='' && $dia==='' && $pulse==='' && $resp==='' && $spo2==='' && $pain==='' && $notes==='') $error='Record at least one measured observation or add clinical context before saving.';
   elseif (!$valid($temp,25,45)||!$valid($sys,40,300)||!$valid($dia,20,200)||!$valid($pulse,1,300)||!$valid($resp,1,100)||!$valid($spo2,0,100)||!$valid($pain,0,10)) $error='One or more observations are outside the permitted input range.';
+  elseif (!$validInteger($sys,40,300)||!$validInteger($dia,20,200)||!$validInteger($pulse,1,300)||!$validInteger($resp,1,100)||!$validInteger($pain,0,10)) $error='Blood pressure, pulse, respiratory rate and pain score must be whole numbers.';
   elseif (($sys==='')!==($dia==='')) $error='Enter both systolic and diastolic blood pressure, or leave both blank.';
   elseif ($sys!==''&&$dia!==''&&(int)$sys<=(int)$dia) $error='Systolic blood pressure must be greater than diastolic blood pressure.';
   else {
