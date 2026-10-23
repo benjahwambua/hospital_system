@@ -56,10 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 $cs=$conn->prepare('SELECT e.id,e.status,e.triage_level,e.arrived_at,e.chief_complaint,p.patient_number,p.full_name,v.visit_number FROM emergency_cases e JOIN patients p ON p.id=e.patient_id JOIN visits v ON v.id=e.visit_id WHERE e.id=? LIMIT 1');
 if(!$cs){http_response_code(500);exit('Unable to load emergency case.');}
-$cs->bind_param('i',$caseId);$cs->execute();$case=$cs->get_result()->fetch_assoc();$cs->close();
+$cs->bind_param('i',$caseId);
+if(!$cs->execute()){$cs->close();error_log('Emergency observation case lookup failed for case_id='.$caseId);http_response_code(500);exit('Unable to load emergency case details. Please try again.');}
+$case=$cs->get_result()->fetch_assoc();$cs->close();
 if(!$case){http_response_code(404);exit('Emergency case not found.');}
 $hs=$conn->prepare('SELECT o.*,u.full_name recorder_name FROM emergency_observations o LEFT JOIN users u ON u.id=o.recorded_by WHERE o.case_id=? ORDER BY o.recorded_at DESC,o.id DESC');
-$hs->bind_param('i',$caseId);$hs->execute();$history=$hs->get_result();
+if(!$hs){error_log('Emergency observation history prepare failed for case_id='.$caseId);http_response_code(500);exit('Unable to load observation history. Please try again.');}
+$hs->bind_param('i',$caseId);
+if(!$hs->execute()){$hs->close();error_log('Emergency observation history query failed for case_id='.$caseId);http_response_code(500);exit('Unable to load observation history. Please try again.');}
+$history=$hs->get_result();
 include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
 ?>
 <div class="container-fluid py-4">
