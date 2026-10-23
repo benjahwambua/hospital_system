@@ -202,14 +202,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$pageLoadError = '';
 $patients = $conn->query('SELECT id,patient_number,full_name FROM patients ORDER BY full_name ASC LIMIT 2000');
+if (!$patients) { error_log('Theatre patient list query failed: '.$conn->error); $pageLoadError = 'Patient list could not be loaded. Scheduling may be unavailable until the database issue is resolved.'; }
 $staff = $conn->query("SELECT id,full_name FROM users WHERE COALESCE(status,'Active') NOT IN ('Inactive','Disabled') ORDER BY full_name ASC");
+if (!$staff) { error_log('Theatre staff list query failed: '.$conn->error); $pageLoadError = 'Theatre staff list could not be loaded. Verify the user table and database connection before assigning a team.'; }
 $stats = ['today'=>0,'planned'=>0,'in_theatre'=>0,'recovery'=>0];
 if ($q=$conn->query("SELECT SUM(DATE(scheduled_at)=CURDATE() AND status NOT IN ('Cancelled')) today_count,SUM(status IN ('Planned','Pre-op')) planned_count,SUM(status='In Theatre') theatre_count,SUM(status='Recovery') recovery_count FROM theatre_cases")) {
     $s=$q->fetch_assoc() ?: [];
     $stats=['today'=>(int)($s['today_count']??0),'planned'=>(int)($s['planned_count']??0),'in_theatre'=>(int)($s['theatre_count']??0),'recovery'=>(int)($s['recovery_count']??0)];
 }
 $cases = $conn->query("SELECT t.*,p.full_name,p.patient_number,s.full_name surgeon_name,a.full_name anesthetist_name FROM theatre_cases t JOIN patients p ON p.id=t.patient_id LEFT JOIN users s ON s.id=t.surgeon_id LEFT JOIN users a ON a.id=t.anesthetist_id ORDER BY FIELD(t.status,'In Theatre','Recovery','Pre-op','Planned','Completed','Cancelled'),t.scheduled_at ASC LIMIT 150");
+if (!$cases) { error_log('Theatre case list query failed: '.$conn->error); $pageLoadError = 'Theatre cases could not be loaded. The list below is not a reliable indication that no cases exist.'; }
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
@@ -219,6 +223,7 @@ include __DIR__ . '/../includes/sidebar.php';
 <div class="theatre-page"><div class="theatre-shell">
   <section class="theatre-hero"><div><div class="theatre-kicker">Clinical Services / Peri-operative Care</div><h1>Theatre &amp; Surgery</h1><p>Schedule surgical cases, verify the pre-operative safety gate, and track theatre-to-recovery handover.</p></div><div class="theatre-pill">Initial workflow · Clinical validation required</div></section>
   <?php if ($error !== ''): ?><div class="theatre-alert error"><?= theatre_h($error) ?></div><?php endif; ?>
+  <?php if ($pageLoadError !== ''): ?><div class="theatre-alert error"><?= theatre_h($pageLoadError) ?></div><?php endif; ?>
   <?php if ($message !== ''): ?><div class="theatre-alert success"><?= theatre_h($message) ?></div><?php endif; ?>
   <div class="theatre-grid"><div class="theatre-stat"><small>Cases scheduled today</small><strong><?= $stats['today'] ?></strong></div><div class="theatre-stat"><small>Planned / Pre-op</small><strong><?= $stats['planned'] ?></strong></div><div class="theatre-stat"><small>In theatre</small><strong><?= $stats['in_theatre'] ?></strong></div><div class="theatre-stat"><small>Recovery</small><strong><?= $stats['recovery'] ?></strong></div></div>
   <div class="theatre-layout">
