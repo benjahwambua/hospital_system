@@ -120,8 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cancelReason = trim((string)($_POST['cancellation_reason'] ?? ''));
         if ($caseId <= 0 || !in_array($targetStatus, $allowedStatuses, true)) {
             $error = 'Invalid theatre case or status.';
-        } elseif ($targetStatus === 'In Theatre' && in_array(0, $checks, true)) {
-            $error = 'The patient-safety gate is incomplete. Confirm consent, identity, site, allergies, fasting and anesthesia review before starting theatre.';
         } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($intraop === '' || $anesthesia === '')) {
             $error = 'Before handing over to recovery or completing the case, record both intra-operative findings and anaesthesia notes.';
         } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($recovery === '' || !in_array($outcome, ['Recovered','Transferred','Admitted','Other'], true))) {
@@ -165,6 +163,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // are omitted from the submitted form.
                 foreach (array_keys($checks) as $checkField) {
                     $checks[$checkField] = (!empty($current[$checkField]) || $checks[$checkField] === 1) ? 1 : 0;
+                }
+                if ($targetStatus === 'In Theatre' && in_array(0, $checks, true)) {
+                    throw new RuntimeException('The patient-safety gate is incomplete. Confirm consent, identity, site, allergies, fasting and anaesthesia review before starting theatre.');
                 }
                 if ($targetStatus === 'In Theatre') {
                     $surgeonId = (int)($current['surgeon_id'] ?? 0);
