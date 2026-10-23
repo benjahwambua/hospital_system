@@ -561,6 +561,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  * already exists in the Pharmacy and Laboratory ledgers. It deliberately does
  * not merge those balances into the Central Stores movement ledger.
  */
+$inventorySourceFilter = trim((string)($_GET['source'] ?? ''));
+if (!in_array($inventorySourceFilter, ['Central Stores', 'Pharmacy', 'Laboratory'], true)) $inventorySourceFilter = '';
 $systemInventoryRows = [];
 $inventorySourceCounts = ['Central Stores'=>0, 'Pharmacy'=>0, 'Laboratory'=>0];
 $hasPharmacyStock = false;
@@ -732,7 +734,7 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
 <p class="small text-secondary mb-3">Central Stores, Pharmacy and Laboratory stock are searchable in one place. Pharmacy supplier and price fields are included where recorded. Each quantity remains tied to its source ledger; balances are not combined or changed by this catalogue.</p>
 <div class="row g-2 mb-3">
 <div class="col-md-4"><input class="form-control" id="systemInventorySearch" type="search" placeholder="Search item, code, supplier, category or batch" aria-label="Search hospital inventory"></div>
-<div class="col-md-3"><select class="form-select" id="systemInventorySource" aria-label="Filter inventory source"><option value="">All inventory sources</option><option>Central Stores</option><option>Pharmacy</option><option>Laboratory</option></select></div>
+<div class="col-md-3"><select class="form-select" id="systemInventorySource" aria-label="Filter inventory source"><option value="" <?= $inventorySourceFilter === '' ? 'selected' : '' ?>>All inventory sources</option><option <?= $inventorySourceFilter === 'Central Stores' ? 'selected' : '' ?>>Central Stores</option><option <?= $inventorySourceFilter === 'Pharmacy' ? 'selected' : '' ?>>Pharmacy</option><option <?= $inventorySourceFilter === 'Laboratory' ? 'selected' : '' ?>>Laboratory</option></select></div>
 <div class="col-md-5 d-flex flex-wrap gap-2 align-items-center"><span class="pill">Central Stores: <?=$inventorySourceCounts['Central Stores']?></span><span class="pill">Pharmacy: <?=$inventorySourceCounts['Pharmacy']?></span><span class="pill">Laboratory: <?=$inventorySourceCounts['Laboratory']?></span></div>
 </div>
 <div class="table-responsive"><table class="table table-sm" id="systemInventoryTable"><thead><tr><th>Item / Medicine</th><th>Source</th><th>Category</th><th>Unit</th><th>Supplier</th><th>On Hand</th><th>Buying Price</th><th>Selling Price</th><th>Stock Value</th><th>Batch / Lot</th><th>Expiry</th><th>Stock Status</th></tr></thead><tbody>
@@ -760,6 +762,7 @@ body{background:#f3f6fb;color:#243247;font-family:Inter,Segoe UI,Arial,sans-seri
  }
  search.addEventListener('input',filterRows);
  source.addEventListener('change',filterRows);
+ filterRows();
 })();
 </script>
 <?php if($systemInventoryError): ?><div class="alert alert-danger" role="alert">The consolidated inventory catalogue could not be loaded. Please check the application error log; no inventory changes were made.</div><?php endif; ?>
