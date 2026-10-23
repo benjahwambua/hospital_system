@@ -8,7 +8,24 @@ require_module_access($conn,'staff_leave','view');
 $uid=(int)($_SESSION['user_id']??0);
 $canApprove=function_exists('can_approve') ? can_approve($conn,'staff_leave') : false;
 $stmt=$conn->prepare("SELECT r.*,u.full_name,u.username FROM staff_leave_requests r JOIN users u ON u.id=r.user_id WHERE (?=1 OR r.user_id=?) ORDER BY r.created_at DESC");
-$isAdmin=$canApprove?1:0; $stmt->bind_param('ii',$isAdmin,$uid); $stmt->execute(); $rows=$stmt->get_result();
+$isAdmin=$canApprove?1:0;
+$rows=false;
+$loadError='';
+if (!$stmt) {
+    error_log('Staff leave list prepare failed: '.$conn->error);
+    $loadError='The leave register is unavailable. Confirm that database/staff_leave_migration.sql has been applied.';
+} else {
+    $stmt->bind_param('ii',$isAdmin,$uid);
+    if (!$stmt->execute()) {
+        error_log('Staff leave list execute failed: '.$stmt->error);
+        $loadError='The leave register could not be loaded. Please retry or contact the system administrator.';
+    } else {
+        $rows=$stmt->get_result();
+        if (!$rows) $loadError='The leave register returned no readable result. Please retry.';
+    }
+    $stmt->close();
+}
+$requestCount = $rows ? $rows->num_rows : 0;
 
 include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
 ?>
@@ -82,9 +99,10 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 </style>
 <div class="lv-page"><div class="lv-wrap">
 <div class="lv-hero"><div class="lv-hero-main"><div><div class="lv-kicker">Staff · Human Resources</div><h1>Staff Leave Management</h1><p>Submit, review and track staff leave requests.</p></div><div class="lv-actions"><a href="request.php" class="lv-action lv-action-primary"><i class="fas fa-plus"></i> Request Leave</a></div></div></div>
-<div class="lv-metrics"><div class="lv-card lv-metric"><small>Total Requests</small><strong><?=number_format($rows->num_rows)?></strong><span>Requests in your leave view</span></div><div class="lv-card lv-metric"><small>Access</small><strong><?=$canApprove?'Review':'Request'?></strong><span><?=$canApprove?'Approval queue enabled':'Personal leave requests'?></span></div><div class="lv-card lv-metric"><small>Module</small><strong>Staff</strong><span>Human resources leave</span></div><div class="lv-card lv-metric"><small>Status</small><strong>Live</strong><span>Current leave register</span></div></div><div class="lv-card"><div class="lv-card-header"><div><strong>Leave Requests</strong><small>Review and track staff leave requests.</small></div></div><div class="card-body p-0"><div class="table-responsive"><table class="table mb-0 lv-table"><thead class="bg-light"><tr><th>Staff</th><th>Leave Type</th><th>Period</th><th>Days</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody>
-<?php while($r=$rows->fetch_assoc()): ?>
+<?php if ($loadError !== ''): ?><div class="alert alert-warning" role="alert"><?=htmlspecialchars($loadError, ENT_QUOTES, 'UTF-8')?></div><?php endif; ?><div class="lv-metrics"><div class="lv-card lv-metric"><small>Total Requests</small><strong><?=number_format($requestCount)?></strong><span>Requests in your leave view</span></div><div class="lv-card lv-metric"><small>Access</small><strong><?=$canApprove?'Review':'Request'?></strong><span><?=$canApprove?'Approval queue enabled':'Personal leave requests'?></span></div><div class="lv-card lv-metric"><small>Module</small><strong>Staff</strong><span>Human resources leave</span></div><div class="lv-card lv-metric"><small>Status</small><strong>Live</strong><span>Current leave register</span></div></div><div class="lv-card"><div class="lv-card-header"><div><strong>Leave Requests</strong><small>Review and track staff leave requests.</small></div></div><div class="card-body p-0"><div class="table-responsive"><table class="table mb-0 lv-table"><thead class="bg-light"><tr><th>Staff</th><th>Leave Type</th><th>Period</th><th>Days</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody>
+<?php if ($rows): while($r=$rows->fetch_assoc()): ?>
 <tr><td><div class="lv-staff"><?=htmlspecialchars($r['full_name'])?></div><div class="lv-muted"><?=htmlspecialchars($r['username'])?></div></td><td><?=htmlspecialchars($r['leave_type'])?></td><td><?=htmlspecialchars($r['start_date'])?> → <?=htmlspecialchars($r['end_date'])?></td><td><?=htmlspecialchars($r['days'])?></td><td><?=htmlspecialchars($r['reason']??'—')?></td><td><span class="lv-badge lv-badge-<?= $r['status']==='Approved'?'success':($r['status']==='Rejected'?'danger':($r['status']==='Cancelled'?'secondary':'warning')) ?>"><?=htmlspecialchars($r['status'])?></span></td><td><?php if($canApprove && $r['status']==='Pending'): ?><a class="btn btn-sm btn-outline-success" href="action.php?id=<?=$r['id']?>&decision=approve">Review</a><?php else: ?><span class="text-muted small">—</span><?php endif; ?></td></tr>
-<?php endwhile; if($rows->num_rows===0): ?><tr><td colspan="7" class="text-center text-muted py-4">No leave requests found.</td></tr><?php endif; ?>
+<?php endwhile; if($requestCount===0 && $loadError===''): ?><tr><td colspan="7" class="text-center text-muted py-4">No leave requests found.</td></tr><?php endif; ?>
 </tbody></table></div></div></div></div>
+<?php endif; ?>
 <?php include __DIR__.'/../includes/footer.php'; ?>
