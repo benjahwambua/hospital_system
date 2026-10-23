@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $pulse=trim((string)($_POST['pulse_bpm']??'')); $resp=trim((string)($_POST['respiratory_rate']??'')); $spo2=trim((string)($_POST['oxygen_saturation']??''));
   $pain=trim((string)($_POST['pain_score']??'')); $notes=trim((string)($_POST['notes']??''));
   if (strlen($notes)>1500) $error='Observation notes must be 1,500 characters or fewer.';
+  elseif ($temp==='' && $sys==='' && $dia==='' && $pulse==='' && $resp==='' && $spo2==='' && $pain==='' && $notes==='') $error='Record at least one measured observation or add clinical context before saving.';
   elseif (!$valid($temp,25,45)||!$valid($sys,40,300)||!$valid($dia,20,200)||!$valid($pulse,1,300)||!$valid($resp,1,100)||!$valid($spo2,0,100)||!$valid($pain,0,10)) $error='One or more observations are outside the permitted input range.';
   elseif (($sys==='')!==($dia==='')) $error='Enter both systolic and diastolic blood pressure, or leave both blank.';
   elseif ($sys!==''&&$dia!==''&&(int)$sys<=(int)$dia) $error='Systolic blood pressure must be greater than diastolic blood pressure.';
