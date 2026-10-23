@@ -178,16 +178,18 @@ body{background:#f5f7fb!important}.container{max-width:1500px!important;padding:
                             <?php else: ?>
                                 <form method="post">
                                     <textarea name="findings" rows="2" placeholder="Enter results..." required><?= htmlspecialchars($job['results'] ?? '') ?></textarea>
-                        </td>
-                        <td>
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                     <input type="hidden" name="record_id" value="<?= (int)$job['id'] ?>">
                                     <input type="hidden" name="result_action" value="complete">
                                     <button type="submit" name="save_lab_result" class="btn-action btn-save">Save &amp; Close</button>
                                 </form>
                             <?php endif; ?>
+                        </td>
+                        <td>
                             <?php if ($is_done): ?>
                                 <a href="print_result.php?id=<?= (int)$job['id'] ?>" target="_blank" class="btn-action btn-print">🖨️ Print Report</a>
+                            <?php else: ?>
+                                <span class="text-muted">Awaiting result</span>
                             <?php endif; ?>
                         </td>
                     </tr>
