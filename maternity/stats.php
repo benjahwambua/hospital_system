@@ -5,19 +5,21 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_module_access($conn, 'maternity', 'view');
 
-$totalResult=$conn->query("SELECT COUNT(*) c FROM maternity");
+// Keep every report metric and chart on the same registered maternal-care cohort.
+$maternalPatientFilter = "COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity')";
+$totalResult=$conn->query("SELECT COUNT(DISTINCT m.id) c FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE {$maternalPatientFilter}");
 $total=(int)($totalResult ? ($totalResult->fetch_assoc()['c']??0) : 0);
-$deliveryCountResult=$conn->query("SELECT COUNT(*) c FROM maternity_delivery");
+$deliveryCountResult=$conn->query("SELECT COUNT(DISTINCT d.id) c FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id WHERE {$maternalPatientFilter}");
 $deliveries=(int)($deliveryCountResult ? ($deliveryCountResult->fetch_assoc()['c']??0) : 0);
-$babyCountResult=$conn->query("SELECT COUNT(*) c FROM maternity_baby");
+$babyCountResult=$conn->query("SELECT COUNT(DISTINCT b.id) c FROM maternity_baby b JOIN maternity m ON m.id=b.maternity_id JOIN patients p ON p.id=m.patient_id WHERE {$maternalPatientFilter}");
 $babies=(int)($babyCountResult ? ($babyCountResult->fetch_assoc()['c']??0) : 0);
 $monthlyLabels=[];$monthlyValues=[];
-$monthly=$conn->query("SELECT DATE_FORMAT(created_at,'%b %Y') label,DATE_FORMAT(created_at,'%Y-%m') sort_key,COUNT(*) total FROM maternity_delivery GROUP BY sort_key,label ORDER BY sort_key DESC LIMIT 12");
+$monthly=$conn->query("SELECT DATE_FORMAT(d.created_at,'%b %Y') label,DATE_FORMAT(d.created_at,'%Y-%m') sort_key,COUNT(DISTINCT d.id) total FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id WHERE {$maternalPatientFilter} GROUP BY sort_key,label ORDER BY sort_key DESC LIMIT 12");
 if($monthly){$rows=[];while($row=$monthly->fetch_assoc())$rows[]=$row;foreach(array_reverse($rows) as $row){$monthlyLabels[]=$row['label'];$monthlyValues[]=(int)$row['total'];}}
 $modeLabels=[];$modeValues=[];
-$modes=$conn->query("SELECT COALESCE(NULLIF(delivery_mode,''),'Unspecified') label,COUNT(*) total FROM maternity_delivery GROUP BY label ORDER BY total DESC LIMIT 8");
+$modes=$conn->query("SELECT COALESCE(NULLIF(d.delivery_mode,''),'Unspecified') label,COUNT(DISTINCT d.id) total FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id WHERE {$maternalPatientFilter} GROUP BY label ORDER BY total DESC LIMIT 8");
 if($modes)while($row=$modes->fetch_assoc()){$modeLabels[]=$row['label'];$modeValues[]=(int)$row['total'];}
-$recent=$conn->query("SELECT d.*,p.full_name,m.anc_number FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY d.created_at DESC LIMIT 20");
+$recent=$conn->query("SELECT d.*,p.full_name,m.anc_number FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id WHERE {$maternalPatientFilter} ORDER BY d.created_at DESC LIMIT 20");
 $e=static fn($value)=>htmlspecialchars((string)($value??''),ENT_QUOTES,'UTF-8');
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
