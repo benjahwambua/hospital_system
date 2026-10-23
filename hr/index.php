@@ -64,8 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($linkedUserValue !== null) {
                     $check = $conn->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
                     if (!$check) throw new RuntimeException('Unable to validate the linked account.');
-                    $check->bind_param('i', $linkedUserValue); $check->execute(); $exists = $check->get_result()->fetch_assoc(); $check->close();
+                    $check->bind_param('i', $linkedUserValue);
+                    if (!$check->execute()) { $check->close(); throw new RuntimeException('Unable to validate the linked account.'); }
+                    $exists = $check->get_result()->fetch_assoc();
+                    $check->close();
                     if (!$exists) throw new InvalidArgumentException('The selected login account does not exist.');
+
+                    // A login account may belong to only one employee record.
+                    $linkedCheck = $conn->prepare('SELECT id FROM hr_staff WHERE linked_user_id = ? AND id <> ? LIMIT 1');
+                    if (!$linkedCheck) throw new RuntimeException('Unable to check whether the login account is already linked.');
+                    $linkedCheck->bind_param('ii', $linkedUserValue, $id);
+                    if (!$linkedCheck->execute()) { $linkedCheck->close(); throw new RuntimeException('Unable to check whether the login account is already linked.'); }
+                    $alreadyLinked = $linkedCheck->get_result()->fetch_assoc();
+                    $linkedCheck->close();
+                    if ($alreadyLinked) throw new InvalidArgumentException('This login account is already linked to another employee. Choose an unlinked account.');
                 }
                 if ($id > 0) {
                     $stmt = $conn->prepare('UPDATE hr_staff SET linked_user_id=?, first_name=?, middle_name=?, last_name=?, phone=?, email=?, department=?, job_title=?, employment_type=?, hire_date=?, contract_end_date=?, status=?, notes=?, updated_by=? WHERE id=?');
@@ -106,12 +118,24 @@ if ($editId > 0 && $canEdit) {
     $stmt = $conn->prepare('SELECT * FROM hr_staff WHERE id=? LIMIT 1');
     if ($stmt) { $stmt->bind_param('i', $editId); $stmt->execute(); $edit = $stmt->get_result()->fetch_assoc(); $stmt->close(); }
 }
-$users = $conn->query('SELECT id, full_name, username FROM users ORDER BY full_name');
+$linkedUserId = max(0, (int)($_GET['link_user_id'] ?? 0));
+$selectedLinkedUserId = (int)($edit['linked_user_id'] ?? $linkedUserId);
+// Offer only unassigned accounts, plus the account already linked to the record being edited.
+// This avoids presenting accounts that would violate uq_hr_staff_linked_user.
+$users = $conn->prepare("SELECT u.id, u.full_name, u.username
+    FROM users u
+    WHERE NOT EXISTS (SELECT 1 FROM hr_staff hs WHERE hs.linked_user_id = u.id)
+       OR u.id = ?
+    ORDER BY u.full_name, u.username");
+if ($users) {
+    $users->bind_param('i', $selectedLinkedUserId);
+    if (!$users->execute()) { $users->close(); $users = false; }
+    else { $users = $users->get_result(); }
+}
 $systemUsers = $conn->query("SELECT u.id,u.full_name,u.username,u.role,hs.id AS hr_staff_id,
     CONCAT_WS(' ',hs.first_name,hs.middle_name,hs.last_name) AS employee_name
     FROM users u LEFT JOIN hr_staff hs ON hs.linked_user_id=u.id
     ORDER BY u.full_name,u.username");
-$linkedUserId = max(0, (int)($_GET['link_user_id'] ?? 0));
 $filters = [];
 $where = '1=1';
 $search = trim((string)($_GET['q'] ?? ''));
@@ -143,7 +167,7 @@ include __DIR__ . '/../includes/sidebar.php';
 <form method="post" class="hr-form"><input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>"><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)($edit['id'] ?? 0) ?>">
 <div class="hr-field"><label>First name *</label><input name="first_name" required maxlength="80" value="<?= $e($edit['first_name'] ?? '') ?>"></div><div class="hr-field"><label>Middle name</label><input name="middle_name" maxlength="80" value="<?= $e($edit['middle_name'] ?? '') ?>"></div><div class="hr-field"><label>Last name *</label><input name="last_name" required maxlength="80" value="<?= $e($edit['last_name'] ?? '') ?>"></div>
 <div class="hr-field"><label>Department *</label><select name="department" required><option value="">Select department</option><?php foreach ($departments as $item): ?><option value="<?= $e($item) ?>" <?= (($edit['department'] ?? '') === $item) ? 'selected' : '' ?>><?= $e($item) ?></option><?php endforeach; ?></select></div><div class="hr-field"><label>Job title *</label><input name="job_title" required maxlength="120" value="<?= $e($edit['job_title'] ?? '') ?>" placeholder="e.g. Staff Nurse"></div><div class="hr-field"><label>Employment type</label><select name="employment_type"><?php foreach ($employmentTypes as $item): ?><option value="<?= $e($item) ?>" <?= (($edit['employment_type'] ?? 'Permanent') === $item) ? 'selected' : '' ?>><?= $e($item) ?></option><?php endforeach; ?></select></div>
-<div class="hr-field"><label>Phone</label><input name="phone" maxlength="30" value="<?= $e($edit['phone'] ?? '') ?>"></div><div class="hr-field"><label>Work email</label><input type="email" name="email" maxlength="190" value="<?= $e($edit['email'] ?? '') ?>"></div><div class="hr-field"><label>Linked login account</label><select name="linked_user_id"><option value="0">No linked account</option><?php if ($users): while ($u = $users->fetch_assoc()): ?><option value="<?= (int)$u['id'] ?>" <?= ((int)($edit['linked_user_id'] ?? $linkedUserId) === (int)$u['id']) ? 'selected' : '' ?>><?= $e($u['full_name'].' · '.$u['username']) ?></option><?php endwhile; $users->data_seek(0); endif; ?></select></div>
+<div class="hr-field"><label>Phone</label><input name="phone" maxlength="30" value="<?= $e($edit['phone'] ?? '') ?>"></div><div class="hr-field"><label>Work email</label><input type="email" name="email" maxlength="190" value="<?= $e($edit['email'] ?? '') ?>"></div><div class="hr-field"><label>Linked login account</label><select name="linked_user_id"><option value="0">No linked account</option><?php if ($users): while ($u = $users->fetch_assoc()): ?><option value="<?= (int)$u['id'] ?>" <?= ( $selectedLinkedUserId === (int)$u['id']) ? 'selected' : '' ?>><?= $e($u['full_name'].' · '.$u['username']) ?></option><?php endwhile; $users->data_seek(0); endif; ?></select></div>
 <div class="hr-field"><label>Hire date</label><input type="date" name="hire_date" value="<?= $e($edit['hire_date'] ?? '') ?>"></div><div class="hr-field"><label>Contract end date</label><input type="date" name="contract_end_date" value="<?= $e($edit['contract_end_date'] ?? '') ?>"></div><div class="hr-field"><label>Employment status</label><select name="status"><?php foreach ($statuses as $item): ?><option value="<?= $e($item) ?>" <?= (($edit['status'] ?? 'Active') === $item) ? 'selected' : '' ?>><?= $e($item) ?></option><?php endforeach; ?></select></div>
 <div class="hr-field hr-field-wide"><label>HR notes (avoid passwords or unnecessary sensitive data)</label><textarea name="notes" maxlength="1000"><?= $e($edit['notes'] ?? '') ?></textarea></div><div class="hr-form-actions"><button class="hr-btn hr-btn-dark" type="submit"><i class="fas fa-save"></i> Save employee</button><?php if ($edit): ?><a class="hr-btn hr-btn-muted" href="index.php">Cancel edit</a><?php endif; ?></div></form></section><?php endif; ?>
 <section class="hr-card"><div class="hr-card-head"><div><strong>Employee register</strong><small>Search by staff number, name, contact, role or filter by department/status.</small></div></div><form method="get" class="hr-filters"><input type="search" name="q" value="<?= $e($search) ?>" placeholder="Search staff directory"><select name="department"><option value="">All departments</option><?php foreach ($departments as $item): ?><option value="<?= $e($item) ?>" <?= $filterDepartment === $item ? 'selected' : '' ?>><?= $e($item) ?></option><?php endforeach; ?></select><select name="status"><option value="">All statuses</option><?php foreach ($statuses as $item): ?><option value="<?= $e($item) ?>" <?= $filterStatus === $item ? 'selected' : '' ?>><?= $e($item) ?></option><?php endforeach; ?></select><button class="hr-btn hr-btn-dark" type="submit"><i class="fas fa-search"></i> Search</button><a class="hr-btn hr-btn-muted" href="index.php">Reset</a></form><div class="hr-table-wrap"><table class="hr-table"><thead><tr><th>Staff number / name</th><th>Department / title</th><th>Contact</th><th>Employment</th><th>Linked account</th><th>Status</th><th>Action</th></tr></thead><tbody><?php if ($staffRows && $staffRows->num_rows > 0): while ($row = $staffRows->fetch_assoc()): ?><tr><td><span class="hr-name"><?= $e($row['staff_no'] ?: 'Pending number') ?></span><span class="hr-muted"><?= $e(trim($row['first_name'].' '.$row['middle_name'].' '.$row['last_name'])) ?></span></td><td><span class="hr-name"><?= $e($row['department']) ?></span><span class="hr-muted"><?= $e($row['job_title']) ?></span></td><td><?= $e($row['phone'] ?: '—') ?><span class="hr-muted"><?= $e($row['email'] ?: 'No email') ?></span></td><td><?= $e($row['employment_type']) ?><span class="hr-muted">Hired: <?= $e($row['hire_date'] ?: 'Not recorded') ?></span></td><td><?= $e($row['account_name'] ?: 'Not linked') ?></td><td><span class="hr-status <?= $row['status'] === 'Active' ? 'hr-status-active' : ($row['status'] === 'On Leave' ? 'hr-status-leave' : 'hr-status-separated') ?>"><?= $e($row['status']) ?></span></td><td><?php if ($canEdit): ?><a class="hr-btn hr-btn-muted" href="?edit=<?= (int)$row['id'] ?>#staff-form"><i class="fas fa-pen"></i> Edit</a><?php else: ?>—<?php endif; ?></td></tr><?php endwhile; else: ?><tr><td class="hr-empty" colspan="7">No staff records found. Add your first employee or change the search filters.</td></tr><?php endif; ?></tbody></table></div></section>
