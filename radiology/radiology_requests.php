@@ -18,6 +18,7 @@ $where = "ps.category='radiology'";
 $params = [];
 $types = '';
 if ($patientId > 0) { $where .= " AND ps.patient_id=?"; $params[]=$patientId; $types.='i'; }
+if ($visitId > 0) { $where .= " AND ps.visit_id=?"; $params[]=$visitId; $types.='i'; }
 
 $sql = "SELECT ps.id, ps.patient_id, ps.visit_id, ps.service_id, ps.service_name_snapshot,
                ps.service_code_snapshot, ps.status, ps.created_at, ps.results,
