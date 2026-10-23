@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $conn->begin_transaction();
             try {
-                $lock = $conn->prepare('SELECT id,status,surgeon_id,anesthetist_id,consent_confirmed,identity_confirmed,site_marked,allergies_reviewed,fasting_confirmed,anesthesia_reviewed FROM theatre_cases WHERE id=? FOR UPDATE');
+                $lock = $conn->prepare('SELECT id,patient_id,status,outcome,surgeon_id,anesthetist_id,consent_confirmed,identity_confirmed,site_marked,allergies_reviewed,fasting_confirmed,anesthesia_reviewed FROM theatre_cases WHERE id=? FOR UPDATE');
                 if (!$lock) throw new RuntimeException('Unable to lock the theatre case.');
                 $lock->bind_param('i', $caseId);
                 if (!$lock->execute()) {
@@ -145,6 +145,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lock->close();
                 if (!$current) throw new RuntimeException('Theatre case was not found.');
                 $oldStatus = (string)$current['status'];
+                $effectiveOutcome = $outcome !== '' ? $outcome : (string)($current['outcome'] ?? '');
+                if ($targetStatus === 'Completed' && $effectiveOutcome === 'Admitted') {
+                    $patientId = (int)$current['patient_id'];
+                    $admissionCheck = $conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
+                    if (!$admissionCheck) throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case.');
+                    $admissionCheck->bind_param('i', $patientId);
+                    if (!$admissionCheck->execute()) {
+                        $admissionError = $admissionCheck->error;
+                        $admissionCheck->close();
+                        throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case. ' . $admissionError);
+                    }
+                    $activeAdmission = $admissionCheck->get_result()->fetch_assoc();
+                    $admissionCheck->close();
+                    if (!$activeAdmission) throw new RuntimeException('This case outcome is Admitted, but the patient has no active inpatient admission. Complete the ward admission first, then complete the theatre case.');
+                }
                 // Safety confirmations are retained once recorded; a routine status update
                 // must not silently erase prior pre-operative checks when unchecked boxes
                 // are omitted from the submitted form.
