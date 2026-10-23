@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notes = trim((string)($_POST['clinical_notes'] ?? ''));
         if ($patientId <= 0 || $procedure === '' || $scheduled === '') {
             $error = 'Patient, planned procedure and scheduled date/time are required.';
+        } elseif (strlen($notes) > 4000) {
+            $error = 'Clinical notes must not exceed 4,000 characters.';
         } elseif (!in_array($urgency, ['Emergency','Urgent','Elective'], true)) {
             $error = 'Select a valid theatre urgency.';
         } else {
@@ -126,6 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.';
         } elseif ($targetStatus === 'Cancelled' && $cancelReason === '') {
             $error = 'A cancellation reason is required.';
+        } elseif (strlen($intraop) > 5000 || strlen($anesthesia) > 3000 || strlen($recovery) > 4000 || strlen($cancelReason) > 1000) {
+            $error = 'The submitted theatre notes exceed the allowed length. Shorten the notes and try again.';
         } else {
             $conn->begin_transaction();
             try {
