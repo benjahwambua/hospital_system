@@ -33,7 +33,8 @@ Mark each test Pass, Fail or Not run and record the tester, date and environment
 - Confirm a user without Create cannot schedule a case and a user without Edit cannot update a case.
 - Try entering In Theatre with each safety confirmation missing; every attempt must be blocked.
 - Confirm In Theatre requires two distinct assigned accounts to exist and be active; verify separately with clinical governance that each person is appropriately qualified and currently licensed, because the application does not enforce professional credentials.
-- Check each of the six safety items, save, reopen, explicitly uncheck one item, and save again; confirm the revocation is persisted. Confirm the case cannot transition into In Theatre until all six items are re-confirmed.
+- Before theatre starts, check each safety item, save, reopen, explicitly uncheck one item, and save again; confirm the revocation is persisted and the case cannot transition into In Theatre until all six items are re-confirmed.
+- After a case enters In Theatre or Recovery, attempt to change a pre-operative checklist flag; confirm the application rejects the edit so the historical pre-operative record is preserved.
 - Verify only these lifecycle transitions are accepted: Planned → Pre-op/Cancelled; Pre-op → Planned/In Theatre/Cancelled; In Theatre → Recovery; Recovery → Completed. Same-state saves may update documentation but must not bypass the gates.
 - Confirm cancellation requires a reason and cannot be used after the case has entered theatre.
 - Confirm Recovery and Completed require intra-operative notes, anaesthesia notes, recovery/handover notes and a valid outcome.

@@ -179,6 +179,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lock->close();
                 if (!$current) throw new RuntimeException('Theatre case was not found.');
                 $oldStatus = (string)$current['status'];
+                // The checklist records pre-operative confirmations. It may be corrected
+                // before surgery starts, but must remain an accurate historical record once
+                // the case enters theatre or recovery.
+                if (in_array($oldStatus, ['In Theatre', 'Recovery'], true)) {
+                    foreach (array_keys($checks) as $field) {
+                        if ((int)$checks[$field] !== (int)$current[$field]) {
+                            throw new RuntimeException('Pre-operative safety confirmations are locked after theatre starts. Record any changed clinical condition in the appropriate clinical notes instead of rewriting the pre-operative record.');
+                        }
+                    }
+                }
                 $effectiveOutcome = $outcome !== '' ? $outcome : (string)($current['outcome'] ?? '');
                 $effectiveIntraop = $intraop !== '' ? $intraop : (string)($current['intraoperative_notes'] ?? '');
                 $effectiveAnesthesia = $anesthesia !== '' ? $anesthesia : (string)($current['anesthesia_notes'] ?? '');
