@@ -120,10 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cancelReason = trim((string)($_POST['cancellation_reason'] ?? ''));
         if ($caseId <= 0 || !in_array($targetStatus, $allowedStatuses, true)) {
             $error = 'Invalid theatre case or status.';
-        } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($intraop === '' || $anesthesia === '')) {
-            $error = 'Before handing over to recovery or completing the case, record both intra-operative findings and anaesthesia notes.';
-        } elseif (in_array($targetStatus, ['Recovery','Completed'], true) && ($recovery === '' || !in_array($outcome, ['Recovered','Transferred','Admitted','Other'], true))) {
-            $error = 'Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.';
         } elseif ($targetStatus === 'Cancelled' && $cancelReason === '') {
             $error = 'A cancellation reason is required.';
         } elseif (strlen($intraop) > 5000 || strlen($anesthesia) > 3000 || strlen($recovery) > 4000 || strlen($cancelReason) > 1000) {
@@ -131,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $conn->begin_transaction();
             try {
-                $lock = $conn->prepare('SELECT id,patient_id,status,outcome,surgeon_id,anesthetist_id,consent_confirmed,identity_confirmed,site_marked,allergies_reviewed,fasting_confirmed,anesthesia_reviewed FROM theatre_cases WHERE id=? FOR UPDATE');
+                $lock = $conn->prepare('SELECT id,patient_id,status,outcome,surgeon_id,anesthetist_id,consent_confirmed,identity_confirmed,site_marked,allergies_reviewed,fasting_confirmed,anesthesia_reviewed,intraoperative_notes,anesthesia_notes,recovery_notes FROM theatre_cases WHERE id=? FOR UPDATE');
                 if (!$lock) throw new RuntimeException('Unable to lock the theatre case.');
                 $lock->bind_param('i', $caseId);
                 if (!$lock->execute()) {
@@ -144,6 +140,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$current) throw new RuntimeException('Theatre case was not found.');
                 $oldStatus = (string)$current['status'];
                 $effectiveOutcome = $outcome !== '' ? $outcome : (string)($current['outcome'] ?? '');
+                $effectiveIntraop = $intraop !== '' ? $intraop : (string)($current['intraoperative_notes'] ?? '');
+                $effectiveAnesthesia = $anesthesia !== '' ? $anesthesia : (string)($current['anesthesia_notes'] ?? '');
+                $effectiveRecovery = $recovery !== '' ? $recovery : (string)($current['recovery_notes'] ?? '');
+                if (in_array($targetStatus, ['Recovery','Completed'], true)
+                    && ($effectiveIntraop === '' || $effectiveAnesthesia === '')) {
+                    throw new RuntimeException('Before handing over to recovery or completing the case, record both intra-operative findings and anaesthesia notes.');
+                }
+                if (in_array($targetStatus, ['Recovery','Completed'], true)
+                    && ($effectiveRecovery === '' || !in_array($effectiveOutcome, ['Recovered','Transferred','Admitted','Other'], true))) {
+                    throw new RuntimeException('Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.');
+                }
                 if ($targetStatus === 'Completed' && $effectiveOutcome === 'Admitted') {
                     $patientId = (int)$current['patient_id'];
                     $admissionCheck = $conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
@@ -204,10 +211,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $uid = (int)($_SESSION['user_id'] ?? 0);
                 $startSql = $targetStatus === 'In Theatre' && $oldStatus !== 'In Theatre' ? date('Y-m-d H:i:s') : null;
                 $endSql = $targetStatus === 'Recovery' && $oldStatus === 'In Theatre' ? date('Y-m-d H:i:s') : null;
-                $recoverySql = in_array($targetStatus, ['Recovery','Completed'], true) ? $recovery : null;
+                $recoverySql = in_array($targetStatus, ['Recovery','Completed'], true) && $recovery !== '' ? $recovery : null;
                 $outcomeSql = in_array($targetStatus, ['Recovery','Completed'], true) && $outcome !== '' ? $outcome : null;
                 $cancelSql = $targetStatus === 'Cancelled' ? $cancelReason : null;
-                $sql = "UPDATE theatre_cases SET consent_confirmed=?,identity_confirmed=?,site_marked=?,allergies_reviewed=?,fasting_confirmed=?,anesthesia_reviewed=?,intraoperative_notes=COALESCE(NULLIF(?,''),intraoperative_notes),anesthesia_notes=COALESCE(NULLIF(?,''),anesthesia_notes),recovery_notes=COALESCE(?,recovery_notes),outcome=COALESCE(?,outcome),cancellation_reason=COALESCE(?,cancellation_reason),status=?,theatre_started_at=COALESCE(theatre_started_at,?),theatre_ended_at=COALESCE(theatre_ended_at,?),updated_by=?,updated_at=NOW() WHERE id=?";
+                $sql = "UPDATE theatre_cases SET consent_confirmed=?,identity_confirmed=?,site_marked=?,allergies_reviewed=?,fasting_confirmed=?,anesthesia_reviewed=?,intraoperative_notes=COALESCE(NULLIF(?,''),intraoperative_notes),anesthesia_notes=COALESCE(NULLIF(?,''),anesthesia_notes),recovery_notes=COALESCE(NULLIF(?,''),recovery_notes),outcome=COALESCE(?,outcome),cancellation_reason=COALESCE(?,cancellation_reason),status=?,theatre_started_at=COALESCE(theatre_started_at,?),theatre_ended_at=COALESCE(theatre_ended_at,?),updated_by=?,updated_at=NOW() WHERE id=?";
                 $stmt = $conn->prepare($sql);
                 if (!$stmt) throw new RuntimeException('Unable to prepare the case update. Confirm the theatre migration.');
                 $stmt->bind_param('iiiiiissssssssii', $checks['consent_confirmed'],$checks['identity_confirmed'],$checks['site_marked'],$checks['allergies_reviewed'],$checks['fasting_confirmed'],$checks['anesthesia_reviewed'],$intraop,$anesthesia,$recoverySql,$outcomeSql,$cancelSql,$targetStatus,$startSql,$endSql,$uid,$caseId);
