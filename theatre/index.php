@@ -163,7 +163,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $transactionStarted = true;
                 $lock = $conn->prepare('SELECT id,patient_id,status,outcome,surgeon_id,anesthetist_id,consent_confirmed,identity_confirmed,site_marked,allergies_reviewed,fasting_confirmed,anesthesia_reviewed,intraoperative_notes,anesthesia_notes,recovery_notes FROM theatre_cases WHERE id=? FOR UPDATE');
-                if (!$lock) throw new RuntimeException('Unable to lock the theatre case.');
+                if (!$lock) {
+                    error_log('Theatre case lock prepare failed for case id '.$caseId.': '.$conn->error);
+                    throw new RuntimeException('Unable to lock the theatre case.');
+                }
                 $lock->bind_param('i', $caseId);
                 if (!$lock->execute()) {
                     error_log('Theatre case lock query failed for case id '.$caseId.': '.$lock->error);
@@ -189,7 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($targetStatus === 'Completed' && $effectiveOutcome === 'Admitted') {
                     $patientId = (int)$current['patient_id'];
                     $admissionCheck = $conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
-                    if (!$admissionCheck) throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case.');
+                    if (!$admissionCheck) {
+                        error_log('Theatre admission verification prepare failed for case id '.$caseId.': '.$conn->error);
+                        throw new RuntimeException('Unable to verify the inpatient admission before completing this theatre case.');
+                    }
                     $admissionCheck->bind_param('i', $patientId);
                     if (!$admissionCheck->execute()) {
                         error_log('Theatre admission verification failed for case id '.$caseId.': '.$admissionCheck->error);
@@ -216,7 +222,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new RuntimeException('Assign both a lead surgeon and an anaesthesia provider before starting the operation.');
                     }
                     $staffCheck = $conn->prepare("SELECT COUNT(*) active_count FROM users WHERE id IN (?,?) AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled')");
-                    if (!$staffCheck) throw new RuntimeException('Unable to verify the assigned theatre team.');
+                    if (!$staffCheck) {
+                        error_log('Theatre active team verification prepare failed for case id '.$caseId.': '.$conn->error);
+                        throw new RuntimeException('Unable to verify the assigned theatre team.');
+                    }
                     $staffCheck->bind_param('ii', $surgeonId, $anesthetistId);
                     if (!$staffCheck->execute()) {
                         error_log('Theatre team verification failed for case id '.$caseId.': '.$staffCheck->error);
@@ -251,7 +260,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $cancelSql = $targetStatus === 'Cancelled' ? $cancelReason : null;
                 $sql = "UPDATE theatre_cases SET consent_confirmed=?,identity_confirmed=?,site_marked=?,allergies_reviewed=?,fasting_confirmed=?,anesthesia_reviewed=?,intraoperative_notes=COALESCE(NULLIF(?,''),intraoperative_notes),anesthesia_notes=COALESCE(NULLIF(?,''),anesthesia_notes),recovery_notes=COALESCE(NULLIF(?,''),recovery_notes),outcome=COALESCE(?,outcome),cancellation_reason=COALESCE(?,cancellation_reason),status=?,theatre_started_at=COALESCE(theatre_started_at,?),theatre_ended_at=COALESCE(theatre_ended_at,?),updated_by=?,updated_at=NOW() WHERE id=?";
                 $stmt = $conn->prepare($sql);
-                if (!$stmt) throw new RuntimeException('Unable to prepare the case update. Confirm the theatre migration.');
+                if (!$stmt) {
+                    error_log('Theatre case update prepare failed for case id '.$caseId.': '.$conn->error);
+                    throw new RuntimeException('Unable to prepare the case update. Confirm the theatre migration.');
+                }
                 $stmt->bind_param('iiiiiissssssssii', $checks['consent_confirmed'],$checks['identity_confirmed'],$checks['site_marked'],$checks['allergies_reviewed'],$checks['fasting_confirmed'],$checks['anesthesia_reviewed'],$intraop,$anesthesia,$recoverySql,$outcomeSql,$cancelSql,$targetStatus,$startSql,$endSql,$uid,$caseId);
                 if (!$stmt->execute()) {
                     error_log('Theatre case update failed for case id '.$caseId.': '.$stmt->error);
