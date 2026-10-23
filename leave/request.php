@@ -2,32 +2,120 @@
 require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/session.php';
 require_once __DIR__.'/../includes/auth.php';
-require_login(); require_module_access($conn,'staff_leave','create');
-if(empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32)); $csrf=$_SESSION['csrf_token']; $error=''; $message='';
-$uid=(int)($_SESSION['user_id']??0);
-if($_SERVER['REQUEST_METHOD']==='POST'){
- if(!hash_equals($csrf,(string)($_POST['csrf_token']??''))) $error='Invalid security token.';
- else{
-  $type=trim((string)($_POST['leave_type']??'')); $start=(string)($_POST['start_date']??''); $end=(string)($_POST['end_date']??''); $reason=trim((string)($_POST['reason']??''));
-  $allowed=['Annual','Sick','Maternity','Paternity','Compassionate','Unpaid','Other'];
-  $sd=DateTime::createFromFormat('Y-m-d',$start); $ed=DateTime::createFromFormat('Y-m-d',$end);
-  if(!in_array($type,$allowed,true)||!$sd||!$ed||$sd->format('Y-m-d')!==$start||$ed->format('Y-m-d')!==$end) $error='Enter a valid leave type and dates.';
-  elseif($ed<$sd) $error='End date cannot be before start date.';
-  else{
-   $days=(float)$sd->diff($ed)->days+1;
-   $over=$conn->prepare("SELECT id FROM staff_leave_requests WHERE user_id=? AND status IN ('Pending','Approved') AND start_date<=? AND end_date>=? LIMIT 1");
-   $over->bind_param('iss',$uid,$end,$start); $over->execute(); $existing=$over->get_result()->fetch_assoc(); $over->close();
-   if($existing) $error='You already have a pending or approved leave request overlapping these dates.';
-   else{
-    $s=$conn->prepare("INSERT INTO staff_leave_requests(user_id,leave_type,start_date,end_date,days,reason) VALUES(?,?,?,?,?,?)");
-    $s->bind_param('isssds',$uid,$type,$start,$end,$days,$reason);
-    if($s->execute()) $message='Leave request submitted for approval.'; else $error='Unable to submit the leave request.';
-    $s->close();
-   }
-  }
- }
+require_login();
+require_module_access($conn, 'staff_leave', 'create');
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
-include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar.php';
+$csrf = $_SESSION['csrf_token'];
+$error = '';
+$message = '';
+$uid = (int)($_SESSION['user_id'] ?? 0);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($csrf, (string)($_POST['csrf_token'] ?? ''))) {
+        $error = 'Your security token expired. Refresh the page and try again.';
+    } else {
+        $type = trim((string)($_POST['leave_type'] ?? ''));
+        $start = trim((string)($_POST['start_date'] ?? ''));
+        $end = trim((string)($_POST['end_date'] ?? ''));
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        $allowed = ['Annual', 'Sick', 'Maternity', 'Paternity', 'Compassionate', 'Unpaid', 'Other'];
+        $sd = DateTime::createFromFormat('!Y-m-d', $start);
+        $ed = DateTime::createFromFormat('!Y-m-d', $end);
+        $dateErrorsStart = DateTime::getLastErrors();
+        $dateErrorsEnd = DateTime::getLastErrors();
+        $startValid = $sd instanceof DateTime && $sd->format('Y-m-d') === $start
+            && (!$dateErrorsStart || (!$dateErrorsStart['warning_count'] && !$dateErrorsStart['error_count']));
+        $endValid = $ed instanceof DateTime && $ed->format('Y-m-d') === $end
+            && (!$dateErrorsEnd || (!$dateErrorsEnd['warning_count'] && !$dateErrorsEnd['error_count']));
+
+        if (!in_array($type, $allowed, true) || !$startValid || !$endValid) {
+            $error = 'Enter a valid leave type and calendar dates.';
+        } elseif ($end < $start) {
+            $error = 'End date cannot be before start date.';
+        } elseif (strlen($reason) > 500) {
+            $error = 'Reason or notes cannot exceed 500 characters.';
+        } elseif ($uid < 1) {
+            $error = 'Your account could not be identified. Sign in again and retry.';
+        } else {
+            $days = (float)$sd->diff($ed)->days + 1;
+            try {
+                /*
+                 * Lock the requester's user row before checking for overlapping
+                 * leave. This serializes concurrent submissions by the same user
+                 * and prevents two simultaneous requests bypassing the overlap check.
+                 */
+                if (!$conn->begin_transaction()) {
+                    throw new RuntimeException('Unable to begin leave request transaction.');
+                }
+                $lock = $conn->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+                if (!$lock) {
+                    throw new RuntimeException('Unable to validate the requesting account.');
+                }
+                $lock->bind_param('i', $uid);
+                if (!$lock->execute()) {
+                    $lock->close();
+                    throw new RuntimeException('Unable to validate the requesting account.');
+                }
+                $account = $lock->get_result()->fetch_assoc();
+                $lock->close();
+                if (!$account) {
+                    throw new RuntimeException('The requesting account no longer exists.');
+                }
+
+                $overlap = $conn->prepare("SELECT id FROM staff_leave_requests
+                    WHERE user_id = ? AND status IN ('Pending','Approved')
+                    AND start_date <= ? AND end_date >= ? LIMIT 1");
+                if (!$overlap) {
+                    throw new RuntimeException('Unable to check existing leave requests.');
+                }
+                $overlap->bind_param('iss', $uid, $end, $start);
+                if (!$overlap->execute()) {
+                    $overlap->close();
+                    throw new RuntimeException('Unable to check existing leave requests.');
+                }
+                $existing = $overlap->get_result()->fetch_assoc();
+                $overlap->close();
+
+                if ($existing) {
+                    $conn->rollback();
+                    $error = 'You already have a pending or approved leave request overlapping these dates.';
+                } else {
+                    $stmt = $conn->prepare('INSERT INTO staff_leave_requests
+                        (user_id, leave_type, start_date, end_date, days, reason)
+                        VALUES (?, ?, ?, ?, ?, ?)');
+                    if (!$stmt) {
+                        throw new RuntimeException('Unable to prepare the leave request.');
+                    }
+                    $reasonValue = $reason !== '' ? $reason : null;
+                    $stmt->bind_param('isssds', $uid, $type, $start, $end, $days, $reasonValue);
+                    if (!$stmt->execute()) {
+                        $stmt->close();
+                        throw new RuntimeException('Unable to save the leave request.');
+                    }
+                    $stmt->close();
+                    if (!$conn->commit()) {
+                        throw new RuntimeException('Unable to commit the leave request.');
+                    }
+                    if (function_exists('audit')) {
+                        audit('staff_leave_submitted', 'leave_type='.$type.',start_date='.$start.',end_date='.$end);
+                    }
+                    $message = 'Leave request submitted for approval.';
+                }
+            } catch (Throwable $e) {
+                try { $conn->rollback(); } catch (Throwable $ignored) {}
+                error_log('Staff leave request failed: '.$e->getMessage());
+                if ($error === '') {
+                    $error = 'The leave request could not be saved. Please retry; if the problem continues, contact the administrator.';
+                }
+            }
+        }
+    }
+}
+include __DIR__.'/../includes/header.php';
+include __DIR__.'/../includes/sidebar.php';
 ?>
 
 <style>
@@ -98,6 +186,7 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 @media(max-width:767px){.lv-page{padding:18px 12px 35px}.lv-hero{padding:23px 20px;border-radius:17px}.lv-hero h1{font-size:1.4rem!important}.lv-metrics{grid-template-columns:1fr}.lv-form{padding:18px}.lv-card-header{padding:16px}.lv-details dt,.lv-details dd{padding-left:12px;padding-right:12px}}
 </style>
 <div class="lv-page"><div class="lv-wrap lv-form-wrap"><div class="lv-hero"><div class="lv-hero-main"><div><div class="lv-kicker">Staff · Human Resources</div><h1>Request Leave</h1><p>Submit a leave request for review and approval.</p></div><div class="lv-actions"><a href="index.php" class="lv-action lv-action-light">Back to Leave</a></div></div></div><div class="lv-card"><div class="lv-card-header"><div><strong>New Leave Request</strong><small>Provide the leave period and supporting reason or notes.</small></div></div><div class="lv-form">
-<?php if($message): ?><div class="alert alert-success"><?=htmlspecialchars($message)?></div><?php endif; ?><?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; ?>
-<form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><div class="lv-section"><div class="lv-section-title"><i class="fas fa-calendar-alt"></i> Leave Details</div><div class="form-row"><div class="form-group col-md-6 lv-field"><label>Leave Type</label><select name="leave_type" class="form-control" required><option value="">Select</option><?php foreach(['Annual','Sick','Maternity','Paternity','Compassionate','Unpaid','Other'] as $x): ?><option><?=htmlspecialchars($x)?></option><?php endforeach; ?></select></div><div class="form-group col-md-3 lv-field"><label>Start Date</label><input type="date" name="start_date" class="form-control" required></div><div class="form-group col-md-3 lv-field"><label>End Date</label><input type="date" name="end_date" class="form-control" required></div></div></div><div class="lv-section"><div class="lv-section-title"><i class="fas fa-sticky-note-o"></i> Notes</div><div class="form-group lv-field"><label>Reason / Notes</label><textarea name="reason" class="form-control" rows="4" maxlength="500"></textarea></div><div class="lv-form-actions"><button class="lv-btn lv-btn-primary" type="submit"><i class="fas fa-paper-plane"></i> Submit Request</button></div></div></form>
+<?php if ($message !== ''): ?><div class="alert alert-success"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+<?php if ($error !== ''): ?><div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+<form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>"><div class="lv-section"><div class="lv-section-title"><i class="fas fa-calendar-alt"></i> Leave Details</div><div class="form-row"><div class="form-group col-md-6 lv-field"><label>Leave Type</label><select name="leave_type" class="form-control" required><option value="">Select</option><?php foreach (['Annual','Sick','Maternity','Paternity','Compassionate','Unpaid','Other'] as $x): ?><option value="<?= htmlspecialchars($x, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($x, ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></select></div><div class="form-group col-md-3 lv-field"><label>Start Date</label><input type="date" name="start_date" class="form-control" required></div><div class="form-group col-md-3 lv-field"><label>End Date</label><input type="date" name="end_date" class="form-control" required></div></div></div><div class="lv-section"><div class="lv-section-title"><i class="fas fa-sticky-note-o"></i> Notes</div><div class="form-group lv-field"><label>Reason / Notes</label><textarea name="reason" class="form-control" rows="4" maxlength="500"></textarea></div><div class="lv-form-actions"><button class="lv-btn lv-btn-primary" type="submit"><i class="fas fa-paper-plane"></i> Submit Request</button></div></div></form>
 </div></div></div></div><?php include __DIR__.'/../includes/footer.php'; ?>
