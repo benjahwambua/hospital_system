@@ -208,12 +208,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $admissionCheck->close();
                     if (!$activeAdmission) throw new RuntimeException('This case outcome is Admitted, but the patient has no active inpatient admission. Complete the ward admission first, then complete the theatre case.');
                 }
-                // Safety confirmations are retained once recorded; a routine status update
-                // must not silently erase prior pre-operative checks when unchecked boxes
-                // are omitted from the submitted form.
-                foreach (array_keys($checks) as $checkField) {
-                    $checks[$checkField] = (!empty($current[$checkField]) || $checks[$checkField] === 1) ? 1 : 0;
-                }
+                // The form submits the complete checklist on every update. Respect explicit
+                // unchecking so a previously confirmed item can be revoked if its condition
+                // changes; the In Theatre gate below will block starting without all checks.
                 if ($targetStatus === 'In Theatre' && in_array(0, $checks, true)) {
                     throw new RuntimeException('The patient-safety gate is incomplete. Confirm consent, identity, site, allergies, fasting and anaesthesia review before starting theatre.');
                 }
