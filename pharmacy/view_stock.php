@@ -159,6 +159,7 @@ include __DIR__ . '/../includes/sidebar.php';
         </form>
 
         <a href="add_stock.php" class="btn btn-success mb-2"><i class="fa fa-plus"></i> Add Stock</a>
+        <a href="../stores/index.php?source=Pharmacy#central-stock-catalogue" class="btn btn-primary mb-2 ms-2"><i class="fa fa-warehouse"></i> View in Central Stores</a>
         <a href="../procurement/purchase_orders.php" class="btn btn-warning mb-2 ms-2"><i class="fa fa-shopping-cart"></i> Procurement / PO</a>
         <a href="?export=excel" class="btn btn-info mb-2 ms-2"><i class="fa fa-file-excel"></i> Export Stock Sheet</a>
     </div>
