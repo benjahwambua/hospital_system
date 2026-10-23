@@ -30,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (($surgeonRaw !== '' && ($surgeonId === false || $surgeonId <= 0))
             || ($anesthetistRaw !== '' && ($anesthetistId === false || $anesthetistId <= 0))) {
             $error = 'Select a valid surgeon and anaesthesia provider, or leave the assignments unassigned.';
+        } elseif ($surgeonId !== null && $surgeonId !== false && $anesthetistId !== null && $anesthetistId !== false && (int)$surgeonId === (int)$anesthetistId) {
+            $error = 'Assign different staff members as lead surgeon and anaesthesia provider.';
         } elseif (strlen($notes) > 4000) {
             $error = 'Clinical notes must not exceed 4,000 characters.';
         } elseif (!in_array($urgency, ['Emergency','Urgent','Elective'], true)) {
