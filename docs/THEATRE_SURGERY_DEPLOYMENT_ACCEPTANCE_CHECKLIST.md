@@ -20,7 +20,7 @@ This checklist applies to the current Theatre & Surgery workflow in `theatre/ind
 2. Confirm the base HMS schema, patient table and access-control migration are installed.
 3. Review `database/theatre_surgery_migration.sql` against the target schema; apply it once in a backed-up test environment.
 4. Verify the `theatre_cases` table and `theatre` row in `access_modules`.
-5. Explicitly assign Theatre View/Create/Edit/Approve rights to the intended users through Access Rights. The current page uses View, Create and Edit actions; do not infer permissions from a job title or role.
+5. Explicitly assign Theatre View/Create/Edit rights to the intended users through Access Rights. The current page enforces View, Create and Edit; it does not implement a separate approval action, so do not treat Approve permission as an implemented Theatre workflow. Do not infer permissions from a job title or role.
 6. Confirm the Theatre link is visible only to users with module access, then test direct URL access for users without access.
 
 ## Functional acceptance tests
