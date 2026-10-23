@@ -20,11 +20,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $procedure = trim((string)($_POST['procedure_name'] ?? ''));
         $urgency = (string)($_POST['urgency'] ?? 'Elective');
         $scheduled = trim((string)($_POST['scheduled_at'] ?? ''));
-        $surgeonId = filter_input(INPUT_POST, 'surgeon_id', FILTER_VALIDATE_INT);
-        $anesthetistId = filter_input(INPUT_POST, 'anesthetist_id', FILTER_VALIDATE_INT);
+        $surgeonRaw = trim((string)($_POST['surgeon_id'] ?? ''));
+        $anesthetistRaw = trim((string)($_POST['anesthetist_id'] ?? ''));
+        $surgeonId = $surgeonRaw === '' ? null : filter_var($surgeonRaw, FILTER_VALIDATE_INT);
+        $anesthetistId = $anesthetistRaw === '' ? null : filter_var($anesthetistRaw, FILTER_VALIDATE_INT);
         $notes = trim((string)($_POST['clinical_notes'] ?? ''));
         if ($patientId <= 0 || $procedure === '' || $scheduled === '') {
             $error = 'Patient, planned procedure and scheduled date/time are required.';
+        } elseif (($surgeonRaw !== '' && ($surgeonId === false || $surgeonId <= 0))
+            || ($anesthetistRaw !== '' && ($anesthetistId === false || $anesthetistId <= 0))) {
+            $error = 'Select a valid surgeon and anaesthesia provider, or leave the assignments unassigned.';
         } elseif (strlen($notes) > 4000) {
             $error = 'Clinical notes must not exceed 4,000 characters.';
         } elseif (!in_array($urgency, ['Emergency','Urgent','Elective'], true)) {
