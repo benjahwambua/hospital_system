@@ -208,11 +208,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pageLoadError = '';
+$pageLoadErrors = [];
 $patients = $conn->query('SELECT id,patient_number,full_name FROM patients ORDER BY full_name ASC LIMIT 2000');
-if (!$patients) { error_log('Theatre patient list query failed: '.$conn->error); $pageLoadError = 'Patient list could not be loaded. Scheduling may be unavailable until the database issue is resolved.'; }
+if (!$patients) { error_log('Theatre patient list query failed: '.$conn->error); $pageLoadErrors[] = 'Patient list could not be loaded. Scheduling is unavailable until the database issue is resolved.'; }
 $staff = $conn->query("SELECT id,full_name FROM users WHERE COALESCE(status,'Active') NOT IN ('Inactive','Disabled') ORDER BY full_name ASC");
-if (!$staff) { error_log('Theatre staff list query failed: '.$conn->error); $pageLoadError = 'Theatre staff list could not be loaded. Verify the user table and database connection before assigning a team.'; }
+if (!$staff) { error_log('Theatre staff list query failed: '.$conn->error); $pageLoadErrors[] = 'Theatre staff list could not be loaded. Verify the user table and database connection before assigning a team.'; }
 $statsAvailable = false;
 $stats = ['today'=>'Unavailable','planned'=>'Unavailable','in_theatre'=>'Unavailable','recovery'=>'Unavailable'];
 $q = $conn->query("SELECT SUM(DATE(scheduled_at)=CURDATE() AND status NOT IN ('Cancelled')) today_count,SUM(status IN ('Planned','Pre-op')) planned_count,SUM(status='In Theatre') theatre_count,SUM(status='Recovery') recovery_count FROM theatre_cases");
@@ -222,10 +222,11 @@ if ($q) {
     $statsAvailable = true;
 } else {
     error_log('Theatre metrics query failed: '.$conn->error);
-    $pageLoadError = trim($pageLoadError.' Theatre metrics could not be loaded. Counts are marked unavailable rather than shown as zero.');
+    $pageLoadErrors[] = 'Theatre metrics could not be loaded. Counts are marked unavailable rather than shown as zero.';
 }
 $cases = $conn->query("SELECT t.*,p.full_name,p.patient_number,s.full_name surgeon_name,a.full_name anesthetist_name FROM theatre_cases t JOIN patients p ON p.id=t.patient_id LEFT JOIN users s ON s.id=t.surgeon_id LEFT JOIN users a ON a.id=t.anesthetist_id ORDER BY FIELD(t.status,'In Theatre','Recovery','Pre-op','Planned','Completed','Cancelled'),t.scheduled_at ASC LIMIT 150");
-if (!$cases) { error_log('Theatre case list query failed: '.$conn->error); $pageLoadError = 'Theatre cases could not be loaded. The list below is not a reliable indication that no cases exist.'; }
+if (!$cases) { error_log('Theatre case list query failed: '.$conn->error); $pageLoadErrors[] = 'Theatre cases could not be loaded. The list below is not a reliable indication that no cases exist.'; }
+$pageLoadError = implode(' ', $pageLoadErrors);
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
@@ -240,7 +241,7 @@ include __DIR__ . '/../includes/sidebar.php';
   <div class="theatre-grid"><div class="theatre-stat"><small>Cases scheduled today</small><strong><?= $stats['today'] ?></strong></div><div class="theatre-stat"><small>Planned / Pre-op</small><strong><?= $stats['planned'] ?></strong></div><div class="theatre-stat"><small>In theatre</small><strong><?= $stats['in_theatre'] ?></strong></div><div class="theatre-stat"><small>Recovery</small><strong><?= $stats['recovery'] ?></strong></div></div>
   <div class="theatre-layout">
     <section class="theatre-panel"><h2>Schedule a case</h2>
-    <?php if ($canCreate): ?>
+    <?php if ($canCreate && $patients && $staff): ?>
       <form class="theatre-form" method="post"><input type="hidden" name="csrf_token" value="<?= theatre_h(csrf_token()) ?>"><input type="hidden" name="action" value="create">
         <label for="patient_id">Registered patient *</label><select id="patient_id" name="patient_id" required><option value="">Select patient</option><?php if($patients): while($p=$patients->fetch_assoc()): ?><option value="<?= (int)$p['id'] ?>"><?= theatre_h($p['patient_number'].' — '.$p['full_name']) ?></option><?php endwhile; endif; ?></select>
         <label for="procedure_name">Planned procedure *</label><input id="procedure_name" name="procedure_name" maxlength="180" required placeholder="e.g. Open reduction and internal fixation">
@@ -252,7 +253,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <label for="clinical_notes">Clinical notes / indication</label><textarea id="clinical_notes" name="clinical_notes" maxlength="4000"></textarea>
         <button class="theatre-btn" type="submit">Schedule theatre case</button>
       </form>
-    <?php else: ?><p class="theatre-muted">You have view access only. Request Theatre Create permission to schedule cases.</p><?php endif; ?>
+    <?php elseif ($canCreate): ?><p class="theatre-muted">Scheduling is temporarily unavailable because the patient or active theatre-team list could not be loaded. Restore the lookup before creating a case.</p><?php else: ?><p class="theatre-muted">You have view access only. Request Theatre Create permission to schedule cases.</p><?php endif; ?>
     </section>
     <section class="theatre-panel"><h2>Case list &amp; peri-operative tracking</h2><div class="theatre-table-wrap"><table class="theatre-table"><thead><tr><th>Case / Patient</th><th>Schedule / Team</th><th>Status / Safety</th><th>Manage</th></tr></thead><tbody>
     <?php if($cases && $cases->num_rows): while($c=$cases->fetch_assoc()): $safetyCount=(int)$c['consent_confirmed']+(int)$c['identity_confirmed']+(int)$c['site_marked']+(int)$c['allergies_reviewed']+(int)$c['fasting_confirmed']+(int)$c['anesthesia_reviewed']; ?>
@@ -270,7 +271,7 @@ include __DIR__ . '/../includes/sidebar.php';
           <label>Cancellation reason (required to cancel)</label><textarea name="cancellation_reason" maxlength="1000"><?= theatre_h($c['cancellation_reason']) ?></textarea><button class="theatre-btn" type="submit">Save case update</button>
         </form></details><?php else: ?><span class="theatre-muted"><?= in_array($c['status'],['Completed','Cancelled'],true)?'Case closed':($canEdit?'':'Edit permission required') ?></span><?php endif; ?>
       </td></tr>
-    <?php endwhile; else: ?><tr><td colspan="4" class="theatre-empty">No theatre cases yet. Schedule the first case to begin the theatre register.</td></tr><?php endif; ?>
+    <?php endwhile; elseif($cases): ?><tr><td colspan="4" class="theatre-empty">No theatre cases yet. Schedule the first case to begin the theatre register.</td></tr><?php else: ?><tr><td colspan="4" class="theatre-empty">Theatre case list unavailable. Do not treat this as an empty register.</td></tr><?php endif; ?>
     </tbody></table></div></section>
   </div>
   <p class="theatre-muted" style="margin-top:16px">Clinical safety notice: this initial register does not replace an approved WHO Surgical Safety Checklist, anaesthetic chart, operative report, implant/lot traceability, blood product checks, PACU observation chart, or clinician-led clinical decision-making. Validate the workflow with theatre and anaesthesia staff before production use.</p>
