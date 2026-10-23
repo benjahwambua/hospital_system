@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notes = trim((string)($_POST['clinical_notes'] ?? ''));
         if ($patientId <= 0 || $procedure === '' || $scheduled === '') {
             $error = 'Patient, planned procedure and scheduled date/time are required.';
+        } elseif (strlen($notes) > 4000) {
+            $error = 'Clinical notes must not exceed 4,000 characters.';
         } elseif (!in_array($urgency, ['Emergency','Urgent','Elective'], true)) {
             $error = 'Select a valid theatre urgency.';
         } else {
