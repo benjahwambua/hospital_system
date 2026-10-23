@@ -30,16 +30,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!in_array($urgency, ['Emergency','Urgent','Elective'], true)) {
             $error = 'Select a valid theatre urgency.';
         } else {
+            $patientLookupAvailable = true;
             $check = $conn->prepare('SELECT id FROM patients WHERE id=? LIMIT 1');
             if (!$check) {
                 error_log('Theatre patient validation prepare failed for patient id '.$patientId.': '.$conn->error);
                 $error = 'Unable to validate the selected patient. Please try again.';
+                $patientLookupAvailable = false;
                 $patientExists = false;
             } else {
                 $check->bind_param('i', $patientId);
                 if (!$check->execute()) {
+                    error_log('Theatre patient validation execute failed for patient id '.$patientId.': '.$check->error);
                     $check->close();
                     $error = 'Unable to validate the selected patient. Please try again.';
+                    $patientLookupAvailable = false;
                     $patientExists = false;
                 } else {
                     $patientExists = (bool)$check->get_result()->fetch_assoc();
@@ -71,7 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $scheduleIsValid = $validSchedule instanceof DateTime
                 && $validSchedule->format('Y-m-d\TH:i') === $scheduled
                 && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0));
-            if (!$patientExists) {
+            if (!$patientLookupAvailable) {
+                // Keep the database lookup error; a failed lookup is not proof that the patient is missing.
+            } elseif (!$patientExists) {
                 $error = 'The selected patient was not found.';
             } elseif (!$validSurgeon || !$validAnesthetist) {
                 $error = 'Select active surgeon and anesthetist accounts, or leave the assignments unassigned.';
