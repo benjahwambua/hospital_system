@@ -126,6 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.';
         } elseif ($targetStatus === 'Cancelled' && $cancelReason === '') {
             $error = 'A cancellation reason is required.';
+        } elseif (strlen($intraop) > 5000 || strlen($anesthesia) > 3000 || strlen($recovery) > 4000 || strlen($cancelReason) > 1000) {
+            $error = 'The submitted theatre notes exceed the allowed length. Shorten the notes and try again.';
         } else {
             $conn->begin_transaction();
             try {
