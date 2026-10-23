@@ -12,6 +12,7 @@ $allowedTransitions=[
  'Discharged'=>[], 'Transferred'=>[], 'Left Before Assessment'=>[], 'Cancelled'=>[],
 ];
 $validNumber=static function($v,$min,$max):bool{return $v===''|| (is_numeric($v)&&(float)$v>=$min&&(float)$v<=$max);};
+$validInteger=static function($v,$min,$max):bool{return $v===''||(filter_var($v,FILTER_VALIDATE_INT)!==false&&(int)$v>=$min&&(int)$v<=$max);};
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!verify_csrf_token($_POST['csrf_token']??null))$error='Your security token expired. Refresh the page and try again.';
  else{
@@ -21,6 +22,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $patientId=(int)($_POST['patient_id']??0);$arrival=(string)($_POST['arrival_mode']??'Walk-in');$complaint=trim((string)($_POST['chief_complaint']??''));$level=(string)($_POST['triage_level']??'Urgent');$notes=trim((string)($_POST['triage_notes']??''));$temp=trim((string)($_POST['temperature_c']??''));$sys=trim((string)($_POST['systolic_bp']??''));$dia=trim((string)($_POST['diastolic_bp']??''));$pulse=trim((string)($_POST['pulse_bpm']??''));$resp=trim((string)($_POST['respiratory_rate']??''));$spo2=trim((string)($_POST['oxygen_saturation']??''));$pain=trim((string)($_POST['pain_score']??''));$clinician=(int)($_POST['assigned_clinician_id']??0);
    if($patientId<1||$complaint===''||strlen($complaint)>1000||strlen($notes)>1500||!in_array($arrival,$arrivals,true)||!in_array($level,$triage,true))$error='Choose a patient, arrival mode and triage level, and enter the chief complaint.';
    elseif(!$validNumber($temp,25,45)||!$validNumber($sys,40,300)||!$validNumber($dia,20,200)||!$validNumber($pulse,1,300)||!$validNumber($resp,1,100)||!$validNumber($spo2,0,100)||!$validNumber($pain,0,10))$error='One or more vital signs are outside the permitted range.';
+   elseif(!$validInteger($sys,40,300)||!$validInteger($dia,20,200)||!$validInteger($pulse,1,300)||!$validInteger($resp,1,100)||!$validInteger($pain,0,10))$error='Blood pressure, pulse, respiratory rate and pain score must be whole numbers.';
    elseif(($sys==='')!==($dia===''))$error='Enter both systolic and diastolic blood pressure, or leave both blank.';
    elseif($sys!==''&&$dia!==''&&(int)$sys<=(int)$dia)$error='Systolic blood pressure must be greater than diastolic blood pressure.';
    else{
