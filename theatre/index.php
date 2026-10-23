@@ -213,10 +213,16 @@ $patients = $conn->query('SELECT id,patient_number,full_name FROM patients ORDER
 if (!$patients) { error_log('Theatre patient list query failed: '.$conn->error); $pageLoadError = 'Patient list could not be loaded. Scheduling may be unavailable until the database issue is resolved.'; }
 $staff = $conn->query("SELECT id,full_name FROM users WHERE COALESCE(status,'Active') NOT IN ('Inactive','Disabled') ORDER BY full_name ASC");
 if (!$staff) { error_log('Theatre staff list query failed: '.$conn->error); $pageLoadError = 'Theatre staff list could not be loaded. Verify the user table and database connection before assigning a team.'; }
-$stats = ['today'=>0,'planned'=>0,'in_theatre'=>0,'recovery'=>0];
-if ($q=$conn->query("SELECT SUM(DATE(scheduled_at)=CURDATE() AND status NOT IN ('Cancelled')) today_count,SUM(status IN ('Planned','Pre-op')) planned_count,SUM(status='In Theatre') theatre_count,SUM(status='Recovery') recovery_count FROM theatre_cases")) {
+$statsAvailable = false;
+$stats = ['today'=>'Unavailable','planned'=>'Unavailable','in_theatre'=>'Unavailable','recovery'=>'Unavailable'];
+$q = $conn->query("SELECT SUM(DATE(scheduled_at)=CURDATE() AND status NOT IN ('Cancelled')) today_count,SUM(status IN ('Planned','Pre-op')) planned_count,SUM(status='In Theatre') theatre_count,SUM(status='Recovery') recovery_count FROM theatre_cases");
+if ($q) {
     $s=$q->fetch_assoc() ?: [];
     $stats=['today'=>(int)($s['today_count']??0),'planned'=>(int)($s['planned_count']??0),'in_theatre'=>(int)($s['theatre_count']??0),'recovery'=>(int)($s['recovery_count']??0)];
+    $statsAvailable = true;
+} else {
+    error_log('Theatre metrics query failed: '.$conn->error);
+    $pageLoadError = trim($pageLoadError.' Theatre metrics could not be loaded. Counts are marked unavailable rather than shown as zero.');
 }
 $cases = $conn->query("SELECT t.*,p.full_name,p.patient_number,s.full_name surgeon_name,a.full_name anesthetist_name FROM theatre_cases t JOIN patients p ON p.id=t.patient_id LEFT JOIN users s ON s.id=t.surgeon_id LEFT JOIN users a ON a.id=t.anesthetist_id ORDER BY FIELD(t.status,'In Theatre','Recovery','Pre-op','Planned','Completed','Cancelled'),t.scheduled_at ASC LIMIT 150");
 if (!$cases) { error_log('Theatre case list query failed: '.$conn->error); $pageLoadError = 'Theatre cases could not be loaded. The list below is not a reliable indication that no cases exist.'; }
