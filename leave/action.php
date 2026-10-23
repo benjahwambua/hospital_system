@@ -13,13 +13,26 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $decision=(string)($_POST['decision']??''); $notes=trim((string)($_POST['review_notes']??''));
   if(!in_array($decision,['Approved','Rejected'],true)) $error='Invalid decision.';
   elseif($row['status']!=='Pending') $error='This request has already been processed.';
+  elseif(strlen($notes)>500) $error='Review notes cannot exceed 500 characters.';
   else{
    $s=$conn->prepare("UPDATE staff_leave_requests SET status=?,reviewed_by=?,reviewed_at=NOW(),review_notes=?,updated_at=NOW() WHERE id=? AND status='Pending'");
-   $uid=(int)$_SESSION['user_id']; $s->bind_param('sisi',$decision,$uid,$notes,$id); $s->execute(); $changed=$s->affected_rows; $s->close();
-   if($changed!==1) $error='The request could not be updated.';
-   else {
-    if(function_exists('audit')) audit('staff_leave_'.strtolower($decision),"leave_request_id={$id},staff_user_id=".(int)$row['user_id']);
-    header('Location: index.php'); exit;
+   if(!$s) {
+    error_log('Staff leave decision prepare failed: '.$conn->error);
+    $error='The leave decision could not be saved. Please retry.';
+   } else {
+    $uid=(int)$_SESSION['user_id'];
+    $s->bind_param('sisi',$decision,$uid,$notes,$id);
+    if(!$s->execute()) {
+     error_log('Staff leave decision execute failed: '.$s->error);
+     $changed=0;
+    } else { $changed=$s->affected_rows; }
+    $s->close();
+    if($changed!==1) {
+     $error='The request could not be updated. It may already have been processed; refresh and check its status.';
+    } else {
+     if(function_exists('audit')) audit('staff_leave_'.strtolower($decision),"leave_request_id={$id},staff_user_id=".(int)$row['user_id']);
+     header('Location: index.php'); exit;
+    }
    }
   }
  }
