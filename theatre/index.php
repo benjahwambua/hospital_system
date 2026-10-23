@@ -50,23 +50,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $check->close();
                 }
             }
+            $surgeonLookupAvailable = true;
             $validSurgeon = true;
             if ($surgeonId && $surgeonId > 0) {
                 $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
-                if (!$staffCheck) { error_log('Theatre surgeon validation prepare failed for user id '.$surgeonId.': '.$conn->error); $validSurgeon = false; }
+                if (!$staffCheck) { error_log('Theatre surgeon validation prepare failed for user id '.$surgeonId.': '.$conn->error); $surgeonLookupAvailable = false; $validSurgeon = false; }
                 else {
                     $staffCheck->bind_param('i', $surgeonId);
-                    $validSurgeon = $staffCheck->execute() && (bool)$staffCheck->get_result()->fetch_assoc();
+                    if (!$staffCheck->execute()) {
+                        error_log('Theatre surgeon validation execute failed for user id '.$surgeonId.': '.$staffCheck->error);
+                        $surgeonLookupAvailable = false;
+                        $validSurgeon = false;
+                    } else {
+                        $validSurgeon = (bool)$staffCheck->get_result()->fetch_assoc();
+                    }
                     $staffCheck->close();
                 }
             }
+            $anesthetistLookupAvailable = true;
             $validAnesthetist = true;
             if ($anesthetistId && $anesthetistId > 0) {
                 $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
-                if (!$staffCheck) { error_log('Theatre anaesthesia validation prepare failed for user id '.$anesthetistId.': '.$conn->error); $validAnesthetist = false; }
+                if (!$staffCheck) { error_log('Theatre anaesthesia validation prepare failed for user id '.$anesthetistId.': '.$conn->error); $anesthetistLookupAvailable = false; $validAnesthetist = false; }
                 else {
                     $staffCheck->bind_param('i', $anesthetistId);
-                    $validAnesthetist = $staffCheck->execute() && (bool)$staffCheck->get_result()->fetch_assoc();
+                    if (!$staffCheck->execute()) {
+                        error_log('Theatre anaesthesia validation execute failed for user id '.$anesthetistId.': '.$staffCheck->error);
+                        $anesthetistLookupAvailable = false;
+                        $validAnesthetist = false;
+                    } else {
+                        $validAnesthetist = (bool)$staffCheck->get_result()->fetch_assoc();
+                    }
                     $staffCheck->close();
                 }
             }
@@ -79,6 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Keep the database lookup error; a failed lookup is not proof that the patient is missing.
             } elseif (!$patientExists) {
                 $error = 'The selected patient was not found.';
+            } elseif (!$surgeonLookupAvailable || !$anesthetistLookupAvailable) {
+                $error = 'Unable to validate the assigned theatre team. Please retry after the database issue is resolved.';
             } elseif (!$validSurgeon || !$validAnesthetist) {
                 $error = 'Select active surgeon and anesthetist accounts, or leave the assignments unassigned.';
             } elseif (strlen($procedure) > 180) {
