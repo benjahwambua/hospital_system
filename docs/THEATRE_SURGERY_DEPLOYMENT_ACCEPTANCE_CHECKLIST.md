@@ -8,7 +8,7 @@ This checklist applies to the current Theatre & Surgery workflow in `theatre/ind
 - Require individual Theatre View/Create/Edit permissions and CSRF validation.
 - Retain a six-item pre-operative gate: consent, identity, site/side marking, allergy review, fasting status and anaesthesia review.
 - Guard status transitions through Planned, Pre-op, In Theatre, Recovery, and Completed, with cancellation restricted to the early workflow.
-- Require assigned active surgeon and anaesthesia accounts before entering theatre.
+- Require two distinct assigned active user accounts as surgeon and anaesthesia provider before entering theatre. The current workflow checks account activity only; it does not verify professional registration, specialty, licence expiry or HR credential records.
 - Require intra-operative, anaesthesia and recovery/handover documentation plus a valid outcome before Recovery/Completed.
 - Require an active inpatient admission before completing a case with the Admitted outcome.
 - Preserve already-recorded clinical notes when a later status update submits blank note fields.
@@ -32,7 +32,8 @@ Mark each test Pass, Fail or Not run and record the tester, date and environment
 - Confirm patient and assigned team lookups fail safely if their queries fail.
 - Confirm a user without Create cannot schedule a case and a user without Edit cannot update a case.
 - Try entering In Theatre with each safety confirmation missing; every attempt must be blocked.
-- Confirm In Theatre requires both assigned accounts to exist and be active.
+- Confirm In Theatre requires two distinct assigned accounts to exist and be active; verify separately with clinical governance that each person is appropriately qualified and currently licensed, because the application does not enforce professional credentials.
+- Check each of the six safety items, save, reopen, explicitly uncheck one item, and save again; confirm the revocation is persisted. Confirm the case cannot transition into In Theatre until all six items are re-confirmed.
 - Verify only these lifecycle transitions are accepted: Planned → Pre-op/Cancelled; Pre-op → Planned/In Theatre/Cancelled; In Theatre → Recovery; Recovery → Completed. Same-state saves may update documentation but must not bypass the gates.
 - Confirm cancellation requires a reason and cannot be used after the case has entered theatre.
 - Confirm Recovery and Completed require intra-operative notes, anaesthesia notes, recovery/handover notes and a valid outcome.
@@ -44,6 +45,6 @@ Mark each test Pass, Fail or Not run and record the tester, date and environment
 
 ## Clinical gaps that must remain explicit
 
-The current six-item gate is a first safety checkpoint, not a substitute for an approved WHO Surgical Safety Checklist or local theatre policy. Before production clinical use, the hospital must validate and complete the appropriate Sign In, Time Out and Sign Out checklist, operative report, anaesthetic chart, implant/device and lot traceability, blood product checks, antibiotic/time-out documentation where applicable, PACU/recovery observations, post-operative orders, consent documentation, clinical team sign-off, and the interfaces to admissions, billing, pharmacy/stores and reporting.
+The current six-item gate is a first safety checkpoint, not a substitute for an approved WHO Surgical Safety Checklist or local theatre policy. The application currently validates active user accounts, not professional qualifications or licence status; a named clinician and clinical-governance process must verify those before assigning staff to a live case. Before production clinical use, the hospital must validate and complete the appropriate Sign In, Time Out and Sign Out checklist, operative report, anaesthetic chart, implant/device and lot traceability, blood product checks, antibiotic/time-out documentation where applicable, PACU/recovery observations, post-operative orders, consent documentation, clinical team sign-off, and the interfaces to admissions, billing, pharmacy/stores and reporting.
 
 Do not mark this module production-ready based only on syntax checks or a successful code merge. Apply the migration in a test database and complete witnessed theatre/anaesthesia UAT first.
