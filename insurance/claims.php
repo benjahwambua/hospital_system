@@ -3,14 +3,42 @@ require_once __DIR__.'/../config/config.php'; require_once __DIR__.'/../includes
 require_module_access($conn,'insurance','view'); if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32));$csrf=$_SESSION['csrf_token'];$msg='';$err='';
 if($_SERVER['REQUEST_METHOD']==='POST'){
  $a=$_POST['action']??''; require_module_access($conn,'insurance',$a==='submit'?'approve':'create');
+ $transactionStarted=false;
  if(!verify_csrf_token($_POST['csrf_token']??null))$err='Invalid security token.'; else try{
   if($a==='create'){
-   $inv=(int)$_POST['invoice_id']; $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1");$q->bind_param('i',$inv);$q->execute();$v=$q->get_result()->fetch_assoc();$q->close();if(!$v)throw new Exception('Invoice has no verified patient coverage.');
-   $q=$conn->prepare("SELECT COUNT(*) c FROM claim_headers WHERE invoice_id=?");$q->bind_param('i',$inv);$q->execute();$exists=(int)$q->get_result()->fetch_assoc()['c'];$q->close();if($exists)throw new Exception('A claim already exists for this invoice.');
-   $num='CLM-'.date('YmdHis').'-'.random_int(100,999);$s=$conn->prepare("INSERT INTO claim_headers(claim_number,patient_id,patient_coverage_id,payer_id,plan_id,invoice_id,encounter_date,claim_status,total_claim_amount,created_by) VALUES(?,?,?,?,?,?,DATE(?), 'Draft',?,?)");$s->bind_param('siiiiisdi',$num,$v['patient_id'],$v['coverage_id'],$v['payer_id'],$v['plan_id'],$v['id'],$v['created_at'],$v['total'],$_SESSION['user_id']);$s->execute();$cid=$s->insert_id;$s->close();
-   $q=$conn->prepare("SELECT id,item_name,quantity,unit_price,total FROM invoice_items WHERE invoice_id=?");$q->bind_param('i',$inv);$q->execute();$items=$q->get_result();$is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_name,quantity,unit_price,gross_amount,covered_amount,patient_responsibility,status) VALUES(?,?,?,?,?,?,?,?,? ,0,'Draft')");while($it=$items->fetch_assoc()){$type='Other';$gross=(float)$it['total'];$is->bind_param('issidddds',$cid,$type,$src='invoice_items',$it['id'],$it['item_name'],$it['quantity'],$it['unit_price'],$gross,$gross);$is->execute();}$is->close();$q->close();if(function_exists('audit'))audit('insurance_claim_created',"claim_id={$cid},invoice_id={$inv}");$msg='Claim created from invoice.';
+   $conn->begin_transaction();$transactionStarted=true;
+   $inv=(int)($_POST['invoice_id']??0);if($inv<=0)throw new Exception('Select a valid invoice.');
+   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
+   if(!$q)throw new Exception('Unable to prepare invoice and coverage validation.');
+   $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to validate invoice and patient coverage.');$v=$q->get_result()->fetch_assoc();$q->close();
+   if(!$v)throw new Exception('Invoice has no verified patient coverage.');
+   if((float)$v['total']<=0)throw new Exception('A claim requires an invoice with a positive total.');
+   $q=$conn->prepare("SELECT COUNT(*) c FROM claim_headers WHERE invoice_id=?");if(!$q)throw new Exception('Unable to check for an existing claim.');
+   $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to check for an existing claim.');$exists=(int)$q->get_result()->fetch_assoc()['c'];$q->close();if($exists)throw new Exception('A claim already exists for this invoice.');
+   $num='CLM-'.date('YmdHis').'-'.random_int(100,999);
+   $s=$conn->prepare("INSERT INTO claim_headers(claim_number,patient_id,patient_coverage_id,payer_id,plan_id,invoice_id,encounter_date,claim_status,total_claim_amount,created_by) VALUES(?,?,?,?,?,?,DATE(?), 'Draft',?,?)");
+   if(!$s)throw new Exception('Unable to prepare claim header.');
+   $createdBy=(int)($_SESSION['user_id']??0);
+   $s->bind_param('siiiiisdi',$num,$v['patient_id'],$v['coverage_id'],$v['payer_id'],$v['plan_id'],$v['id'],$v['created_at'],$v['total'],$createdBy);
+   if(!$s->execute())throw new Exception('Unable to create claim header: '.$s->error);$cid=(int)$s->insert_id;$s->close();
+   $q=$conn->prepare("SELECT id,item_name,quantity,unit_price,total FROM invoice_items WHERE invoice_id=?");
+   if(!$q)throw new Exception('Unable to prepare invoice claim items.');
+   $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to load invoice items.');$items=$q->get_result();
+   $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_name,quantity,unit_price,gross_amount,covered_amount,patient_responsibility,status) VALUES(?,?,?,?,?,?,?,?,?,0,'Draft')");
+   if(!$is)throw new Exception('Unable to prepare claim item creation.');
+   $itemCount=0;
+   while($it=$items->fetch_assoc()){
+    $type='Other';$src='invoice_items';$sourceId=(int)$it['id'];$itemName=(string)$it['item_name'];$quantity=(float)$it['quantity'];$unitPrice=(float)$it['unit_price'];$gross=(float)$it['total'];$covered=$gross;
+    $is->bind_param('issisdddd',$cid,$type,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$covered);
+    if(!$is->execute())throw new Exception('Unable to create claim item: '.$is->error);
+    $itemCount++;
+   }
+   $is->close();$q->close();
+   if($itemCount===0)throw new Exception('The invoice has no billable line items to claim.');
+   if(function_exists('audit'))audit('insurance_claim_created',"claim_id={$cid},invoice_id={$inv}");
+   $conn->commit();$transactionStarted=false;$msg='Claim created from invoice.';
   }elseif($a==='submit'){ $id=(int)$_POST['id'];$s=$conn->prepare("UPDATE claim_headers SET claim_status='Submitted',submission_date=CURDATE() WHERE id=? AND claim_status='Draft'");$s->bind_param('i',$id);$s->execute();if(!$s->affected_rows)throw new Exception('Claim is not in Draft status.');$s->close();if(function_exists('audit'))audit('insurance_claim_submitted',"claim_id={$id}");$msg='Claim submitted.';}
- }catch(Throwable $e){$err=$e->getMessage();}
+ }catch(Throwable $e){if($transactionStarted){$conn->rollback();$transactionStarted=false;}$err=$e->getMessage();error_log('Insurance claims workflow failed: '.$e->getMessage());}
 }
 $invoices=[];$q=$conn->query("SELECT i.id,i.created_at,i.total,p.full_name FROM invoices i JOIN patients p ON p.id=i.patient_id JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' LEFT JOIN claim_headers ch ON ch.invoice_id=i.id WHERE ch.id IS NULL ORDER BY i.created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$invoices[]=$x;
 $claims=[];$q=$conn->query("SELECT ch.*,p.full_name,py.payer_name FROM claim_headers ch JOIN patients p ON p.id=ch.patient_id JOIN payers py ON py.id=ch.payer_id ORDER BY ch.created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$claims[]=$x;
