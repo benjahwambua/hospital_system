@@ -59,26 +59,28 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if($tariffRow){$allowed=min($gross,max(0.0,(float)$tariffRow['allowed_price']*$quantity));$tariffMatched=true;}
     $baseCovered=round(min($gross,$allowed)*$rate/100,2);
     $payerCoverageTotal+=$baseCovered;
-    $preparedLines[]=['type'=>$type,'src'=>$src,'source_id'=>$sourceId,'item_name'=>$itemName,'quantity'=>$quantity,'unit_price'=>$unitPrice,'gross'=>$gross,'base_covered'=>$baseCovered,'tariff_matched'=>$tariffMatched];
+    $preparedLines[]=['type'=>$type,'src'=>$src,'source_id'=>$sourceId,'item_name'=>$itemName,'quantity'=>$quantity,'unit_price'=>$unitPrice,'gross'=>$gross,'allowed'=>$allowed,'base_covered'=>$baseCovered,'tariff_matched'=>$tariffMatched];
    }
    // Apply the plan copay once per claim, against the payer-covered portion.
    $copayRemaining=max(0.0,(float)($v['default_copay_amount']??0));
-   $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_code,item_name,quantity,unit_price,gross_amount,covered_amount,copay_amount,patient_responsibility,status) VALUES(?,?,?,?,NULL,?,?,?,?,?,?,?,'Draft')");
+   $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_code,item_name,quantity,unit_price,gross_amount,allowed_amount,contractual_adjustment,covered_amount,copay_amount,patient_responsibility,status) VALUES(?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,'Draft')");
    if(!$is)throw new Exception('Unable to prepare claim item creation.');
-   $totalPatientResponsibility=0.0;
+   $totalPatientResponsibility=0.0;$totalAllowedClaim=0.0;
    foreach($preparedLines as $line){
     $copay=min($copayRemaining,$line['base_covered']);$copayRemaining=round($copayRemaining-$copay,2);
     $covered=round(max(0.0,$line['base_covered']-$copay),2);
-    $responsibility=round(max(0.0,$line['gross']-$covered),2);$totalPatientResponsibility+=$responsibility;
+    $allowedAmount=round(min($line['gross'],max(0.0,$line['allowed'])),2);
+    $contractualAdjustment=round(max(0.0,$line['gross']-$allowedAmount),2);
+    $responsibility=round(max(0.0,$allowedAmount-$covered),2);$totalPatientResponsibility+=$responsibility;$totalAllowedClaim+=$allowedAmount;
     $itemTypeValue=$line['type'];$src=$line['src'];$sourceId=$line['source_id'];$itemName=$line['item_name'];$quantity=$line['quantity'];$unitPrice=$line['unit_price'];$gross=$line['gross'];
-    $is->bind_param('issisdddddd',$cid,$itemTypeValue,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$covered,$copay,$responsibility);
+    $is->bind_param('issisdddddddd',$cid,$itemTypeValue,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$allowedAmount,$contractualAdjustment,$covered,$copay,$responsibility);
     if(!$is->execute())throw new Exception('Unable to create claim item: '.$is->error);
    }
    $is->close();
-   $h=$conn->prepare("UPDATE claim_headers SET total_patient_responsibility=? WHERE id=?");
-   if(!$h)throw new Exception('Unable to prepare claim responsibility total.');
-   $h->bind_param('di',$totalPatientResponsibility,$cid);
-   if(!$h->execute())throw new Exception('Unable to save claim responsibility total.');
+   $h=$conn->prepare("UPDATE claim_headers SET total_claim_amount=?,total_patient_responsibility=? WHERE id=?");
+   if(!$h)throw new Exception('Unable to prepare claim totals.');
+   $h->bind_param('ddi',$totalAllowedClaim,$totalPatientResponsibility,$cid);
+   if(!$h->execute())throw new Exception('Unable to save claim totals.');
    $h->close();
    if(function_exists('audit'))audit('insurance_claim_created',"claim_id={$cid},invoice_id={$inv}");
    $conn->commit();$transactionStarted=false;$msg='Claim created from invoice.';
