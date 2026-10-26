@@ -8,7 +8,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($a==='create'){
    $conn->begin_transaction();$transactionStarted=true;
    $inv=(int)($_POST['invoice_id']??0);if($inv<=0)throw new Exception('Select a valid invoice.');
-   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
+   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' AND (pc.start_date IS NULL OR pc.start_date<=CURDATE()) AND (pc.end_date IS NULL OR pc.end_date>=CURDATE()) WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
    if(!$q)throw new Exception('Unable to prepare invoice and coverage validation.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to validate invoice and patient coverage.');$v=$q->get_result()->fetch_assoc();$q->close();
    if(!$v)throw new Exception('Invoice has no verified patient coverage.');
@@ -40,7 +40,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   }elseif($a==='submit'){ $id=(int)$_POST['id'];$s=$conn->prepare("UPDATE claim_headers SET claim_status='Submitted',submission_date=CURDATE() WHERE id=? AND claim_status='Draft'");$s->bind_param('i',$id);$s->execute();if(!$s->affected_rows)throw new Exception('Claim is not in Draft status.');$s->close();if(function_exists('audit'))audit('insurance_claim_submitted',"claim_id={$id}");$msg='Claim submitted.';}
  }catch(Throwable $e){if($transactionStarted){$conn->rollback();$transactionStarted=false;}$err=$e->getMessage();error_log('Insurance claims workflow failed: '.$e->getMessage());}
 }
-$invoices=[];$q=$conn->query("SELECT i.id,i.created_at,i.total,p.full_name FROM invoices i JOIN patients p ON p.id=i.patient_id JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' LEFT JOIN claim_headers ch ON ch.invoice_id=i.id WHERE ch.id IS NULL ORDER BY i.created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$invoices[]=$x;
+$invoices=[];$q=$conn->query("SELECT i.id,i.created_at,i.total,p.full_name FROM invoices i JOIN patients p ON p.id=i.patient_id JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' AND (pc.start_date IS NULL OR pc.start_date<=CURDATE()) AND (pc.end_date IS NULL OR pc.end_date>=CURDATE()) LEFT JOIN claim_headers ch ON ch.invoice_id=i.id WHERE ch.id IS NULL ORDER BY i.created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$invoices[]=$x;
 $claims=[];$q=$conn->query("SELECT ch.*,p.full_name,py.payer_name FROM claim_headers ch JOIN patients p ON p.id=ch.patient_id JOIN payers py ON py.id=ch.payer_id ORDER BY ch.created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$claims[]=$x;
 include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.php';?>
 <div class="main-content"><div class="container-fluid p-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="hms-module-hero mb-4"><div><div class="hms-module-kicker">Insurance &amp; SHA</div><h1>Insurance Claims</h1><p>Generate claims from billed services, review and submit to payers.</p></div></div>
