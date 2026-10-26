@@ -20,12 +20,12 @@ if($q=$conn->query("SELECT COUNT(*) c FROM maternity_delivery md JOIN maternity 
 if($q=$conn->query("SELECT COUNT(*) c FROM maternity_baby mb JOIN maternity m ON m.id=mb.maternity_id JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity')")) $babies=(int)$q->fetch_assoc()['c'];
 if($q=$conn->query("SELECT COUNT(*) c FROM appointments a JOIN patients p ON p.id=a.patient_id WHERE a.appointment_date>=NOW() AND p.clinic_category IN ('ANC','PNC','Maternity') AND COALESCE(a.status,'') NOT IN ('Cancelled','Completed')")) $upcoming=(int)$q->fetch_assoc()['c'];
 $monthlyDeliveryLabels=[];$monthlyDeliveryValues=[];
-if($q=$conn->query("SELECT DATE_FORMAT(created_at,'%b %Y') label,DATE_FORMAT(created_at,'%Y-%m') sort_key,COUNT(*) total FROM maternity_delivery GROUP BY sort_key,label ORDER BY sort_key DESC LIMIT 12")){
+if($q=$conn->query("SELECT DATE_FORMAT(md.created_at,'%b %Y') label,DATE_FORMAT(md.created_at,'%Y-%m') sort_key,COUNT(*) total FROM maternity_delivery md JOIN maternity m ON m.id=md.maternity_id JOIN patients p ON p.id=m.patient_id WHERE COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') GROUP BY sort_key,label ORDER BY sort_key DESC LIMIT 12")){
     $monthlyRows=[];while($row=$q->fetch_assoc())$monthlyRows[]=$row;
     foreach(array_reverse($monthlyRows) as $row){$monthlyDeliveryLabels[]=$row['label'];$monthlyDeliveryValues[]=(int)$row['total'];}
 }
 $visitTypeLabels=[];$visitTypeValues=[];
-if($q=$conn->query("SELECT COALESCE(NULLIF(visit_type,''),'Unspecified') label,COUNT(*) total FROM maternity_visits GROUP BY label ORDER BY total DESC LIMIT 8")){
+if($q=$conn->query("SELECT COALESCE(NULLIF(mv.visit_type,''),'Unspecified') label,COUNT(*) total FROM maternity_visits mv JOIN maternity m ON m.id=mv.maternity_id JOIN patients p ON p.id=m.patient_id WHERE COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') GROUP BY label ORDER BY total DESC LIMIT 8")){
     while($row=$q->fetch_assoc()){$visitTypeLabels[]=$row['label'];$visitTypeValues[]=(int)$row['total'];}
 }
 
