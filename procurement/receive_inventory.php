@@ -190,18 +190,40 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     $check=$conn->prepare("SELECT COUNT(*) c FROM accounting_entries WHERE reference_id IN (?,?)");
                     $check->bind_param('ss',$refInventory,$refPayable); $check->execute(); $alreadyPosted=(int)$check->get_result()->fetch_assoc()['c']>0; $check->close();
                     if(!$alreadyPosted){
-                        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES (?, ?, 0, ?, ?, NOW())");$a->bind_param('sdss',$inventoryAccount,$receiptTotal,$note,$refInventory);if(!$a->execute())throw new Exception('Unable to post inventory accounting entry: '.$a->error);$a->close();
-                        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES ('Accounts Payable',0,?,?,NOW())");$a->bind_param('ds',$receiptTotal,$refPayable);if(!$a->execute())throw new Exception('Unable to post payable accounting entry: '.$a->error);$a->close();
+                        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES (?, ?, 0, ?, ?, NOW())");
+                        if(!$a) throw new Exception('Unable to prepare inventory accounting entry: '.$conn->error);
+                        $a->bind_param('sdss',$inventoryAccount,$receiptTotal,$note,$refInventory);
+                        if(!$a->execute()) throw new Exception('Unable to post inventory accounting entry: '.$a->error);
+                        $a->close();
+
+                        $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,reference_id,created_at) VALUES ('Accounts Payable',0,?,?,?,NOW())");
+                        if(!$a) throw new Exception('Unable to prepare payable accounting entry: '.$conn->error);
+                        $a->bind_param('dss',$receiptTotal,$note,$refPayable);
+                        if(!$a->execute()) throw new Exception('Unable to post payable accounting entry: '.$a->error);
+                        $a->close();
                     }
                 }else{
-                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?, ?, 0, ?, NOW())");$a->bind_param('sds',$inventoryAccount,$receiptTotal,$note);$a->execute();$a->close();
-                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES ('Accounts Payable',0,?, ?,NOW())");$a->bind_param('ds',$receiptTotal,$note);$a->execute();$a->close();
+                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES (?, ?, 0, ?, NOW())");
+                    if(!$a) throw new Exception('Unable to prepare inventory accounting entry: '.$conn->error);
+                    $a->bind_param('sds',$inventoryAccount,$receiptTotal,$note);
+                    if(!$a->execute()) throw new Exception('Unable to post inventory accounting entry: '.$a->error);
+                    $a->close();
+
+                    $a=$conn->prepare("INSERT INTO accounting_entries (account,debit,credit,note,created_at) VALUES ('Accounts Payable',0,?, ?,NOW())");
+                    if(!$a) throw new Exception('Unable to prepare payable accounting entry: '.$conn->error);
+                    $a->bind_param('ds',$receiptTotal,$note);
+                    if(!$a->execute()) throw new Exception('Unable to post payable accounting entry: '.$a->error);
+                    $a->close();
                 }
 
                 $remainingStmt=$conn->prepare("SELECT COUNT(*) c FROM purchase_order_items WHERE purchase_order_id=? AND quantity>COALESCE(received_qty,0)");
                 $remainingStmt->bind_param('i',$poId);$remainingStmt->execute();$hasRemaining=(int)$remainingStmt->get_result()->fetch_assoc()['c']>0;$remainingStmt->close();
                 $newStatus=$hasRemaining?'Partial':'Received';
-                $pou=$conn->prepare("UPDATE purchase_orders SET status=? WHERE id=?");$pou->bind_param('si',$newStatus,$poId);$pou->execute();$pou->close();
+                $pou=$conn->prepare("UPDATE purchase_orders SET status=? WHERE id=?");
+                if(!$pou) throw new Exception('Unable to prepare purchase order receiving status update: '.$conn->error);
+                $pou->bind_param('si',$newStatus,$poId);
+                if(!$pou->execute()) throw new Exception('Unable to update purchase order receiving status: '.$pou->error);
+                $pou->close();
 
                 $conn->commit();
                 unset($_SESSION['grn_receipt_nonces'][$poItemId]);
