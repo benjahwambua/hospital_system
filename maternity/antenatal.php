@@ -25,7 +25,7 @@ $sql = "SELECT v.*,p.full_name,m.anc_number,m.patient_id
           FROM maternity_visits v
           JOIN maternity m ON m.id=v.maternity_id
           JOIN patients p ON p.id=m.patient_id
-          WHERE v.visit_type='ANC'";
+          WHERE v.visit_type='ANC' AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity')";
 if ($patient_id > 0) $sql .= " AND m.patient_id = ?";
 $sql .= " ORDER BY v.created_at DESC LIMIT 200";
 $stmtList=$conn->prepare($sql);
