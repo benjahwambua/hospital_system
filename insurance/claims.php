@@ -65,13 +65,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $copayRemaining=max(0.0,(float)($v['default_copay_amount']??0));
    $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_code,item_name,quantity,unit_price,gross_amount,allowed_amount,contractual_adjustment,covered_amount,copay_amount,patient_responsibility,status) VALUES(?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,'Draft')");
    if(!$is)throw new Exception('Unable to prepare claim item creation.');
-   $totalPatientResponsibility=0.0;$totalAllowedClaim=0.0;
+   $totalPatientResponsibility=0.0;$totalPayerClaim=0.0;
    foreach($preparedLines as $line){
     $copay=min($copayRemaining,$line['base_covered']);$copayRemaining=round($copayRemaining-$copay,2);
     $covered=round(max(0.0,$line['base_covered']-$copay),2);
     $allowedAmount=round(min($line['gross'],max(0.0,$line['allowed'])),2);
     $contractualAdjustment=round(max(0.0,$line['gross']-$allowedAmount),2);
-    $responsibility=round(max(0.0,$allowedAmount-$covered),2);$totalPatientResponsibility+=$responsibility;$totalAllowedClaim+=$allowedAmount;
+    $responsibility=round(max(0.0,$allowedAmount-$covered),2);$totalPatientResponsibility+=$responsibility;$totalPayerClaim+=$covered;
     $itemTypeValue=$line['type'];$src=$line['src'];$sourceId=$line['source_id'];$itemName=$line['item_name'];$quantity=$line['quantity'];$unitPrice=$line['unit_price'];$gross=$line['gross'];
     $is->bind_param('issisdddddddd',$cid,$itemTypeValue,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$allowedAmount,$contractualAdjustment,$covered,$copay,$responsibility);
     if(!$is->execute())throw new Exception('Unable to create claim item: '.$is->error);
@@ -79,7 +79,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $is->close();
    $h=$conn->prepare("UPDATE claim_headers SET total_claim_amount=?,total_patient_responsibility=? WHERE id=?");
    if(!$h)throw new Exception('Unable to prepare claim totals.');
-   $h->bind_param('ddi',$totalAllowedClaim,$totalPatientResponsibility,$cid);
+   $h->bind_param('ddi',$totalPayerClaim,$totalPatientResponsibility,$cid);
    if(!$h->execute())throw new Exception('Unable to save claim totals.');
    $h->close();
    if(function_exists('audit'))audit('insurance_claim_created',"claim_id={$cid},invoice_id={$inv}");
