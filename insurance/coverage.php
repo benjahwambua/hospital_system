@@ -20,10 +20,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $patientId=(int)($_POST['patient_id']??0); $payerId=(int)($_POST['payer_id']??0); $planId=(int)($_POST['plan_id']??0);
                 $member=trim((string)($_POST['member_number']??'')); $card=trim((string)($_POST['card_number']??'')); $principal=trim((string)($_POST['principal_member_name']??''));
                 if($patientId<=0||$payerId<=0||$member==='') throw new Exception('Patient, payer and member number are required.');
-                $s=$conn->prepare("INSERT INTO patient_coverages (patient_id,payer_id,plan_id,member_number,card_number,principal_member_name,eligibility_status,start_date,end_date,is_primary) VALUES (?,?,?,?,?,?, 'Pending', NULLIF(?,''), NULLIF(?,''), 1)");
+                $planId=$planId>0?$planId:null;
+                $start=trim((string)($_POST['start_date']??'')); $end=trim((string)($_POST['end_date']??''));
+                foreach([['Coverage start date',$start],['Coverage end date',$end]] as [$label,$date]){if($date!==''){$parsed=DateTime::createFromFormat('!Y-m-d',$date);if(!$parsed||$parsed->format('Y-m-d')!==$date)throw new Exception($label.' is invalid.');}}
+                if($start!==''&&$end!==''&&$start>$end)throw new Exception('Coverage end date cannot be before its start date.');
+                if($planId!==null){$planCheck=$conn->prepare("SELECT id FROM payer_plans WHERE id=? AND payer_id=? AND active=1 LIMIT 1");if(!$planCheck)throw new Exception('Unable to prepare payer plan validation.');$planCheck->bind_param('ii',$planId,$payerId);if(!$planCheck->execute())throw new Exception('Unable to validate payer plan.');$validPlan=$planCheck->get_result()->fetch_assoc();$planCheck->close();if(!$validPlan)throw new Exception('The selected plan is inactive or does not belong to the selected payer.');}
+                $primaryCheck=$conn->prepare("SELECT COUNT(*) c FROM patient_coverages WHERE patient_id=? AND is_primary=1 AND eligibility_status IN ('Pending','Verified')");if(!$primaryCheck)throw new Exception('Unable to check existing primary coverage.');$primaryCheck->bind_param('i',$patientId);if(!$primaryCheck->execute())throw new Exception('Unable to check existing primary coverage.');$hasPrimary=(int)$primaryCheck->get_result()->fetch_assoc()['c']>0;$primaryCheck->close();$isPrimary=$hasPrimary?0:1;
+                $s=$conn->prepare("INSERT INTO patient_coverages (patient_id,payer_id,plan_id,member_number,card_number,principal_member_name,eligibility_status,start_date,end_date,is_primary) VALUES (?,?,?,?,?,?, 'Pending', NULLIF(?,''), NULLIF(?,''), ?)");
                 if(!$s) throw new Exception('Unable to prepare coverage: '.$conn->error);
-                $start=(string)($_POST['start_date']??''); $end=(string)($_POST['end_date']??'');
-                $s->bind_param('iiissssss',$patientId,$payerId,$planId,$member,$card,$principal,$start,$end); if(!$s->execute()) throw new Exception($s->error); $id=$s->insert_id; $s->close();
+                $s->bind_param('iiisssssi',$patientId,$payerId,$planId,$member,$card,$principal,$start,$end,$isPrimary); if(!$s->execute()) throw new Exception($s->error); $id=$s->insert_id; $s->close();
                 if(function_exists('audit')) audit('insurance_coverage_created',"coverage_id={$id},patient_id={$patientId},payer_id={$payerId}");
                 $success='Coverage added and marked Pending for verification.';
             } elseif ($action==='verify') {
