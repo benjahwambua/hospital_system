@@ -142,11 +142,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     if(!$mainRow) throw new Exception('Central Stores Main location is not configured. Run the Central Stores migration first.');
                     $mainId=(int)$mainRow['id'];
                     $movementNote="PO #$poId / Supplier Invoice $supplierInvoice";
-                    $movement=$conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,'Purchase Order',?,?,?,?,?)");
+                    $movement=$conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,unit_cost,total_cost,reference_type,reference_id,batch_number,expiry_date,notes,created_by) VALUES (?,?,'Receipt',?,?,?,'Purchase Order',?,?,?,?,?)");
                     $uid=(int)$_SESSION['user_id'];
                     $batchValue=$batchNo===''?null:$batchNo;
                     $expiryValue=$expiryDate===''?null:$expiryDate;
-                    $movement->bind_param('iidisssi',$inventoryId,$mainId,$qty,$poId,$batchValue,$expiryValue,$movementNote,$uid);
+                    $movementUnitCost=(float)$unitCost;
+                    $movementTotalCost=round($qty*$movementUnitCost,2);
+                    $movement->bind_param('iidddisssi',$inventoryId,$mainId,$qty,$movementUnitCost,$movementTotalCost,$poId,$batchValue,$expiryValue,$movementNote,$uid);
                     if(!$movement->execute()) throw new Exception('Unable to post receipt to Central Stores: '.$movement->error);
                     $storesMovementId=(int)$movement->insert_id;
                     $movement->close();
