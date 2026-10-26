@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!$schemaReady) {
         $error = 'The denial/appeal database migration is not installed. Apply database/insurance_denial_appeals_migration.sql after database/insurance_migration.sql.';
     } else {
+        $transactionStarted = false;
         try {
             if ($action === 'record_denial') {
                 $claimId = (int)($_POST['claim_id'] ?? 0);
@@ -42,18 +43,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($claimId <= 0 || $reason === '' || !in_array($category, $categories, true) || $amount === false || $amount <= 0) {
                     throw new Exception('Select a claim and denial category, enter a reason, and provide a denied amount greater than zero.');
                 }
-                $s = $conn->prepare("SELECT id,total_claim_amount,claim_status FROM claim_headers WHERE id=? AND claim_status<>'Draft' LIMIT 1");
+                $conn->begin_transaction();
+                $transactionStarted = true;
+                $s = $conn->prepare("SELECT id,total_claim_amount,claim_status FROM claim_headers WHERE id=? AND claim_status<>'Draft' LIMIT 1 FOR UPDATE");
                 if (!$s) throw new Exception('Unable to validate the claim.');
-                $s->bind_param('i', $claimId); $s->execute(); $claim = $s->get_result()->fetch_assoc(); $s->close();
+                $s->bind_param('i', $claimId); if (!$s->execute()) throw new Exception('Unable to load the claim.'); $claim = $s->get_result()->fetch_assoc(); $s->close();
                 if (!$claim) throw new Exception('Select an existing non-draft claim.');
+                $s = $conn->prepare("SELECT COALESCE(SUM(denied_amount),0) AS denied_total FROM claim_denials WHERE claim_id=?");
+                if (!$s) throw new Exception('Unable to check existing claim denials.');
+                $s->bind_param('i', $claimId); if (!$s->execute()) throw new Exception('Unable to check existing claim denials.'); $claimDenied = (float)$s->get_result()->fetch_assoc()['denied_total']; $s->close();
+                if ($amount > max(0, (float)$claim['total_claim_amount'] - $claimDenied)) throw new Exception('The denial amount exceeds the remaining undenied claim balance.');
                 if ($itemId !== null) {
                     $s = $conn->prepare("SELECT id,gross_amount FROM claim_items WHERE id=? AND claim_id=? LIMIT 1");
                     if (!$s) throw new Exception('Unable to validate the claim item.');
-                    $s->bind_param('ii', $itemId, $claimId); $s->execute(); $item = $s->get_result()->fetch_assoc(); $s->close();
+                    $s->bind_param('ii', $itemId, $claimId); if (!$s->execute()) throw new Exception('Unable to load the claim item.'); $item = $s->get_result()->fetch_assoc(); $s->close();
                     if (!$item) throw new Exception('The selected claim item does not belong to this claim.');
-                    if ($amount > (float)$item['gross_amount']) throw new Exception('Denied amount cannot exceed the selected claim item gross amount.');
-                } elseif ($amount > (float)$claim['total_claim_amount']) {
-                    throw new Exception('Denied amount cannot exceed the total claim amount.');
+                    $s = $conn->prepare("SELECT COALESCE(SUM(denied_amount),0) AS denied_total FROM claim_denials WHERE claim_id=? AND claim_item_id=?");
+                    if (!$s) throw new Exception('Unable to check existing item denials.');
+                    $s->bind_param('ii', $claimId, $itemId); if (!$s->execute()) throw new Exception('Unable to check existing item denials.'); $itemDenied = (float)$s->get_result()->fetch_assoc()['denied_total']; $s->close();
+                    if ($amount > max(0, (float)$item['gross_amount'] - $itemDenied)) throw new Exception('The denial amount exceeds the remaining undenied amount for this claim item.');
                 }
                 $s = $conn->prepare("INSERT INTO claim_denials(claim_id,claim_item_id,denial_code,denial_reason,denial_category,denied_amount,appeal_status,notes,created_by,updated_by) VALUES(?,?,?,?,?,?,'Not Appealed',?,?,?)");
                 if (!$s) throw new Exception('Unable to prepare the denial record.');
@@ -61,6 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$s->execute()) throw new Exception('Unable to save the denial record.');
                 $denialId = (int)$s->insert_id; $s->close();
                 if (function_exists('audit')) audit('insurance_denial_recorded', "denial_id={$denialId},claim_id={$claimId},category={$category}");
+                $conn->commit();
+                $transactionStarted = false;
                 $message = 'Denial record saved.';
             } elseif ($action === 'submit_appeal') {
                 $id = (int)($_POST['denial_id'] ?? 0);
@@ -92,7 +102,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception('Unknown denial/appeal action.');
             }
         } catch (Throwable $e) {
+            if ($transactionStarted) {
+                $conn->rollback();
+                $transactionStarted = false;
+            }
             $error = $e->getMessage();
+            error_log('Insurance denial/appeal workflow failed: ' . $e->getMessage());
         }
     }
 }
