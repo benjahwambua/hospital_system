@@ -669,6 +669,39 @@ usort($reconciliationCandidates, static function ($a, $b) {
 });
 
 $items = $conn->query("SELECT i.*,COALESCE(SUM(CASE WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) AND m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity WHEN m.location_id=(SELECT id FROM stores_locations WHERE location_code='MAIN' LIMIT 1) THEN -m.quantity ELSE 0 END),0) AS main_balance FROM stores_items i LEFT JOIN stores_movements m ON m.item_id=i.id WHERE i.active=1 GROUP BY i.id ORDER BY i.item_name");
+$valuationSql = "
+    SELECT lots.*, cost.avg_unit_cost,
+           CASE WHEN cost.avg_unit_cost IS NULL THEN NULL ELSE ROUND(lots.current_balance * cost.avg_unit_cost, 2) END AS estimated_value
+    FROM (
+        SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,
+               i.item_code,i.item_name,l.location_name,
+               COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS current_balance
+        FROM stores_movements m
+        JOIN stores_items i ON i.id=m.item_id
+        JOIN stores_locations l ON l.id=m.location_id
+        GROUP BY m.item_id,m.location_id,COALESCE(m.batch_number,''),COALESCE(m.expiry_date,'1000-01-01'),i.item_code,i.item_name,l.location_name
+        HAVING current_balance > 0.0005
+    ) lots
+    LEFT JOIN (
+        SELECT item_id,COALESCE(batch_number,'') AS batch_key,COALESCE(expiry_date,'1000-01-01') AS expiry_key,
+               SUM(quantity * unit_cost) / NULLIF(SUM(quantity),0) AS avg_unit_cost
+        FROM stores_movements
+        WHERE movement_type='Receipt' AND unit_cost IS NOT NULL AND unit_cost >= 0
+        GROUP BY item_id,COALESCE(batch_number,''),COALESCE(expiry_date,'1000-01-01')
+    ) cost ON cost.item_id=lots.item_id
+          AND cost.batch_key=COALESCE(lots.batch_number,'')
+          AND cost.expiry_key=COALESCE(lots.expiry_date,'1000-01-01')
+    ORDER BY lots.item_name,lots.location_name,lots.expiry_date
+";
+$valuationResult = $conn->query($valuationSql);
+$valuationRows=[];$valuationTotal=0.0;$uncostedQuantity=0.0;
+if ($valuationResult) {
+    while ($valuationRow=$valuationResult->fetch_assoc()) {
+        if ($valuationRow['avg_unit_cost'] === null) $uncostedQuantity += (float)$valuationRow['current_balance'];
+        else $valuationTotal += (float)$valuationRow['estimated_value'];
+        $valuationRows[]=$valuationRow;
+    }
+}
 $expiryLots = $conn->query("SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,i.item_code,i.item_name,l.location_name,MAX(m.created_at) AS last_activity,COALESCE(SUM(CASE WHEN m.movement_type IN ('Opening','Receipt','Transfer In','Return','Adjustment In') THEN m.quantity ELSE -m.quantity END),0) AS current_balance FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id WHERE (m.batch_number IS NOT NULL AND m.batch_number<>'') OR m.expiry_date IS NOT NULL GROUP BY m.item_id,m.location_id,COALESCE(m.batch_number,''),COALESCE(m.expiry_date,'1000-01-01'),i.item_code,i.item_name,l.location_name ORDER BY (MAX(m.expiry_date) IS NULL),MAX(m.expiry_date),i.item_name");
 $expiryRows=[]; if($expiryLots) while($row=$expiryLots->fetch_assoc()) $expiryRows[]=$row;
 $lotExceptionQuery = "SELECT m.item_id,m.location_id,MAX(m.batch_number) AS batch_number,MAX(m.expiry_date) AS expiry_date,
@@ -819,6 +852,16 @@ $issueClass=$issueBalance < -0.0005?'text-danger fw-bold':(($issueLabel==='Expir
 <tr><td><strong><?=htmlspecialchars($lot['item_name'])?></strong><br><small class="text-secondary"><?=htmlspecialchars($lot['item_code'])?></small></td><td><?=htmlspecialchars($lot['location_name'])?></td><td><?=htmlspecialchars($lot['batch_number']?:'—')?></td><td><?=htmlspecialchars($expiryText?:'—')?></td><td class="<?=$statusClass?>"><?=htmlspecialchars($expiryStatus)?></td><td><?=number_format((float)$lot['current_balance'],3)?></td><td><?=htmlspecialchars($lot['last_activity'])?></td></tr>
 <?php endforeach;?><?php if(!$expiryRows):?><tr><td colspan="7" class="text-center text-secondary">No batch or expiry information recorded yet.</td></tr><?php endif;?>
 </tbody></table></div></div></div>
+<div class="panel"><div class="panel-head">Central Stores Valuation (weighted-average receipt cost)</div><div class="panel-body">
+<div class="row mb-3">
+<div class="col-md-6"><div class="alert alert-info mb-2"><strong>Costed on-hand value:</strong> KES <?=number_format($valuationTotal,2)?> <small class="d-block">Estimated from recorded GRN receipt costs and current lot balances.</small></div></div>
+<div class="col-md-6"><div class="alert <?= $uncostedQuantity>0.0005?'alert-warning':'alert-success' ?> mb-2"><strong>Positive stock without a recorded receipt cost:</strong> <?=number_format($uncostedQuantity,3)?> units <small class="d-block">Reconcile legacy/manual receipts before treating the valuation as complete.</small></div></div>
+</div>
+<div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Item</th><th>Location</th><th>Batch</th><th>Expiry</th><th class="text-right">On hand</th><th class="text-right">Avg. unit cost</th><th class="text-right">Estimated value</th><th>Cost status</th></tr></thead><tbody>
+<?php foreach($valuationRows as $vr): ?><tr><td><?=htmlspecialchars($vr['item_code'].' — '.$vr['item_name'])?></td><td><?=htmlspecialchars($vr['location_name'])?></td><td><?=htmlspecialchars($vr['batch_number']??'Untracked')?></td><td><?=htmlspecialchars($vr['expiry_date']??'—')?></td><td class="text-right"><?=number_format((float)$vr['current_balance'],3)?></td><td class="text-right"><?=$vr['avg_unit_cost']===null?'—':'KES '.number_format((float)$vr['avg_unit_cost'],2)?></td><td class="text-right"><?=$vr['estimated_value']===null?'—':'KES '.number_format((float)$vr['estimated_value'],2)?></td><td><?=$vr['avg_unit_cost']===null?'<span class="pill">Cost missing</span>':'<span class="pill">Estimated</span>'?></td></tr><?php endforeach; ?>
+<?php if(!$valuationRows): ?><tr><td colspan="8" class="text-center text-muted">No positive Central Stores balances to value.</td></tr><?php endif; ?>
+</tbody></table></div><small class="text-muted">This report uses weighted-average cost from purchase-order GRN receipts for the same item/batch/expiry. It deliberately does not invent costs for opening balances, manual receipts or historical lots without cost evidence. Reconcile these exceptions and verify accounting totals before relying on it as a financial stock valuation.</small>
+</div></div>
 <div class="panel"><div class="panel-head">Recent Stock Ledger</div><div class="panel-body"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Item</th><th>Location</th><th>Movement</th><th>Qty</th><th>Reference / Notes</th><th>Recorded By</th></tr></thead><tbody>
 <?php $ledger=$conn->query("SELECT m.*,i.item_code,i.item_name,l.location_name,u.full_name FROM stores_movements m JOIN stores_items i ON i.id=m.item_id JOIN stores_locations l ON l.id=m.location_id LEFT JOIN users u ON u.id=m.created_by ORDER BY m.created_at DESC,m.id DESC LIMIT 100"); if($ledger): while($mv=$ledger->fetch_assoc()):?>
 <tr><td><?=htmlspecialchars($mv['created_at'])?></td><td><?=htmlspecialchars($mv['item_code'].' — '.$mv['item_name'])?></td><td><?=htmlspecialchars($mv['location_name'])?></td><td><span class="pill"><?=htmlspecialchars($mv['movement_type'])?></span></td><td><?=number_format((float)$mv['quantity'],3)?></td><td><?=htmlspecialchars(trim(($mv['reference_type']??'').' '.($mv['reference_id']??'').' '.($mv['notes']??'')))?></td><td><?=htmlspecialchars($mv['full_name']??'System')?></td></tr>
