@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_login();require_module_access($conn,'maternity','edit');
 $id=max(0,(int)($_GET['id']??$_POST['id']??0));if(!$id){header('Location:index.php');exit;}
 if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32));$csrfToken=$_SESSION['csrf_token'];$errors=[];
-$s=$conn->prepare("SELECT m.*,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
+$s=$conn->prepare("SELECT m.*,p.full_name,p.patient_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!hash_equals($csrfToken,(string)($_POST['csrf_token']??'')))$errors[]='Security token mismatch.';
  $gravida=max(0,(int)($_POST['gravida']??0));$parity=max(0,(int)($_POST['parity']??0));$lmp=trim((string)($_POST['last_menstrual_period']??''));$edd=trim((string)($_POST['expected_delivery']??''));$notes=trim((string)($_POST['antenatal_notes']??''));
