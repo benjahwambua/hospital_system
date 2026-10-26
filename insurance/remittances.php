@@ -1,13 +1,40 @@
 <?php
 require_once __DIR__.'/../config/config.php';require_once __DIR__.'/../includes/session.php';require_once __DIR__.'/../includes/auth.php';require_login();require_module_access($conn,'insurance','view');
 if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32));$csrf=$_SESSION['csrf_token'];$msg='';$err='';
-if($_SERVER['REQUEST_METHOD']==='POST'){ $a=$_POST['action']??'';require_module_access($conn,'insurance',$a==='match'?'approve':'create');if(!verify_csrf_token($_POST['csrf_token']??null))$err='Invalid security token.';else try{
-if($a==='create'){$payer=(int)$_POST['payer_id'];$ref=trim($_POST['reference_number']);$date=$_POST['payment_date'];$amt=(float)$_POST['amount'];$method=$_POST['payment_method'];$s=$conn->prepare("INSERT INTO remittances(payer_id,reference_number,payment_date,amount_received,payment_method,bank_reference,notes) VALUES(?,?,?,?,?,?,?)");$bank=trim($_POST['bank_reference']);$notes=trim($_POST['notes']);$s->bind_param('issdsss',$payer,$ref,$date,$amt,$method,$bank,$notes);$s->execute();$s->close();if(function_exists('audit'))audit('insurance_remittance_created',"reference={$ref},amount={$amt}");$msg='Remittance recorded.';
-}elseif($a==='match'){$rid=(int)$_POST['remittance_id'];$cid=(int)$_POST['claim_id'];$paid=(float)$_POST['paid_amount'];$s=$conn->prepare("SELECT r.payer_id,r.amount_received,ch.payer_id claim_payer FROM remittances r JOIN claim_headers ch ON ch.id=? WHERE r.id=?");$s->bind_param('ii',$cid,$rid);$s->execute();$v=$s->get_result()->fetch_assoc();$s->close();if(!$v||$v['payer_id']!=$v['claim_payer'])throw new Exception('Remittance and claim payer do not match.');
-$s=$conn->prepare("INSERT INTO remittance_items(remittance_id,claim_id,approved_amount,paid_amount,remittance_status,remarks) SELECT ?,id,total_approved_amount,?,CASE WHEN ? >= total_approved_amount THEN 'Matched' ELSE 'Partial' END,? FROM claim_headers WHERE id=?");$remark=trim($_POST['remarks']);$s->bind_param('iidsi',$rid,$cid,$paid,$remark,$cid);$s->execute();$s->close();$s=$conn->prepare("UPDATE claim_headers SET total_paid_amount=total_paid_amount+?,claim_status=CASE WHEN total_paid_amount+? >= total_approved_amount AND total_approved_amount>0 THEN 'Paid' ELSE 'Partially Approved' END WHERE id=?");$s->bind_param('ddi',$paid,$paid,$cid);$s->execute();$s->close();if(function_exists('audit'))audit('insurance_remittance_matched',"remittance_id={$rid},claim_id={$cid},paid={$paid}");$msg='Remittance matched to claim.';
-}}catch(Throwable $e){$err=$e->getMessage();}}
+if($_SERVER['REQUEST_METHOD']==='POST'){ $a=(string)($_POST['action']??'');require_module_access($conn,'insurance',$a==='match'?'approve':'create');$transactionStarted=false;if(!verify_csrf_token($_POST['csrf_token']??null))$err='Invalid security token.';else try{
+if($a==='create'){
+ $payer=(int)($_POST['payer_id']??0);$ref=trim((string)($_POST['reference_number']??''));$date=(string)($_POST['payment_date']??'');$amt=(float)($_POST['amount']??0);$method=(string)($_POST['payment_method']??'Bank');$bank=trim((string)($_POST['bank_reference']??''));$notes=trim((string)($_POST['notes']??''));
+ if($payer<=0||$ref===''||$date===''||$amt<=0||!in_array($method,['Bank','Cheque','Transfer','Cash','Other'],true))throw new Exception('Enter a valid payer, reference, payment date, positive amount and payment method.');
+ $s=$conn->prepare("INSERT INTO remittances(payer_id,reference_number,payment_date,amount_received,payment_method,bank_reference,notes) VALUES(?,?,?,?,?,?,?)");if(!$s)throw new Exception('Unable to prepare remittance record.');
+ $s->bind_param('issdsss',$payer,$ref,$date,$amt,$method,$bank,$notes);if(!$s->execute())throw new Exception('Unable to record remittance: '.$s->error);$s->close();if(function_exists('audit'))audit('insurance_remittance_created',"reference={$ref},amount={$amt}");$msg='Remittance recorded.';
+}elseif($a==='match'){
+ $rid=(int)($_POST['remittance_id']??0);$cid=(int)($_POST['claim_id']??0);$paid=(float)($_POST['paid_amount']??0);$remark=trim((string)($_POST['remarks']??''));
+ if($rid<=0||$cid<=0||$paid<=0)throw new Exception('Select a remittance and claim and enter a positive payment amount.');
+ $conn->begin_transaction();$transactionStarted=true;
+ $s=$conn->prepare("SELECT r.payer_id,r.amount_received,ch.payer_id claim_payer,ch.total_approved_amount,ch.total_paid_amount,ch.claim_status FROM remittances r JOIN claim_headers ch ON ch.id=? WHERE r.id=? FOR UPDATE");
+ if(!$s)throw new Exception('Unable to prepare remittance and claim validation.');
+ $s->bind_param('ii',$cid,$rid);if(!$s->execute())throw new Exception('Unable to validate remittance and claim.');$v=$s->get_result()->fetch_assoc();$s->close();
+ if(!$v||(int)$v['payer_id']!==(int)$v['claim_payer'])throw new Exception('Remittance and claim payer do not match.');
+ if(!in_array((string)$v['claim_status'],['Approved','Partially Approved'],true))throw new Exception('Only approved claims can be matched to a payer remittance.');
+ $s=$conn->prepare("SELECT COALESCE(SUM(paid_amount),0) paid_total FROM remittance_items WHERE remittance_id=?");if(!$s)throw new Exception('Unable to check remittance balance.');
+ $s->bind_param('i',$rid);if(!$s->execute())throw new Exception('Unable to check remittance balance.');$remUsed=(float)$s->get_result()->fetch_assoc()['paid_total'];$s->close();
+ $s=$conn->prepare("SELECT id FROM remittance_items WHERE remittance_id=? AND claim_id=? LIMIT 1 FOR UPDATE");if(!$s)throw new Exception('Unable to check for an existing remittance match.');
+ $s->bind_param('ii',$rid,$cid);if(!$s->execute())throw new Exception('Unable to check for an existing remittance match.');$duplicate=$s->get_result()->fetch_assoc();$s->close();if($duplicate)throw new Exception('This claim is already matched to this remittance.');
+ $remBalance=(float)$v['amount_received']-$remUsed;$claimBalance=(float)$v['total_approved_amount']-(float)$v['total_paid_amount'];
+ if($remBalance<=0)throw new Exception('This remittance has no unallocated balance.');
+ if($claimBalance<=0)throw new Exception('This claim has no outstanding approved balance.');
+ if($paid>$remBalance)throw new Exception('Payment exceeds the remittance balance available to allocate.');
+ if($paid>$claimBalance)throw new Exception('Payment exceeds the claim outstanding approved balance.');
+ $allocatedApproved=$paid;$status=$paid>=$claimBalance?'Matched':'Partial';
+ $s=$conn->prepare("INSERT INTO remittance_items(remittance_id,claim_id,approved_amount,paid_amount,remittance_status,remarks) VALUES(?,?,?,?,?,?)");if(!$s)throw new Exception('Unable to prepare remittance allocation.');
+ $s->bind_param('iiddss',$rid,$cid,$allocatedApproved,$paid,$status,$remark);if(!$s->execute())throw new Exception('Unable to save remittance allocation: '.$s->error);$s->close();
+ $s=$conn->prepare("UPDATE claim_headers SET total_paid_amount=total_paid_amount+?,claim_status=CASE WHEN total_paid_amount+? >= total_approved_amount AND total_approved_amount>0 THEN 'Paid' ELSE 'Partially Approved' END WHERE id=?");if(!$s)throw new Exception('Unable to prepare claim payment update.');
+ $s->bind_param('ddi',$paid,$paid,$cid);if(!$s->execute()||$s->affected_rows!==1)throw new Exception('Unable to update claim payment balance.');$s->close();
+ if(function_exists('audit'))audit('insurance_remittance_matched',"remittance_id={$rid},claim_id={$cid},paid={$paid}");
+ $conn->commit();$transactionStarted=false;$msg='Remittance matched to claim.';
+}}catch(Throwable $e){if($transactionStarted){$conn->rollback();$transactionStarted=false;}$err=$e->getMessage();error_log('Insurance remittance workflow failed: '.$e->getMessage());}}
 $payers=[];$q=$conn->query("SELECT id,payer_name FROM payers WHERE active=1 ORDER BY payer_name");if($q)while($x=$q->fetch_assoc())$payers[]=$x;
-$claims=[];$q=$conn->query("SELECT id,claim_number,payer_id,total_approved_amount FROM claim_headers WHERE claim_status IN ('Approved','Partially Approved','Submitted','Under Review') ORDER BY created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$claims[]=$x;
+$claims=[];$q=$conn->query("SELECT id,claim_number,payer_id,total_approved_amount FROM claim_headers WHERE claim_status IN ('Approved','Partially Approved') AND total_approved_amount>COALESCE(total_paid_amount,0) ORDER BY created_at DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$claims[]=$x;
 $rem=[];$q=$conn->query("SELECT r.*,p.payer_name,COALESCE(SUM(ri.paid_amount),0) matched FROM remittances r JOIN payers p ON p.id=r.payer_id LEFT JOIN remittance_items ri ON ri.remittance_id=r.id GROUP BY r.id ORDER BY r.payment_date DESC,r.id DESC LIMIT 100");if($q)while($x=$q->fetch_assoc())$rem[]=$x;
 include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.php';?>
 <div class="main-content"><div class="container-fluid p-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="hms-module-hero mb-4"><div><div class="hms-module-kicker">Insurance &amp; SHA</div><h1>Remittances &amp; Reconciliation</h1><p>Record payer receipts and match them against submitted claims.</p></div></div>
