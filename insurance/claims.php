@@ -53,7 +53,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $tariff=$conn->prepare("SELECT COALESCE(NULLIF(approved_price,0),base_price) AS allowed_price FROM payer_tariffs WHERE payer_id=? AND item_name=? AND item_type=? AND active=1 AND (plan_id=? OR plan_id IS NULL) ORDER BY CASE WHEN plan_id=? THEN 1 ELSE 2 END,id DESC LIMIT 1");
     if(!$tariff)throw new Exception('Unable to prepare payer tariff lookup.');
     $payerId=(int)$v['payer_id'];$planId=$v['plan_id']!==null?(int)$v['plan_id']:0;
-    $tariff->bind_param('isiii',$payerId,$itemName,$type,$planId,$planId);
+    $tariff->bind_param('issii',$payerId,$itemName,$type,$planId,$planId);
     if(!$tariff->execute())throw new Exception('Unable to look up payer tariff.');
     $tariffRow=$tariff->get_result()->fetch_assoc();$tariff->close();
     if($tariffRow){$allowed=min($gross,max(0.0,(float)$tariffRow['allowed_price']*$quantity));$tariffMatched=true;}
