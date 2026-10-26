@@ -12,7 +12,11 @@ $csrfToken=$_SESSION['csrf_token'];
 // Handle Lab Result Submission
 // -------------------------
 if (isset($_POST['save_lab_result'])) {
-    $action = ($_POST['result_action'] ?? 'save');
+    $action = (string)($_POST['result_action'] ?? 'save');
+    if (!in_array($action, ['save', 'complete'], true)) {
+        http_response_code(400);
+        exit('Invalid laboratory result action.');
+    }
     require_module_access($conn, 'laboratory', $action === 'complete' ? 'approve' : 'edit');
     if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) { $error='Invalid security token.'; }
     else {
@@ -29,7 +33,7 @@ if (isset($_POST['save_lab_result'])) {
             $check->close();
             if (!$serviceRow) throw new Exception('Laboratory request not found.');
             if (($serviceRow['status'] ?? '') === 'Cancelled') throw new Exception('Cancelled laboratory requests cannot receive results.');
-            if ($action === 'complete' && ($serviceRow['status'] ?? '') === 'Completed') throw new Exception('This laboratory result is already approved.');
+            if (($serviceRow['status'] ?? '') === 'Completed') throw new Exception('This laboratory result is already approved and cannot be changed.');
 
             $status = ($action === 'complete') ? 'Completed' : 'Pending';
             $stmt = $conn->prepare("UPDATE patient_services SET results = ?, status = ? WHERE id = ? AND category = 'lab'");
