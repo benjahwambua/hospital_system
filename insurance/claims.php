@@ -12,29 +12,37 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    if(!$q)throw new Exception('Unable to prepare invoice and coverage validation.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to validate invoice and patient coverage.');$v=$q->get_result()->fetch_assoc();$q->close();
    if(!$v)throw new Exception('Invoice has no verified patient coverage.');
-   if((float)$v['total']<=0)throw new Exception('A claim requires an invoice with a positive total.');
+   $q=$conn->prepare("SELECT id,description AS item_name,quantity,unit_price,total,source,item_type,med_id FROM invoice_items WHERE invoice_id=? AND NOT (COALESCE(source,'manual')='manual' AND LOWER(COALESCE(description,'')) LIKE 'patient payment -%')");
+   if(!$q)throw new Exception('Unable to prepare invoice claim items.');
+   $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to load invoice items.');$items=$q->get_result()->fetch_all(MYSQLI_ASSOC);$q->close();
+   $claimTotal=0.0;foreach($items as $line)$claimTotal+=(float)$line['total'];
+   if(!$items||$claimTotal<=0)throw new Exception('The invoice has no positive billable service or product lines to claim.');
    $q=$conn->prepare("SELECT COUNT(*) c FROM claim_headers WHERE invoice_id=?");if(!$q)throw new Exception('Unable to check for an existing claim.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to check for an existing claim.');$exists=(int)$q->get_result()->fetch_assoc()['c'];$q->close();if($exists)throw new Exception('A claim already exists for this invoice.');
    $num='CLM-'.date('YmdHis').'-'.random_int(100,999);
    $s=$conn->prepare("INSERT INTO claim_headers(claim_number,patient_id,patient_coverage_id,payer_id,plan_id,invoice_id,encounter_date,claim_status,total_claim_amount,created_by) VALUES(?,?,?,?,?,?,DATE(?), 'Draft',?,?)");
    if(!$s)throw new Exception('Unable to prepare claim header.');
    $createdBy=(int)($_SESSION['user_id']??0);
-   $s->bind_param('siiiiisdi',$num,$v['patient_id'],$v['coverage_id'],$v['payer_id'],$v['plan_id'],$v['id'],$v['created_at'],$v['total'],$createdBy);
+   $s->bind_param('siiiiisdi',$num,$v['patient_id'],$v['coverage_id'],$v['payer_id'],$v['plan_id'],$v['id'],$v['created_at'],$claimTotal,$createdBy);
    if(!$s->execute())throw new Exception('Unable to create claim header: '.$s->error);$cid=(int)$s->insert_id;$s->close();
-   $q=$conn->prepare("SELECT id,description AS item_name,quantity,unit_price,total FROM invoice_items WHERE invoice_id=?");
-   if(!$q)throw new Exception('Unable to prepare invoice claim items.');
-   $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to load invoice items.');$items=$q->get_result();
    $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_name,quantity,unit_price,gross_amount,covered_amount,patient_responsibility,status) VALUES(?,?,?,?,?,?,?,?,?,0,'Draft')");
    if(!$is)throw new Exception('Unable to prepare claim item creation.');
    $itemCount=0;
-   while($it=$items->fetch_assoc()){
-    $type='Other';$src='invoice_items';$sourceId=(int)$it['id'];$itemName=(string)$it['item_name'];$quantity=(float)$it['quantity'];$unitPrice=(float)$it['unit_price'];$gross=(float)$it['total'];$covered=$gross;
+   foreach($items as $it){
+    $type='Other';$source=strtolower((string)($it['source']??'manual'));$itemType=strtolower((string)($it['item_type']??''));
+    if($source==='pharmacy'||$itemType==='pharmacy')$type='Pharmacy';
+    elseif($source==='lab'||$itemType==='lab')$type='Lab';
+    elseif($source==='radiology'||$itemType==='radiology')$type='Radiology';
+    elseif($itemType==='procedure')$type='Procedure';
+    elseif($itemType==='consultation')$type='Consultation';
+    elseif($itemType==='admission')$type='Admission';
+    elseif(in_array($itemType,['service','treatment','maternity'],true))$type='Service';
+    $src='invoice_items';$sourceId=(int)$it['id'];$itemName=(string)$it['item_name'];$quantity=(float)$it['quantity'];$unitPrice=(float)$it['unit_price'];$gross=(float)$it['total'];$covered=$gross;
     $is->bind_param('issisdddd',$cid,$type,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$covered);
     if(!$is->execute())throw new Exception('Unable to create claim item: '.$is->error);
     $itemCount++;
    }
-   $is->close();$q->close();
-   if($itemCount===0)throw new Exception('The invoice has no billable line items to claim.');
+   $is->close();
    if(function_exists('audit'))audit('insurance_claim_created',"claim_id={$cid},invoice_id={$inv}");
    $conn->commit();$transactionStarted=false;$msg='Claim created from invoice.';
   }elseif($a==='submit'){ $id=(int)$_POST['id'];$s=$conn->prepare("UPDATE claim_headers SET claim_status='Submitted',submission_date=CURDATE() WHERE id=? AND claim_status='Draft'");$s->bind_param('i',$id);$s->execute();if(!$s->affected_rows)throw new Exception('Claim is not in Draft status.');$s->close();if(function_exists('audit'))audit('insurance_claim_submitted',"claim_id={$id}");$msg='Claim submitted.';}
