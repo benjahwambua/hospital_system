@@ -17,7 +17,7 @@ if ($tablesReady) {
     foreach ([
         'payers'=>"SELECT COUNT(*) c FROM payers WHERE active=1",
         'plans'=>"SELECT COUNT(*) c FROM payer_plans WHERE active=1",
-        'verified'=>"SELECT COUNT(*) c FROM patient_coverages WHERE eligibility_status='Verified'",
+        'verified'=>"SELECT COUNT(*) c FROM patient_coverages WHERE eligibility_status='Verified' AND (start_date IS NULL OR start_date<=CURDATE()) AND (end_date IS NULL OR end_date>=CURDATE())",
         'pending'=>"SELECT COUNT(*) c FROM patient_coverages WHERE eligibility_status='Pending'",
         'preauth'=>"SELECT COUNT(*) c FROM preauthorizations WHERE status IN ('Draft','Submitted','Partially Approved')",
         'claims'=>"SELECT COUNT(*) c FROM claim_headers WHERE claim_status IN ('Draft','Submitted','Under Review','Partially Approved')",
