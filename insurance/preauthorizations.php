@@ -11,15 +11,28 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!hash_equals($csrf,(string)($_POST['csrf_token']??''))) $err='Invalid security token.';
  else try{
   if($action==='create'){
-   $pid=(int)$_POST['patient_id'];$cid=(int)$_POST['coverage_id'];$type=(string)$_POST['service_type'];$amt=(float)$_POST['amount'];$notes=trim((string)$_POST['notes']);
-   $q=$conn->prepare("SELECT patient_id,payer_id,plan_id FROM patient_coverages WHERE id=? AND eligibility_status='Verified'");$q->bind_param('i',$cid);$q->execute();$v=$q->get_result()->fetch_assoc();$q->close();
-   if(!$v||$v['patient_id']!=$pid)throw new Exception('A verified patient coverage record is required.');
-   $num='PA-'.date('YmdHis').'-'.random_int(100,999);$s=$conn->prepare("INSERT INTO preauthorizations(patient_id,patient_coverage_id,payer_id,plan_id,request_number,requested_service_type,requested_amount,status,clinical_notes,created_by) VALUES(?,?,?,?,?,?,?,'Draft',?,?)");
-   $s->bind_param('iiiissdsi',$pid,$cid,$v['payer_id'],$v['plan_id'],$num,$type,$amt,$notes,$_SESSION['user_id']);$s->execute();$id=$s->insert_id;$s->close();if(function_exists('audit'))audit('insurance_preauthorization_created',"id={$id},request={$num}");$msg='Preauthorization created.';
+   $pid=(int)($_POST['patient_id']??0);$cid=(int)($_POST['coverage_id']??0);$type=(string)($_POST['service_type']??'');$amt=(float)($_POST['amount']??0);$notes=trim((string)($_POST['notes']??''));
+   if($pid<=0||$cid<=0||$amt<=0||!in_array($type,['Consultation','Service','Lab','Radiology','Procedure','Pharmacy','Admission','Other'],true)||strlen($notes)>5000)throw new Exception('Enter a valid patient, verified coverage, service type and positive requested amount.');
+   $q=$conn->prepare("SELECT patient_id,payer_id,plan_id FROM patient_coverages WHERE id=? AND eligibility_status='Verified'");if(!$q)throw new Exception('Unable to prepare coverage validation.');$q->bind_param('i',$cid);if(!$q->execute())throw new Exception('Unable to validate patient coverage.');$v=$q->get_result()->fetch_assoc();$q->close();
+   if(!$v||(int)$v['patient_id']!==$pid)throw new Exception('A verified patient coverage record is required.');
+   $num='PA-'.date('YmdHis').'-'.random_int(100,999);$s=$conn->prepare("INSERT INTO preauthorizations(patient_id,patient_coverage_id,payer_id,plan_id,request_number,requested_service_type,requested_amount,status,clinical_notes,created_by) VALUES(?,?,?,?,?,?,?,'Draft',?,?)");if(!$s)throw new Exception('Unable to prepare preauthorization request.');
+   $createdBy=(int)($_SESSION['user_id']??0);$s->bind_param('iiiissdsi',$pid,$cid,$v['payer_id'],$v['plan_id'],$num,$type,$amt,$notes,$createdBy);if(!$s->execute())throw new Exception('Unable to create preauthorization request: '.$s->error);$id=(int)$s->insert_id;$s->close();if(function_exists('audit'))audit('insurance_preauthorization_created',"id={$id},request={$num}");$msg='Preauthorization created.';
   }elseif($action==='decision'){
-   $id=(int)$_POST['id'];$status=(string)$_POST['status'];$approved=(float)$_POST['approved_amount'];$auth=trim((string)$_POST['authorization_number']);
-   if(!in_array($status,['Approved','Partially Approved','Rejected'],true))throw new Exception('Invalid status.');
-   $s=$conn->prepare("UPDATE preauthorizations SET status=?,approved_amount=?,authorization_number=?,valid_from=IF(?='',NULL,NOW()),valid_to=IF(?='',NULL,DATE_ADD(NOW(),INTERVAL 30 DAY)),updated_at=NOW() WHERE id=?");$s->bind_param('sdsssi',$status,$approved,$auth,$auth,$auth,$id);$s->execute();if($s->affected_rows<1)throw new Exception('Preauthorization not found.');$s->close();if(function_exists('audit'))audit('insurance_preauthorization_decision',"id={$id},status={$status},approved={$approved}");$msg='Decision saved.';
+   $id=(int)($_POST['id']??0);$status=(string)($_POST['status']??'');$approved=(float)($_POST['approved_amount']??0);$auth=trim((string)($_POST['authorization_number']??''));
+   if($id<=0||!in_array($status,['Approved','Partially Approved','Rejected'],true))throw new Exception('Invalid preauthorization decision.');
+   $conn->begin_transaction();
+   try{
+    $s=$conn->prepare("SELECT id,status,requested_amount FROM preauthorizations WHERE id=? FOR UPDATE");if(!$s)throw new Exception('Unable to prepare preauthorization validation.');$s->bind_param('i',$id);if(!$s->execute())throw new Exception('Unable to load preauthorization.');$request=$s->get_result()->fetch_assoc();$s->close();
+    if(!$request)throw new Exception('Preauthorization not found.');
+    if(!in_array((string)$request['status'],['Draft','Submitted'],true))throw new Exception('Only draft or submitted preauthorizations can receive a decision.');
+    if($status==='Rejected')$approved=0.0;
+    elseif($approved<=0||(float)$approved>(float)$request['requested_amount'])throw new Exception('Approved amount must be positive and cannot exceed the requested amount.');
+    if($status!=='Rejected'&&$auth==='')throw new Exception('Authorization number is required for approved requests.');
+    $s=$conn->prepare("UPDATE preauthorizations SET status=?,approved_amount=?,authorization_number=?,valid_from=IF(? IN ('Approved','Partially Approved'),NOW(),NULL),valid_to=IF(? IN ('Approved','Partially Approved'),DATE_ADD(NOW(),INTERVAL 30 DAY),NULL),updated_at=NOW() WHERE id=? AND status IN ('Draft','Submitted')");if(!$s)throw new Exception('Unable to prepare preauthorization decision update.');
+    $s->bind_param('sdsssi',$status,$approved,$auth,$status,$status,$id);if(!$s->execute()||$s->affected_rows!==1)throw new Exception('Preauthorization decision was not saved. Refresh and verify its status.');$s->close();
+    if(function_exists('audit'))audit('insurance_preauthorization_decision',"id={$id},status={$status},approved={$approved}");
+    $conn->commit();$msg='Decision saved.';
+   }catch(Throwable $e){$conn->rollback();throw $e;}
   }
  }catch(Throwable $e){$err=$e->getMessage();}
 }
