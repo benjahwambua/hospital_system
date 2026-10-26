@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';require_once __DIR__ . '/../includes/session.php';require_once __DIR__ . '/../includes/auth.php';require_login();require_module_access($conn,'maternity','view');
 $id=max(0,(int)($_GET['id']??0));if(!$id){header('Location:index.php');exit;}
-$s=$conn->prepare("SELECT m.*,p.id patient_id,p.full_name,p.patient_number,p.phone,p.date_of_birth FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
+$s=$conn->prepare("SELECT m.*,p.id patient_id,p.full_name,p.patient_number,p.phone,p.date_of_birth FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");$s->bind_param('i',$id);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if(!$m){http_response_code(404);exit('Maternity record not found.');}
 $vis=$conn->prepare("SELECT * FROM maternity_visits WHERE maternity_id=? ORDER BY created_at DESC LIMIT 20");$vis->bind_param('i',$id);$vis->execute();$visits=$vis->get_result();$vis->close();
 $del=$conn->prepare("SELECT * FROM maternity_delivery WHERE maternity_id=? ORDER BY created_at DESC LIMIT 10");$del->bind_param('i',$id);$del->execute();$deliveries=$del->get_result();$del->close();
 $bab=$conn->prepare("SELECT * FROM maternity_baby WHERE maternity_id=? ORDER BY created_at DESC LIMIT 20");$bab->bind_param('i',$id);$bab->execute();$babies=$bab->get_result();$bab->close();
