@@ -65,17 +65,16 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $copayRemaining=max(0.0,(float)($v['default_copay_amount']??0));
    $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_code,item_name,quantity,unit_price,gross_amount,covered_amount,copay_amount,patient_responsibility,status) VALUES(?,?,?,?,NULL,?,?,?,?,?,?,?,'Draft')");
    if(!$is)throw new Exception('Unable to prepare claim item creation.');
+   $totalPatientResponsibility=0.0;
    foreach($preparedLines as $line){
     $copay=min($copayRemaining,$line['base_covered']);$copayRemaining=round($copayRemaining-$copay,2);
     $covered=round(max(0.0,$line['base_covered']-$copay),2);
-    $responsibility=round(max(0.0,$line['gross']-$covered),2);
+    $responsibility=round(max(0.0,$line['gross']-$covered),2);$totalPatientResponsibility+=$responsibility;
     $itemTypeValue=$line['type'];$src=$line['src'];$sourceId=$line['source_id'];$itemName=$line['item_name'];$quantity=$line['quantity'];$unitPrice=$line['unit_price'];$gross=$line['gross'];
     $is->bind_param('issisdddddd',$cid,$itemTypeValue,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$covered,$copay,$responsibility);
     if(!$is->execute())throw new Exception('Unable to create claim item: '.$is->error);
    }
    $is->close();
-   $totalPatientResponsibility=0.0;
-   foreach($preparedLines as $idx=>$line){$totalPatientResponsibility+=max(0.0,$line['gross']-max(0.0,$line['base_covered']-min(max(0.0,(float)($v['default_copay_amount']??0)),array_sum(array_column(array_slice($preparedLines,0,$idx+1),'base_covered')))));}
    $h=$conn->prepare("UPDATE claim_headers SET total_patient_responsibility=? WHERE id=?");
    if(!$h)throw new Exception('Unable to prepare claim responsibility total.');
    $h->bind_param('di',$totalPatientResponsibility,$cid);
