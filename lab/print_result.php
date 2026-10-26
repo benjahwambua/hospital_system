@@ -7,17 +7,18 @@ require_module_access($conn, 'laboratory', 'view');
 
 $id = intval($_GET['id'] ?? 0);
 // Enhanced query to get all necessary clinical data
-$query = "SELECT ps.*, p.full_name, p.patient_number, p.gender, p.age, sm.service_name 
-          FROM patient_services ps 
-          JOIN patients p ON ps.patient_id = p.id 
-          JOIN services_master sm ON ps.service_id = sm.id 
-          WHERE ps.id = ?";
+$query = "SELECT ps.*, p.full_name, p.patient_number, p.gender, p.age, sm.service_name
+          FROM patient_services ps
+          JOIN patients p ON ps.patient_id = p.id
+          JOIN services_master sm ON ps.service_id = sm.id
+          WHERE ps.id = ? AND ps.category = 'lab' AND ps.status = 'Completed'
+          LIMIT 1";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $res = $stmt->get_result()->fetch_assoc();
 
-if (!$res) die("Result not found.");
+if (!$res) { http_response_code(404); exit("Approved laboratory report not found."); }
 ?>
 
 <!DOCTYPE html>
