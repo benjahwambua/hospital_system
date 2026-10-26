@@ -16,6 +16,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     } elseif (isset($_POST['receive_stock'])) {
         $poId=(int)($_POST['po_id']??0);
         $poItemId=(int)($_POST['po_item_id']??0);
+        $postedReceiptNonce=(string)($_POST['receipt_nonce']??'');
+        $expectedReceiptNonce=(string)($_SESSION['grn_receipt_nonces'][$poItemId]??'');
+        if ($poItemId<=0 || $expectedReceiptNonce==='' || !hash_equals($expectedReceiptNonce,$postedReceiptNonce)) {
+            $message='This receipt form has already been used or expired. Refresh the page and verify the remaining quantity before receiving stock.';
+            $type='danger';
+        }
         $qty=(int)($_POST['actual_qty']??0);
         $supplierInvoice=trim((string)($_POST['supplier_invoice_no']??''));
         $paymentMethod='Credit';
@@ -26,7 +32,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $remarks=trim((string)($_POST['remarks']??''));
         $dueDate=trim((string)($_POST['due_date']??''));
 
-        if($poId<=0||$poItemId<=0||$qty<=0||$supplierInvoice==='') {
+        if ($type==='danger') {
+            // Invalid or replayed receipt token: do not post stock or financial entries.
+        } elseif($poId<=0||$poItemId<=0||$qty<=0||$supplierInvoice==='') {
             $message='PO item, quantity and supplier invoice number are required.'; $type='danger';
         } else {
             $conn->begin_transaction();
@@ -195,7 +203,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $newStatus=$hasRemaining?'Partial':'Received';
                 $pou=$conn->prepare("UPDATE purchase_orders SET status=? WHERE id=?");$pou->bind_param('si',$newStatus,$poId);$pou->execute();$pou->close();
 
-                $conn->commit(); $message="GRN #$printId created. $qty unit(s) added to ".strtoupper($inventoryType)." inventory and KES ".number_format($receiptTotal,2)." added to Supplier Payables.";
+                $conn->commit();
+                unset($_SESSION['grn_receipt_nonces'][$poItemId]);
+                $message="GRN #$printId created. $qty unit(s) added to ".strtoupper($inventoryType)." inventory and KES ".number_format($receiptTotal,2)." added to Supplier Payables.";
             } catch(Throwable $e){$conn->rollback();error_log('GRN creation error: '.$e->getMessage());$message='Unable to receive inventory right now. Please verify the GRN details and try again.';$type='danger';}
         }
     }
@@ -213,7 +223,7 @@ include __DIR__.'/../includes/header.php'; include __DIR__.'/../includes/sidebar
 <?php if($message): ?><div class="alert alert-<?=htmlspecialchars($type)?>"><?=htmlspecialchars($message)?><?php if($printId): ?> <a class="btn btn-sm btn-light ml-2" target="_blank" href="?print_receipt=<?=$printId?>">Print GRN</a><?php endif;?></div><?php endif;?>
 <div class="procurement-card"><div class="procurement-card-header">Goods Awaiting Receipt</div><div class="card-body table-responsive"><table class="procurement-table"><thead class="thead-light"><tr><th>PO</th><th>Supplier</th><th>Inventory</th><th>Item</th><th>Ordered</th><th>Received</th><th>Balance</th><th>Supplier Invoice</th><th>Batch</th><th>Expiry</th><th>Due Date</th><th>Qty</th><th></th></tr></thead><tbody>
 <?php if($pending&&$pending->num_rows): while($row=$pending->fetch_assoc()): ?>
-<tr><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="po_id" value="<?=$row['po_id']?>"><input type="hidden" name="po_item_id" value="<?=$row['po_item_id']?>"><input type="hidden" name="unit_cost" value="<?=htmlspecialchars($row['unit_price'])?>">
+<?php $receiptNonce=bin2hex(random_bytes(32)); if(!isset($_SESSION['grn_receipt_nonces']))$_SESSION['grn_receipt_nonces']=[]; $_SESSION['grn_receipt_nonces'][(int)$row['po_item_id']]=$receiptNonce; ?><tr><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrf)?>"><input type="hidden" name="receipt_nonce" value="<?=htmlspecialchars($receiptNonce)?>"><input type="hidden" name="po_id" value="<?=$row['po_id']?>"><input type="hidden" name="po_item_id" value="<?=$row['po_item_id']?>"><input type="hidden" name="unit_cost" value="<?=htmlspecialchars($row['unit_price'])?>">
 <td>#<?=$row['po_id']?></td><td><?=htmlspecialchars($row['supplier_name'])?></td><td><span class="badge badge-<?=$row['inventory_type']==='lab'?'info':'primary'?>"><?=strtoupper($row['inventory_type'])?></span></td><td><?=htmlspecialchars($row['item_name'])?></td><td><?=$row['quantity']?></td><td><?=$row['received_qty']?></td><td class="font-weight-bold text-danger"><?=$row['balance_remaining']?></td>
 <td><input name="supplier_invoice_no" class="form-control form-control-sm" required></td><td><input name="batch_no" class="form-control form-control-sm" placeholder="Batch"></td><td><input name="expiry_date" type="date" class="form-control form-control-sm"></td><td><input name="due_date" type="date" class="form-control form-control-sm"></td><td><input type="number" name="actual_qty" class="form-control form-control-sm" min="1" max="<?=$row['balance_remaining']?>" value="<?=$row['balance_remaining']?>" required></td><td><button name="receive_stock" class="btn btn-success btn-sm">Create GRN</button></td></form></tr>
 <?php endwhile; else: ?><tr><td colspan="14" class="text-center text-muted">No approved PO items awaiting receipt.</td></tr><?php endif;?>
