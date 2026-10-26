@@ -8,7 +8,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($a==='create'){
    $conn->begin_transaction();$transactionStarted=true;
    $inv=(int)($_POST['invoice_id']??0);if($inv<=0)throw new Exception('Select a valid invoice.');
-   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' AND (pc.start_date IS NULL OR pc.start_date<=CURDATE()) AND (pc.end_date IS NULL OR pc.end_date>=CURDATE()) WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
+   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id,pp.consultation_cover_percent,pp.pharmacy_cover_percent,pp.lab_cover_percent,pp.radiology_cover_percent,pp.procedure_cover_percent,pp.default_copay_amount FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' AND (pc.start_date IS NULL OR pc.start_date<=CURDATE()) AND (pc.end_date IS NULL OR pc.end_date>=CURDATE()) LEFT JOIN payer_plans pp ON pp.id=pc.plan_id AND pp.payer_id=pc.payer_id AND pp.active=1 WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
    if(!$q)throw new Exception('Unable to prepare invoice and coverage validation.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to validate invoice and patient coverage.');$v=$q->get_result()->fetch_assoc();$q->close();
    if(!$v)throw new Exception('Invoice has no verified patient coverage.');
@@ -25,9 +25,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $createdBy=(int)($_SESSION['user_id']??0);
    $s->bind_param('siiiiisdi',$num,$v['patient_id'],$v['coverage_id'],$v['payer_id'],$v['plan_id'],$v['id'],$v['created_at'],$claimTotal,$createdBy);
    if(!$s->execute())throw new Exception('Unable to create claim header: '.$s->error);$cid=(int)$s->insert_id;$s->close();
-   $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_name,quantity,unit_price,gross_amount,covered_amount,patient_responsibility,status) VALUES(?,?,?,?,?,?,?,?,?,0,'Draft')");
-   if(!$is)throw new Exception('Unable to prepare claim item creation.');
-   $itemCount=0;
+   // Calculate benefits from the selected active plan. Unsupported benefit categories
+   // default to 0% rather than assuming full payer coverage.
+   $preparedLines=[];$payerCoverageTotal=0.0;
    foreach($items as $it){
     $type='Other';$source=strtolower((string)($it['source']??'manual'));$itemType=strtolower((string)($it['item_type']??''));
     if($source==='pharmacy'||$itemType==='pharmacy')$type='Pharmacy';
@@ -37,12 +37,49 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     elseif($itemType==='consultation')$type='Consultation';
     elseif($itemType==='admission')$type='Admission';
     elseif(in_array($itemType,['service','treatment','maternity'],true))$type='Service';
-    $src='invoice_items';$sourceId=(int)$it['id'];$itemName=(string)$it['item_name'];$quantity=(float)$it['quantity'];$unitPrice=(float)$it['unit_price'];$gross=(float)$it['total'];$covered=$gross;
-    $is->bind_param('issisdddd',$cid,$type,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$covered);
+
+    $rate=0.0;
+    if($type==='Consultation')$rate=max(0.0,min(100.0,(float)($v['consultation_cover_percent']??0)));
+    elseif($type==='Pharmacy')$rate=max(0.0,min(100.0,(float)($v['pharmacy_cover_percent']??0)));
+    elseif($type==='Lab')$rate=max(0.0,min(100.0,(float)($v['lab_cover_percent']??0)));
+    elseif($type==='Radiology')$rate=max(0.0,min(100.0,(float)($v['radiology_cover_percent']??0)));
+    elseif($type==='Procedure')$rate=max(0.0,min(100.0,(float)($v['procedure_cover_percent']??0)));
+
+    $src='invoice_items';$sourceId=(int)$it['id'];$itemName=(string)$it['item_name'];
+    $quantity=max(0.0,(float)$it['quantity']);$unitPrice=max(0.0,(float)$it['unit_price']);$gross=max(0.0,(float)$it['total']);
+    $allowed=$gross;$tariffMatched=false;
+    // Invoice rows do not consistently retain a canonical service code. Match a
+    // tariff only by exact item name and benefit type; prefer plan-specific rows.
+    $tariff=$conn->prepare("SELECT COALESCE(NULLIF(approved_price,0),base_price) AS allowed_price FROM payer_tariffs WHERE payer_id=? AND item_name=? AND item_type=? AND active=1 AND (plan_id=? OR plan_id IS NULL) ORDER BY CASE WHEN plan_id=? THEN 1 ELSE 2 END,id DESC LIMIT 1");
+    if(!$tariff)throw new Exception('Unable to prepare payer tariff lookup.');
+    $payerId=(int)$v['payer_id'];$planId=$v['plan_id']!==null?(int)$v['plan_id']:0;
+    $tariff->bind_param('issii',$payerId,$itemName,$type,$planId,$planId);
+    if(!$tariff->execute())throw new Exception('Unable to look up payer tariff.');
+    $tariffRow=$tariff->get_result()->fetch_assoc();$tariff->close();
+    if($tariffRow){$allowed=min($gross,max(0.0,(float)$tariffRow['allowed_price']*$quantity));$tariffMatched=true;}
+    $baseCovered=round(min($gross,$allowed)*$rate/100,2);
+    $payerCoverageTotal+=$baseCovered;
+    $preparedLines[]=['type'=>$type,'src'=>$src,'source_id'=>$sourceId,'item_name'=>$itemName,'quantity'=>$quantity,'unit_price'=>$unitPrice,'gross'=>$gross,'base_covered'=>$baseCovered,'tariff_matched'=>$tariffMatched];
+   }
+   // Apply the plan copay once per claim, against the payer-covered portion.
+   $copayRemaining=max(0.0,(float)($v['default_copay_amount']??0));
+   $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_code,item_name,quantity,unit_price,gross_amount,covered_amount,copay_amount,patient_responsibility,status) VALUES(?,?,?,?,NULL,?,?,?,?,?,?,?,'Draft')");
+   if(!$is)throw new Exception('Unable to prepare claim item creation.');
+   $totalPatientResponsibility=0.0;
+   foreach($preparedLines as $line){
+    $copay=min($copayRemaining,$line['base_covered']);$copayRemaining=round($copayRemaining-$copay,2);
+    $covered=round(max(0.0,$line['base_covered']-$copay),2);
+    $responsibility=round(max(0.0,$line['gross']-$covered),2);$totalPatientResponsibility+=$responsibility;
+    $itemTypeValue=$line['type'];$src=$line['src'];$sourceId=$line['source_id'];$itemName=$line['item_name'];$quantity=$line['quantity'];$unitPrice=$line['unit_price'];$gross=$line['gross'];
+    $is->bind_param('issisdddddd',$cid,$itemTypeValue,$src,$sourceId,$itemName,$quantity,$unitPrice,$gross,$covered,$copay,$responsibility);
     if(!$is->execute())throw new Exception('Unable to create claim item: '.$is->error);
-    $itemCount++;
    }
    $is->close();
+   $h=$conn->prepare("UPDATE claim_headers SET total_patient_responsibility=? WHERE id=?");
+   if(!$h)throw new Exception('Unable to prepare claim responsibility total.');
+   $h->bind_param('di',$totalPatientResponsibility,$cid);
+   if(!$h->execute())throw new Exception('Unable to save claim responsibility total.');
+   $h->close();
    if(function_exists('audit'))audit('insurance_claim_created',"claim_id={$cid},invoice_id={$inv}");
    $conn->commit();$transactionStarted=false;$msg='Claim created from invoice.';
   }elseif($a==='submit'){ $id=(int)$_POST['id'];$s=$conn->prepare("UPDATE claim_headers SET claim_status='Submitted',submission_date=CURDATE() WHERE id=? AND claim_status='Draft'");$s->bind_param('i',$id);$s->execute();if(!$s->affected_rows)throw new Exception('Claim is not in Draft status.');$s->close();if(function_exists('audit'))audit('insurance_claim_submitted',"claim_id={$id}");$msg='Claim submitted.';}
