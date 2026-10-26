@@ -22,7 +22,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   elseif(!in_array($mode,$allowedModes,true)||!in_array($gender,$allowedGender,true)||!in_array($alive,$allowedOutcome,true))$error='Invalid delivery or newborn details.';
   elseif($babyNo===''||strlen($babyNo)>30||strlen($doctor)>150||strlen($condition)>500||strlen($comp)>500||strlen($loss)>50||strlen($notes)>2000)$error='One or more delivery fields are invalid or too long.';
   else{
-   $check=$conn->prepare("SELECT m.id FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");
+   $check=$conn->prepare("SELECT m.id FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");
    $check->bind_param('i',$mid);$check->execute();$eligible=$check->get_result()->fetch_assoc();$check->close();
    if(!$eligible)$error='The selected patient is not a registered maternity patient.';
    else{
@@ -44,9 +44,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   }
  }
 }
-$matList=$conn->query("SELECT m.id,p.full_name,p.patient_number,m.anc_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY p.full_name ASC");
-$deliveries=$conn->query("SELECT d.*,b.weight baby_weight,b.apgar,b.gender,b.alive,b.resuscitation,b.baby_number,p.full_name,m.anc_number FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id LEFT JOIN maternity_baby b ON b.maternity_id=m.id AND b.created_at>=d.created_at ORDER BY d.created_at DESC LIMIT 200");
-$stats=$conn->query("SELECT COUNT(*) total,SUM(delivery_mode='CS') cs_count,(SELECT COUNT(*) FROM maternity_baby WHERE alive=1) live_births FROM maternity_delivery")->fetch_assoc();
+$matList=$conn->query("SELECT m.id,p.full_name,p.patient_number,m.anc_number FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY p.full_name ASC");
+$deliveries=$conn->query("SELECT d.*,b.weight baby_weight,b.apgar,b.gender,b.alive,b.resuscitation,b.baby_number,p.full_name,m.anc_number FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id LEFT JOIN maternity_baby b ON b.maternity_id=m.id AND b.created_at>=d.created_at WHERE COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') ORDER BY d.created_at DESC LIMIT 200");
+$stats=$conn->query("SELECT COUNT(*) total,SUM(d.delivery_mode='CS') cs_count,(SELECT COUNT(*) FROM maternity_baby mb JOIN maternity m2 ON m2.id=mb.maternity_id JOIN patients p2 ON p2.id=m2.patient_id WHERE mb.alive=1 AND COALESCE(p2.is_walkin,0)=0 AND p2.clinic_category IN ('ANC','PNC','Maternity')) live_births FROM maternity_delivery d JOIN maternity m ON m.id=d.maternity_id JOIN patients p ON p.id=m.patient_id WHERE COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity')")->fetch_assoc();
 include __DIR__ . '/../includes/header.php';include __DIR__ . '/../includes/sidebar.php';?>
 <div class="main-content"><div class="container-fluid pt-4">
 <div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h4 mb-1 text-gray-800"><i class="fas fa-baby text-primary mr-2"></i>Delivery Register</h2><p class="text-muted mb-0">Record deliveries and newborn details in the maternity clinical record.</p></div><a href="index.php" class="btn btn-light">Maternity Dashboard</a></div>
