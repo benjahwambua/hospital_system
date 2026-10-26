@@ -21,7 +21,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $createdBy=(int)($_SESSION['user_id']??0);
    $s->bind_param('siiiiisdi',$num,$v['patient_id'],$v['coverage_id'],$v['payer_id'],$v['plan_id'],$v['id'],$v['created_at'],$v['total'],$createdBy);
    if(!$s->execute())throw new Exception('Unable to create claim header: '.$s->error);$cid=(int)$s->insert_id;$s->close();
-   $q=$conn->prepare("SELECT id,item_name,quantity,unit_price,total FROM invoice_items WHERE invoice_id=?");
+   $q=$conn->prepare("SELECT id,description AS item_name,quantity,unit_price,total FROM invoice_items WHERE invoice_id=?");
    if(!$q)throw new Exception('Unable to prepare invoice claim items.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to load invoice items.');$items=$q->get_result();
    $is=$conn->prepare("INSERT INTO claim_items(claim_id,item_type,source_table,source_id,item_name,quantity,unit_price,gross_amount,covered_amount,patient_responsibility,status) VALUES(?,?,?,?,?,?,?,?,?,0,'Draft')");
