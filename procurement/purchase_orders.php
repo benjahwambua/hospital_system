@@ -8,11 +8,54 @@ if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes
 $csrfToken=$_SESSION['csrf_token'];
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['approve_po'])) {
     require_module_access($conn, 'procurement', 'approve');
-    if (!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))) die('Invalid security token.');
+    if (!hash_equals($csrfToken,(string)($_POST['csrf_token']??''))) {
+        http_response_code(400);
+        exit('Invalid security token. Refresh the page and try again.');
+    }
     $approveId=(int)($_POST['po_id']??0);
-    $stmt=$conn->prepare("UPDATE purchase_orders SET status='Approved' WHERE id=? AND status='Pending'");
-    $stmt->bind_param('i',$approveId); $stmt->execute(); $stmt->close();
-    header('Location: view_po.php?id='.$approveId.'&approved=1'); exit;
+    if ($approveId<=0) {
+        http_response_code(400);
+        exit('Invalid purchase order.');
+    }
+
+    $conn->begin_transaction();
+    try {
+        $poCheck=$conn->prepare("SELECT id,status FROM purchase_orders WHERE id=? FOR UPDATE");
+        if (!$poCheck) throw new Exception('Unable to prepare purchase order approval.');
+        $poCheck->bind_param('i',$approveId);
+        if (!$poCheck->execute()) throw new Exception('Unable to load purchase order for approval.');
+        $poRow=$poCheck->get_result()->fetch_assoc();
+        $poCheck->close();
+        if (!$poRow) throw new Exception('Purchase order not found.');
+        if (($poRow['status']??'')!=='Pending') throw new Exception('Only pending purchase orders can be approved.');
+
+        $lineCheck=$conn->prepare("SELECT COUNT(*) AS line_count,COALESCE(SUM(quantity),0) AS total_quantity,COALESCE(SUM(line_total),0) AS line_total FROM purchase_order_items WHERE purchase_order_id=?");
+        if (!$lineCheck) throw new Exception('Unable to validate purchase order lines.');
+        $lineCheck->bind_param('i',$approveId);
+        if (!$lineCheck->execute()) throw new Exception('Unable to validate purchase order lines.');
+        $lineSummary=$lineCheck->get_result()->fetch_assoc();
+        $lineCheck->close();
+        if (!$lineSummary || (int)$lineSummary['line_count']<1 || (float)$lineSummary['total_quantity']<=0 || (float)$lineSummary['line_total']<=0) {
+            throw new Exception('A purchase order must contain valid items and a positive total before approval.');
+        }
+
+        $stmt=$conn->prepare("UPDATE purchase_orders SET status='Approved' WHERE id=? AND status='Pending'");
+        if (!$stmt) throw new Exception('Unable to prepare purchase order approval update.');
+        $stmt->bind_param('i',$approveId);
+        if (!$stmt->execute() || $stmt->affected_rows!==1) {
+            $stmt->close();
+            throw new Exception('Purchase order approval was not applied. Refresh and check its status.');
+        }
+        $stmt->close();
+        $conn->commit();
+        header('Location: view_po.php?id='.$approveId.'&approved=1');
+        exit;
+    } catch (Throwable $e) {
+        $conn->rollback();
+        error_log('Purchase order approval failed for PO '.$approveId.': '.$e->getMessage());
+        http_response_code(400);
+        exit(htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
+    }
 }
 
 include __DIR__ . '/../includes/header.php';
