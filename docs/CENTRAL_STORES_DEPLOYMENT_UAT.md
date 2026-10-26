@@ -2,9 +2,9 @@
 
 ## Purpose and release boundary
 
-This runbook covers the Central Stores lot-level physical-count schema and the matching application workflow. It is a controlled deployment procedure, not evidence that the migration or UAT has already been completed.
+This runbook covers the Central Stores lot-level physical-count schema, stock valuation fields and the matching application workflows. It is a controlled deployment procedure, not evidence that the migrations or UAT have already been completed.
 
-**Do not deploy the new lot-level stock-count page before applying** `database/central_stores_lot_counts_migration.sql`. The migration expects the base Central Stores schema from `database/central_stores_migration.sql` to exist first.
+**Migration order:** apply `database/central_stores_migration.sql`, then `database/central_stores_lot_counts_migration.sql`, then `database/central_stores_valuation_migration.sql`. Do not deploy the matching application code until the required migrations have been applied and verified. Back up the database before each schema change.
 
 ## 1. Before changing production
 
@@ -70,6 +70,22 @@ WHERE lot_key IS NULL OR lot_key = '';
 ```
 
 The expected result is zero.
+
+## 3A. Apply the valuation migration
+
+After the base Central Stores and lot-count migrations have succeeded, apply `database/central_stores_valuation_migration.sql` once. This adds nullable cost fields to the immutable movement ledger; it deliberately does not fabricate costs for legacy stock.
+
+Preflight and post-migration checks:
+
+```sql
+SHOW COLUMNS FROM stores_movements LIKE 'unit_cost';
+SHOW COLUMNS FROM stores_movements LIKE 'total_cost';
+SHOW INDEX FROM stores_movements WHERE Key_name = 'idx_stores_movements_cost';
+```
+
+Expected: `unit_cost` and `total_cost` columns exist and the cost index is present. Stop on any SQL error; do not blindly rerun a partially applied `ALTER TABLE` migration.
+
+After deployment, receive a test PO line into a non-production Central Stores item. Verify the new `Receipt` movement stores the correct unit cost and `quantity × unit_cost` total cost. Confirm the valuation report shows the expected lot/location balance and weighted-average cost. Manual receipts, opening balances and historic lots without a documented receipt cost should appear as uncosted exceptions until reconciled from source documents.
 
 ## 4. Deploy and smoke-test the application
 
