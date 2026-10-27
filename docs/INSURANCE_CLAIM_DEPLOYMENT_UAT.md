@@ -4,7 +4,7 @@
 
 This runbook covers the claim tariff-adjustment schema and the current plan-benefit, tariff, copay, and claim-receivable calculations. It is not evidence that the migration has been applied or that the financial workflow has passed UAT.
 
-**Migration order:** ensure the core HMS schema is present, apply `database/insurance_migration.sql` if the Insurance tables do not already exist, then apply `database/insurance_claim_tariff_adjustments_migration.sql`. Ensure `invoice_financial_allocations` exists from the base Insurance migration before deploying the claim/allocation integration. After deployment and a backup, review and run `database/insurance_legacy_allocations_backfill.sql` to link eligible legacy claims that do not yet have an allocation. Back up the target database first. The base migration uses `CREATE TABLE IF NOT EXISTS`; it does not add missing columns to existing tables.
+**Migration order:** back up the target database first and ensure the core HMS schema is present. Apply `database/insurance_migration.sql` if the Insurance tables do not already exist; then apply `database/insurance_claim_tariff_adjustments_migration.sql` and `database/insurance_denial_appeals_migration.sql` to add the required claim-item and appeal fields. Ensure `invoice_financial_allocations` exists from the base Insurance migration before deploying the claim/allocation integration. After schema verification and a backup, review and run `database/insurance_legacy_allocations_backfill.sql` to link eligible legacy claims that do not yet have an allocation. The base migration uses `CREATE TABLE IF NOT EXISTS`; it does not add missing columns to existing tables.
 
 ## 1. Backup and identify target
 
