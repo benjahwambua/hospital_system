@@ -61,7 +61,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $refType='theatre_case';$refId=(int)$caseId;$uid=(int)($_SESSION['user_id']??0);
    $movement=$conn->prepare("INSERT INTO stores_movements (item_id,location_id,movement_type,quantity,unit_cost,total_cost,reference_type,reference_id,batch_number,expiry_date,notes,created_by,created_at) VALUES (?,?,'Issue',?,?,?,?,?,?,?,?,?,NOW())");
    if(!$movement) throw new RuntimeException('Unable to prepare Central Stores movement. Confirm the stores schema.');
-   $movement->bind_param('iiddsdisssii',$itemId,$locationId,$quantity,$unitCost,$totalCost,$refType,$refId,$batch,$expiry,$notes,$uid);
+   $movement->bind_param('iidddsisssi',$itemId,$locationId,$quantity,$unitCost,$totalCost,$refType,$refId,$batch,$expiry,$notes,$uid);
    if(!$movement->execute()){$msg=$movement->error;$movement->close();throw new RuntimeException('Stock issue could not be saved: '.$msg);}
    $movementId=(int)$movement->insert_id;$movement->close();
    $map=$conn->prepare('INSERT INTO theatre_case_stock_issues (case_id,item_id,location_id,movement_id,batch_number,expiry_date,quantity,recorded_by) VALUES (?,?,?,?,?,?,?,?)');
