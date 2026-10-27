@@ -49,3 +49,11 @@ Mark each test Pass, Fail or Not run and record the tester, date and environment
 The current six-item gate is a first safety checkpoint, not a substitute for an approved WHO Surgical Safety Checklist or local theatre policy. The application currently validates active user accounts, not professional qualifications or licence status; a named clinician and clinical-governance process must verify those before assigning staff to a live case. Before production clinical use, the hospital must validate and complete the appropriate Sign In, Time Out and Sign Out checklist, operative report, anaesthetic chart, implant/device and lot traceability, blood product checks, antibiotic/time-out documentation where applicable, PACU/recovery observations, post-operative orders, consent documentation, clinical team sign-off, and the interfaces to admissions, billing, pharmacy/stores and reporting.
 
 Do not mark this module production-ready based only on syntax checks or a successful code merge. Apply the migration in a test database and complete witnessed theatre/anaesthesia UAT first.
+
+
+## Theatre team credential validation
+
+- [ ] When scheduling a case with an assigned surgeon or anaesthesia provider, verify that the user is linked to an Active HR staff record and has an Active `Professional Licence` credential with a registration number and no expired expiry date.
+- [ ] Confirm an expired, suspended, revoked, unlinked or missing licence blocks the assignment with a clear message.
+- [ ] Confirm a missing HR staff/credential schema fails closed for assigned clinicians; unassigned cases can still be scheduled for later credential verification.
+- [ ] Confirm the HR staff master and credential migrations are applied before operational rollout; PHP lint alone does not prove this workflow against the live database.
