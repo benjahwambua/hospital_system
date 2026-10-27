@@ -72,3 +72,13 @@ Do not mark this module production-ready based only on syntax checks or a succes
 9. Mark each test Pass, Fail or Not run with tester, date and environment. PHP lint and merge status do not establish live database/browser acceptance.
 
 The new PACU observation form is a supplemental structured record and is not a substitute for a clinically approved observation frequency, escalation thresholds, discharge criteria or a locally approved PACU chart. The hospital's clinical leadership must approve the fields and workflow before live clinical use.
+
+
+## Phased surgical safety checklist
+
+- Apply `database/theatre_safety_checklist_migration.sql` after the Theatre/Surgery base migration.
+- Open **Phased Safety Checklist** from the theatre case list and complete Sign In, Time Out and Sign Out at the appropriate clinical workflow points.
+- Each item must be recorded as Confirmed or Not applicable; completed phases are locked and audited.
+- The application blocks transition to **In Theatre** until Sign In and Time Out are complete, and blocks transition to **Recovery** until Sign Out is complete. The legacy six-item pre-operative safety gate remains in force.
+- Validate wording and phase timing with the hospital's surgical, anaesthesia and nursing leads before production; this implementation is not a substitute for local policy or clinical judgement.
+- Apply the migration and test on a backed-up non-production database first. Browser UAT remains required.
