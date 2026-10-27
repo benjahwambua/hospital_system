@@ -99,3 +99,9 @@ The new PACU observation form is a supplemental structured record and is not a s
 - From a case in Pre-op, In Theatre, Recovery or Completed, open **Theatre Stock Usage** and select an active item, issuing location, quantity and batch/expiry where tracked.
 - The workflow checks the exact lot balance, blocks expired stock and over-issues, writes an **Issue** movement into `stores_movements`, and links it to the theatre case.
 - The stock issue requires both Theatre edit and Central Stores edit permissions. Validate item balances and batch records with stores staff in a backed-up test database; browser UAT remains required.
+
+
+## PACU completion gate
+
+- A theatre case cannot move from Recovery to Completed until at least one structured PACU observation has been recorded during Recovery.
+- Validate the observation chart and completion gate with theatre and anaesthesia staff. A recorded observation does not itself establish clinical stability or replace clinician judgement.
