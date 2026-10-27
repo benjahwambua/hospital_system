@@ -16,7 +16,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    // is available. Legacy invoices without visit linkage are classified from
    // explicit inpatient billing markers; ambiguous cases must be linked before
    // a claim can be generated rather than silently assuming coverage.
-   $scope=strtolower(trim((string)($v['coverage_scope']??'outpatient')));
+   $scope=strtolower(trim((string)($v['coverage_scope']??'')));
+   if($scope==='')throw new Exception('The selected coverage has no active plan with a configured coverage scope. Assign an active payer plan before generating the claim.');
    if(!in_array($scope,['outpatient','inpatient','both'],true))throw new Exception('The selected insurance plan has an invalid coverage scope.');
    if($scope!=='both'){
     $encounterKind='unknown';$visitId=0;
