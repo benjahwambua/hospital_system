@@ -223,6 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 $effectiveOutcome = $outcome !== '' ? $outcome : (string)($current['outcome'] ?? '');
+                $admissionIdToLink = null;
                 $effectiveIntraop = $intraop !== '' ? $intraop : (string)($current['intraoperative_notes'] ?? '');
                 $effectiveAnesthesia = $anesthesia !== '' ? $anesthesia : (string)($current['anesthesia_notes'] ?? '');
                 $effectiveRecovery = $recovery !== '' ? $recovery : (string)($current['recovery_notes'] ?? '');
@@ -267,6 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $activeAdmission = $admissionCheck->get_result()->fetch_assoc();
                     $admissionCheck->close();
                     if (!$activeAdmission) throw new RuntimeException('This case outcome is Admitted, but the patient has no active inpatient admission. Complete the ward admission first, then complete the theatre case.');
+                    $admissionIdToLink = (int)$activeAdmission['id'];
                 }
                 // The legacy six-item pre-operative gate remains required. The phased
                 // WHO-style checklist is a separate auditable record and must also be complete.
@@ -354,6 +356,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('The theatre case update failed. Please retry.');
                 }
                 $stmt->close();
+                if ($targetStatus === 'Completed' && $effectiveOutcome === 'Admitted') {
+                    $linkAdmission = $conn->prepare('INSERT INTO theatre_case_admissions (case_id, admission_id, recorded_by) VALUES (?,?,?) ON DUPLICATE KEY UPDATE admission_id=VALUES(admission_id)');
+                    if (!$linkAdmission) {
+                        error_log('Theatre admission linkage prepare failed for case id '.$caseId.': '.$conn->error);
+                        throw new RuntimeException('Theatre admission linkage is not installed. Apply database/theatre_admission_linkage_migration.sql before completing this case.');
+                    }
+                    $uidForAdmission = (int)($_SESSION['user_id'] ?? 0);
+                    $linkAdmission->bind_param('iii', $caseId, $admissionIdToLink, $uidForAdmission);
+                    if (!$linkAdmission->execute()) {
+                        error_log('Theatre admission linkage failed for case id '.$caseId.': '.$linkAdmission->error);
+                        $linkAdmission->close();
+                        throw new RuntimeException('Unable to link this theatre case to the active inpatient admission.');
+                    }
+                    $linkAdmission->close();
+                }
                 if (!$conn->commit()) {
                     error_log('Theatre transaction commit failed for case id '.$caseId.': '.$conn->error);
                     throw new RuntimeException('The theatre case update could not be confirmed. Refresh the case before retrying.');
