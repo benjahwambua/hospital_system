@@ -4,7 +4,7 @@
 
 This runbook covers the claim tariff-adjustment schema and the current plan-benefit, tariff, copay, and claim-receivable calculations. It is not evidence that the migration has been applied or that the financial workflow has passed UAT.
 
-**Migration order:** ensure the core HMS schema is present, apply `database/insurance_migration.sql` if the Insurance tables do not already exist, then apply `database/insurance_claim_tariff_adjustments_migration.sql`. Back up the target database first. The base migration uses `CREATE TABLE IF NOT EXISTS`; it does not add missing columns to existing tables.
+**Migration order:** ensure the core HMS schema is present, apply `database/insurance_migration.sql` if the Insurance tables do not already exist, then apply `database/insurance_claim_tariff_adjustments_migration.sql`. Ensure `invoice_financial_allocations` exists from the base Insurance migration before deploying the claim/allocation integration. After deployment and a backup, review and run `database/insurance_legacy_allocations_backfill.sql` to link eligible legacy claims that do not yet have an allocation. Back up the target database first. The base migration uses `CREATE TABLE IF NOT EXISTS`; it does not add missing columns to existing tables.
 
 ## 1. Backup and identify target
 
@@ -79,6 +79,10 @@ For each case, record Pass/Fail, tester, timestamp, test data IDs and evidence.
 - [ ] Contractual adjustment is not incorrectly added to patient responsibility.
 - [ ] Claim-header `total_claim_amount` equals the sum of payer-covered line amounts after benefit percentage and copay, consistent with the open-claim receivable dashboard.
 - [ ] Claim-header `total_patient_responsibility` equals the sum of line patient responsibilities.
+- [ ] New claim creation creates exactly one linked `invoice_financial_allocations` row with expected payer amount and open balance.
+- [ ] Claim adjudication updates the linked allocation's approved amount and outstanding balance.
+- [ ] Remittance matching updates the linked allocation's settled amount, balance and settlement status in the same transaction.
+- [ ] The legacy allocation backfill preview is reviewed; after execution, the post-check returns zero invoiced claims without allocations.
 - [ ] Claim creation failure rolls back both header and item rows.
 - [ ] Duplicate claim creation for the same invoice is rejected.
 - [ ] Submission is only allowed from Draft and updates the expected submission date/status.
