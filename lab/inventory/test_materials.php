@@ -3,7 +3,7 @@ require_once __DIR__.'/../../config/config.php';
 require_once __DIR__.'/../../includes/session.php';
 require_once __DIR__.'/../../includes/auth.php';
 require_login();
-require_module_access($conn,'laboratory','edit');
+require_module_access($conn,'laboratory','view');
 
 
 if(empty($_SESSION['csrf_token']))$_SESSION['csrf_token']=bin2hex(random_bytes(32));
@@ -13,6 +13,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if(!hash_equals($csrf,(string)($_POST['csrf_token']??''))){$error='Invalid security token.';}
     else{
         $action=$_POST['action']??'add';
+        if(!in_array($action,['add','delete'],true)){
+            http_response_code(400);
+            exit('Invalid material mapping action.');
+        }
+        require_module_access($conn,'laboratory',$action==='delete'?'delete':'edit');
         if($action==='delete'){
             $id=(int)($_POST['id']??0);
             $s=$conn->prepare("UPDATE lab_service_materials SET active=0 WHERE id=?");$s->bind_param('i',$id);$s->execute();$s->close();$success='Material mapping disabled.';
