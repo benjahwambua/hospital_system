@@ -339,6 +339,7 @@ include __DIR__ . '/../includes/sidebar.php';
 </style>
 <div class="theatre-page"><div class="theatre-shell">
   <section class="theatre-hero"><div><div class="theatre-kicker">Clinical Services / Peri-operative Care</div><h1>Theatre &amp; Surgery</h1><p>Schedule surgical cases, verify the pre-operative safety gate, and track theatre-to-recovery handover.</p></div><div class="theatre-pill">Initial workflow · Clinical validation required</div></section>
+  <p style="margin:0 0 16px"><a href="clinical_records.php" style="display:inline-block;background:#075b9d;color:#fff;text-decoration:none;padding:9px 13px;border-radius:8px;font-weight:800">Open PACU &amp; Implant Records</a> <span class="theatre-muted">Recovery observations and device/lot traceability</span></p>
   <?php if ($error !== ''): ?><div class="theatre-alert error"><?= theatre_h($error) ?></div><?php endif; ?>
   <?php if ($pageLoadError !== ''): ?><div class="theatre-alert error"><?= theatre_h($pageLoadError) ?></div><?php endif; ?>
   <?php if ($message !== ''): ?><div class="theatre-alert success"><?= theatre_h($message) ?></div><?php endif; ?>
