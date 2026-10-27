@@ -127,13 +127,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $surgeonId = $surgeonId && $surgeonId > 0 ? $surgeonId : null;
                 $anesthetistId = $anesthetistId && $anesthetistId > 0 ? $anesthetistId : null;
                 $caseNumber = 'TH-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
-                $stmt = $conn->prepare("INSERT INTO theatre_cases (case_number,patient_id,procedure_name,urgency,scheduled_at,surgeon_id,anesthetist_id,clinical_notes,status,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?, 'Planned',?,?)");
+                // Link the surgical case to the patient's current open encounter when one exists,
+                // so downstream billing can reuse the correct visit invoice.
+                $visitId = null;
+                $visitStmt = $conn->prepare("SELECT id FROM visits WHERE patient_id=? AND status IN ('Open','In Progress') ORDER BY visit_date DESC,visit_time DESC,id DESC LIMIT 1");
+                if (!$visitStmt) {
+                    error_log('Theatre visit lookup prepare failed for patient id '.$patientId.': '.$conn->error);
+                    $error = 'Unable to link the theatre case to the current patient visit. Please retry.';
+                } else {
+                    $visitStmt->bind_param('i', $patientId);
+                    if (!$visitStmt->execute()) {
+                        error_log('Theatre visit lookup failed for patient id '.$patientId.': '.$visitStmt->error);
+                        $error = 'Unable to link the theatre case to the current patient visit. Please retry.';
+                    } else {
+                        $visitRow = $visitStmt->get_result()->fetch_assoc();
+                        if ($visitRow) $visitId = (int)$visitRow['id'];
+                    }
+                    $visitStmt->close();
+                }
+                if ($error === '') $stmt = $conn->prepare("INSERT INTO theatre_cases (case_number,patient_id,visit_id,procedure_name,urgency,scheduled_at,surgeon_id,anesthetist_id,clinical_notes,status,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?, 'Planned',?,?)");
+                else $stmt = false;
                 if (!$stmt) {
                     error_log('Theatre case insert prepare failed for patient id '.$patientId.': '.$conn->error);
                     $error = 'Unable to prepare the theatre case. Confirm the theatre migration has been applied.';
                 } else {
                     $uid = (int)($_SESSION['user_id'] ?? 0);
-                    $stmt->bind_param('sisssiisii', $caseNumber, $patientId, $procedure, $urgency, $scheduleSql, $surgeonId, $anesthetistId, $notes, $uid, $uid);
+                    $stmt->bind_param('siisssiisii', $caseNumber, $patientId, $visitId, $procedure, $urgency, $scheduleSql, $surgeonId, $anesthetistId, $notes, $uid, $uid);
                     if ($stmt->execute()) {
                         $newId = (int)$stmt->insert_id;
                         if (function_exists('audit')) audit('theatre_case_created', 'case_id='.$newId.',case_number='.$caseNumber.',patient_id='.$patientId);
