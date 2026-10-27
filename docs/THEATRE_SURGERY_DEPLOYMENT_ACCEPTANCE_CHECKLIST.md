@@ -32,7 +32,7 @@ Mark each test Pass, Fail or Not run and record the tester, date and environment
 - Confirm patient and assigned team lookups fail safely if their queries fail.
 - Confirm a user without Create cannot schedule a case and a user without Edit cannot update a case.
 - Try entering In Theatre with each safety confirmation missing; every attempt must be blocked.
-- Confirm In Theatre requires two distinct assigned accounts to exist and be active; verify separately with clinical governance that each person is appropriately qualified and currently licensed, because the application does not enforce professional credentials.
+- Confirm In Theatre requires two distinct assigned accounts to exist and be active, and confirm each assigned clinician has an Active HR staff record plus an Active, unexpired Professional Licence with a registration number. Clinical governance must still verify the regulator/source and scope of practice; database fields alone do not authenticate a licence.
 - Before theatre starts, check each safety item, save, reopen, explicitly uncheck one item, and save again; confirm the revocation is persisted and the case cannot transition into In Theatre until all six items are re-confirmed.
 - After a case enters In Theatre or Recovery, attempt to change a pre-operative checklist flag; confirm the application rejects the edit so the historical pre-operative record is preserved.
 - Verify only these lifecycle transitions are accepted: Planned → Pre-op/Cancelled; Pre-op → Planned/In Theatre/Cancelled; In Theatre → Recovery; Recovery → Completed. Same-state saves may update documentation but must not bypass the gates.
@@ -57,3 +57,18 @@ Do not mark this module production-ready based only on syntax checks or a succes
 - [ ] Confirm an expired, suspended, revoked, unlinked or missing licence blocks the assignment with a clear message.
 - [ ] Confirm a missing HR staff/credential schema fails closed for assigned clinicians; unassigned cases can still be scheduled for later credential verification.
 - [ ] Confirm the HR staff master and credential migrations are applied before operational rollout; PHP lint alone does not prove this workflow against the live database.
+
+
+## PACU and implant/device records
+
+1. Review `database/theatre_clinical_records_migration.sql` against the target schema and apply it only after a verified backup in a test environment.
+2. Confirm the Theatre page links to `theatre/clinical_records.php` and users without Theatre View cannot access the records page directly.
+3. Confirm PACU observations can be recorded only while the case is in Recovery and require Theatre Edit permission.
+4. Validate accepted ranges and rejection of invalid heart rate, respiratory rate, blood pressure, oxygen saturation, temperature and pain-score values.
+5. Confirm observation history is retained and displayed in timestamp order without overwriting earlier observations.
+6. Confirm implant/device records require an item name and at least a lot/batch or serial number; verify manufacturer, model, expiry, quantity, site and notes persist.
+7. Confirm device records are available for In Theatre, Recovery and Completed cases, and cannot be added to Planned or Pre-op cases.
+8. Verify foreign keys prevent orphan clinical records and the audit log records successful creates.
+9. Mark each test Pass, Fail or Not run with tester, date and environment. PHP lint and merge status do not establish live database/browser acceptance.
+
+The new PACU observation form is a supplemental structured record and is not a substitute for a clinically approved observation frequency, escalation thresholds, discharge criteria or a locally approved PACU chart. The hospital's clinical leadership must approve the fields and workflow before live clinical use.
