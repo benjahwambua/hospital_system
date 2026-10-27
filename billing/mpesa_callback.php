@@ -39,6 +39,11 @@ try {
     } elseif($status==='completed' && abs($callbackAmount-(float)$tx['amount'])>0.00001){
         $status='failed';
         $resultDesc='M-Pesa callback amount does not match the initiated transaction amount.';
+    } elseif($status==='completed' && $receipt===''){
+        // Do not mark the STK transaction completed unless there is a receipt
+        // that can be used to create and reconcile the corresponding payment.
+        $status='failed';
+        $resultDesc='M-Pesa callback did not include a receipt number; payment requires reconciliation.';
     }
 
     $stmt=$conn->prepare("UPDATE mpesa_transactions SET result_code=?, result_desc=?, mpesa_receipt=?, phone=?, status=?, raw_response=?, updated_at=NOW() WHERE id=?");
