@@ -1,16 +1,3 @@
-<style>
-/* HMS operational page styling */
-.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
-.main-content>.container-fluid{max-width:1500px}
-.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
-.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
-.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
-.main-content .table td{border-color:#edf0f5;vertical-align:middle}
-.main-content .table tbody tr:hover{background:#f8fbff}
-.main-content .form-control{border-color:#d7dee8;border-radius:9px}
-.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
-.main-content .btn{border-radius:8px;font-weight:700}
-</style>
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/session.php';
@@ -19,7 +6,9 @@ require_module_access($conn, 'radiology', 'view');
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
 $csrfToken=$_SESSION['csrf_token']; $message='';
-$hasVisit=$conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'") && $conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'")->num_rows>0;
+$visitColumnCheck=$conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'");
+$hasVisit=$visitColumnCheck && $visitColumnCheck->num_rows>0;
+if ($visitColumnCheck) $visitColumnCheck->free();
 
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_radiology_result'])){
  require_module_access($conn, 'radiology', 'approve');
@@ -58,6 +47,20 @@ $sql.=" WHERE ps.category='radiology' ORDER BY (ps.status='Pending') DESC, ps.cr
 $jobs=$conn->query($sql);
 include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sidebar.php';
 ?>
+<style>
+/* HMS operational page styling */
+.main-content{background:#f5f7fb;min-height:calc(100vh - 72px)}
+.main-content>.container-fluid{max-width:1500px}
+.main-content .card{border:1px solid #e5eaf1;border-radius:14px;box-shadow:0 4px 18px rgba(31,45,61,.05);overflow:hidden}
+.main-content .card-header{background:#fff;border-bottom:1px solid #edf0f5;color:#25324a}
+.main-content .table thead th{background:#f8fafc;border-top:0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.35px}
+.main-content .table td{border-color:#edf0f5;vertical-align:middle}
+.main-content .table tbody tr:hover{background:#f8fbff}
+.main-content .form-control{border-color:#d7dee8;border-radius:9px}
+.main-content .form-control:focus{border-color:#075b9d;box-shadow:0 0 0 3px rgba(7,91,157,.08)}
+.main-content .btn{border-radius:8px;font-weight:700}
+</style>
+
 <div class="main-content"><div class="container-fluid pt-4">
 <div class="card shadow-sm"><div class="card-header bg-white"><h4 class="mb-0 font-weight-bold">Radiology Results Worklist</h4></div>
 <div class="card-body"><?= $message ? '<div class="alert alert-info">'.htmlspecialchars($message).'</div>' : '' ?>
@@ -65,7 +68,7 @@ include __DIR__ . '/../includes/header.php'; include __DIR__ . '/../includes/sid
 <?php if($jobs && $jobs->num_rows): while($j=$jobs->fetch_assoc()): ?><tr>
 <td><?=htmlspecialchars($j['created_at'])?></td><td><strong><?=htmlspecialchars($j['full_name'])?></strong><br><small><?=htmlspecialchars($j['patient_number'])?></small></td>
 <td><?=htmlspecialchars($j['visit_number']??'Legacy')?></td><td><?=htmlspecialchars($j['service_name'])?><br><span class="badge badge-<?=($j['status']==='Completed'?'success':'warning')?>"><?=htmlspecialchars($j['status']??'Pending')?></span></td>
-<td><form method="post" id="radForm<?=$j['id']?>"><textarea name="findings" class="form-control" rows="2" placeholder="Radiologist findings..."><?=htmlspecialchars($j['results']??'')?></textarea><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="record_id" value="<?=$j['id']?>"></form></td><td><?php if(can_approve($conn, 'radiology')): ?><button form="radForm<?=$j['id']?>" name="save_radiology_result" class="btn btn-sm btn-success">Save & Close</button><?php else: ?><span class="text-muted small">Approval permission required</span><?php endif; ?></td>
+<td><?php if(($j['status']??'')==='Completed'): ?><div class="text-wrap"><?=nl2br(htmlspecialchars($j['results']??''))?></div><?php else: ?><form method="post" id="radForm<?=$j['id']?>"><textarea name="findings" class="form-control" rows="2" placeholder="Radiologist findings..." required><?=htmlspecialchars($j['results']??'')?></textarea><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($csrfToken)?>"><input type="hidden" name="record_id" value="<?=$j['id']?>"></form><?php endif; ?></td><td><?php if(($j['status']??'')==='Completed'): ?><span class="text-muted small">Completed — read only</span><?php elseif(can_approve($conn, 'radiology')): ?><button form="radForm<?=$j['id']?>" name="save_radiology_result" class="btn btn-sm btn-success">Save & Close</button><?php else: ?><span class="text-muted small">Approval permission required</span><?php endif; ?></td>
 </tr><?php endwhile; else: ?><tr><td colspan="6" class="text-center text-muted py-4">No radiology orders found.</td></tr><?php endif; ?>
 </tbody></table></div></div></div></div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
