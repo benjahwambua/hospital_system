@@ -8,7 +8,7 @@ This checklist applies to the current Theatre & Surgery workflow in `theatre/ind
 - Require individual Theatre View/Create/Edit permissions and CSRF validation.
 - Retain a six-item pre-operative gate: consent, identity, site/side marking, allergy review, fasting status and anaesthesia review.
 - Guard status transitions through Planned, Pre-op, In Theatre, Recovery, and Completed, with cancellation restricted to the early workflow.
-- Require two distinct assigned active user accounts as surgeon and anaesthesia provider before entering theatre. The current workflow checks account activity only; it does not verify professional registration, specialty, licence expiry or HR credential records.
+- Require two distinct assigned active user accounts as surgeon and anaesthesia provider before entering theatre, with each assigned user linked to an Active HR staff record and an Active Professional Licence credential with a registration number and no expired expiry date. Regulator authenticity and scope of practice still require clinical-governance verification.
 - Require intra-operative, anaesthesia and recovery/handover documentation plus a valid outcome before Recovery/Completed.
 - Require an active inpatient admission before completing a case with the Admitted outcome.
 - Preserve already-recorded clinical notes when a later status update submits blank note fields.
