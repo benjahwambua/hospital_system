@@ -105,3 +105,7 @@ The new PACU observation form is a supplemental structured record and is not a s
 
 - A theatre case cannot move from Recovery to Completed until at least one structured PACU observation has been recorded during Recovery.
 - Validate the observation chart and completion gate with theatre and anaesthesia staff. A recorded observation does not itself establish clinical stability or replace clinician judgement.
+
+
+- Confirm multiple stock issues for the same item and lot can be recorded as separate Central Stores movements against one theatre case, and that each movement remains traceable.
+- Confirm no additional stock issue is permitted after a case reaches Completed or Cancelled.
