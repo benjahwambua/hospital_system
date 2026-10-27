@@ -783,7 +783,10 @@ function add_invoice_item($conn, $invoice_id, $description, $qty, $unit_price, $
         $columns[] = 'source';
         $placeholders[] = '?';
         $types .= 's';
-        $values[] = $item_type === 'pharmacy' ? 'pharmacy' : 'service';
+        // invoice_items.source is an enum in existing HMS databases; map to a
+        // supported source instead of writing the invalid value 'service'.
+        $sourceValue = in_array($item_type, ['pharmacy','lab','radiology','manual'], true) ? $item_type : 'manual';
+        $values[] = $sourceValue;
     }
     if ($med_id !== null && invoice_item_column_exists($conn, 'med_id')) {
         $columns[] = 'med_id';
