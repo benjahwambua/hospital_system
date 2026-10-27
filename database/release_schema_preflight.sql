@@ -23,14 +23,14 @@ FROM (
     UNION ALL SELECT 'theatre_case_stock_issues'
     UNION ALL SELECT 'theatre_case_admissions'
     UNION ALL SELECT 'maternity_partograph_observations'
-    UNION ALL SELECT 'central_store_locations'
-    UNION ALL SELECT 'central_store_items'
-    UNION ALL SELECT 'central_store_movements'
+    UNION ALL SELECT 'stores_locations'
+    UNION ALL SELECT 'stores_items'
+    UNION ALL SELECT 'stores_movements'
     UNION ALL SELECT 'invoices'
     UNION ALL SELECT 'invoice_items'
     UNION ALL SELECT 'patient_services'
     UNION ALL SELECT 'user_module_access'
-    UNION ALL SELECT 'modules'
+    UNION ALL SELECT 'access_modules'
 ) AS expected
 LEFT JOIN information_schema.TABLES AS t
        ON t.TABLE_SCHEMA = DATABASE()
