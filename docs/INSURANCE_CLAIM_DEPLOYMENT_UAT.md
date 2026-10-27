@@ -96,7 +96,7 @@ For each case, record Pass/Fail, tester, timestamp, test data IDs and evidence.
 
 ## 5A. Invoice allocation integrity checks
 
-After applying the Insurance schema and reviewing/running the legacy allocation backfill, execute `database/insurance_financial_reconciliation_checks.sql`. It is read-only and reports missing or duplicate claim allocations, claim/allocation amount mismatches, overpaid claims, overallocated remittances, payer mismatches and remittance items linked to unexpected claim statuses. Record query results and have Finance/Insurance review every exception; do not auto-correct historical amounts or statuses without source evidence.
+After applying the Insurance schema and reviewing/running the legacy allocation backfill, execute `database/insurance_financial_reconciliation_checks.sql`. It is read-only and reports missing or duplicate claim allocations, claim/allocation amount mismatches, overpaid claims, overallocated remittances, payer mismatches, remittance items linked to unexpected claim statuses, denial totals above payer exposure, and resolved/written-off appeals that need explicit Finance reconciliation. Record query results and have Finance/Insurance review every exception; do not auto-correct historical amounts or statuses without source evidence.
 
 ## 6. Financial reconciliation
 
