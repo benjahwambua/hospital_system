@@ -234,6 +234,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     && ($effectiveRecovery === '' || !in_array($effectiveOutcome, ['Recovered','Transferred','Admitted','Other'], true))) {
                     throw new RuntimeException('Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.');
                 }
+                if ($targetStatus === 'Completed') {
+                    $pacuCheck = $conn->prepare('SELECT id FROM theatre_recovery_observations WHERE case_id=? LIMIT 1 FOR UPDATE');
+                    if (!$pacuCheck) {
+                        error_log('Theatre PACU completion check prepare failed for case id '.$caseId.': '.$conn->error);
+                        throw new RuntimeException('PACU observation records are not installed. Apply database/theatre_clinical_records_migration.sql before completing the case.');
+                    }
+                    $pacuCheck->bind_param('i', $caseId);
+                    if (!$pacuCheck->execute()) {
+                        $pacuCheck->close();
+                        throw new RuntimeException('Unable to verify the PACU observation chart before completing this case.');
+                    }
+                    $hasPacuObservation = (bool)$pacuCheck->get_result()->fetch_assoc();
+                    $pacuCheck->close();
+                    if (!$hasPacuObservation) {
+                        throw new RuntimeException('Record at least one PACU observation during Recovery before completing the theatre case.');
+                    }
+                }
                 if ($targetStatus === 'Completed' && $effectiveOutcome === 'Admitted') {
                     $patientId = (int)$current['patient_id'];
                     $admissionCheck = $conn->prepare("SELECT id FROM admissions WHERE patient_id=? AND status='Admitted' LIMIT 1 FOR UPDATE");
