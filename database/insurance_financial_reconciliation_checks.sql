@@ -65,3 +65,33 @@ JOIN remittances r ON r.id = ri.remittance_id
 JOIN claim_headers ch ON ch.id = ri.claim_id
 WHERE ch.claim_status NOT IN ('Approved','Partially Approved','Paid')
 ORDER BY ri.id;
+
+-- 8. Denial records whose cumulative amount exceeds the claim's approved payer exposure.
+-- Before adjudication, total_claim_amount is used as the provisional ceiling.
+SELECT ch.id AS claim_id, ch.claim_number, ch.claim_status,
+       ch.total_claim_amount, ch.total_approved_amount,
+       SUM(d.denied_amount) AS recorded_denied_amount,
+       CASE WHEN ch.total_approved_amount > 0
+            THEN ch.total_approved_amount ELSE ch.total_claim_amount END AS payer_exposure_ceiling
+FROM claim_headers ch
+JOIN claim_denials d ON d.claim_id = ch.id
+GROUP BY ch.id, ch.claim_number, ch.claim_status,
+         ch.total_claim_amount, ch.total_approved_amount
+HAVING SUM(d.denied_amount) >
+       CASE WHEN ch.total_approved_amount > 0
+            THEN ch.total_approved_amount ELSE ch.total_claim_amount END + 0.01
+ORDER BY ch.id;
+
+-- 9. Resolved/written-off appeals requiring explicit Finance review.
+-- Appeal outcomes do not automatically change claim or invoice allocation balances.
+SELECT d.id AS denial_id, ch.id AS claim_id, ch.claim_number, ch.claim_status,
+       d.denial_reason, d.denied_amount, d.appeal_status, d.resolution_outcome,
+       d.resolution_notes, a.id AS allocation_id, a.approved_amount AS allocation_approved,
+       a.settled_amount AS allocation_settled, a.balance_amount AS allocation_balance,
+       a.allocation_status
+FROM claim_denials d
+JOIN claim_headers ch ON ch.id = d.claim_id
+LEFT JOIN invoice_financial_allocations a ON a.claim_id = ch.id
+WHERE d.appeal_status IN ('Resolved','Written Off')
+   OR d.resolution_outcome IS NOT NULL
+ORDER BY d.updated_at DESC, d.id DESC;
