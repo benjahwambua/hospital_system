@@ -86,8 +86,12 @@ For each case, record Pass/Fail, tester, timestamp, test data IDs and evidence.
 - [ ] Claim creation failure rolls back both header and item rows.
 - [ ] Duplicate claim creation for the same invoice is rejected.
 - [ ] Submission is only allowed from Draft and updates the expected submission date/status.
-- [ ] Remittance allocations cannot exceed the remaining claim/claim-item balances and update paid/open balances correctly.
-- [ ] Denial/appeal actions preserve the audit trail and do not permit denials exceeding the remaining claim/item balance.
+- [ ] Remittance allocations cannot exceed the remaining remittance and approved claim balances; a missing invoice allocation causes the entire match transaction to roll back.
+- [ ] Claim adjudication updates exactly one linked invoice allocation; if the allocation is missing, the claim status and approved amount remain unchanged after rollback.
+- [ ] Denial amounts cannot exceed remaining approved payer exposure at claim level; before adjudication, the submitted payer claim amount is the temporary cap.
+- [ ] Item-level denial amounts cannot exceed the remaining payer-covered amount for that claim item, even when the item's gross charge is higher.
+- [ ] Denial/appeal actions preserve the audit trail; appeal resolution does not silently modify invoice or claim balances without approved accounting rules.
+- [ ] Read-only financial reconciliation checks are run; every returned exception is investigated and signed off by Finance/Insurance.
 - [ ] Users without the required Insurance permissions cannot view or perform the relevant actions.
 
 ## 5A. Invoice allocation integrity checks
