@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
    $already=(bool)$dupe->get_result()->fetch_assoc(); $dupe->close();
    if ($already) throw new RuntimeException('This service has already been charged to this theatre case. Duplicate charges are blocked.');
    $patientId=(int)$case['patient_id']; $visitId=(int)($case['visit_id']??0);
+   if ($visitId <= 0) $visitId = (int)get_or_create_current_visit($conn, $patientId);
    $priceData=get_service_price_for_patient($conn,$patientId,$serviceId);
    $price=(float)$priceData['price'];
    if ($price < 0) throw new RuntimeException('The service price is invalid.');
