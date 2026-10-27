@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $surgeonLookupAvailable = true;
             $validSurgeon = true;
             if ($surgeonId && $surgeonId > 0) {
-                $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
+                $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? LIMIT 1");
                 if (!$staffCheck) { error_log('Theatre surgeon validation prepare failed for user id '.$surgeonId.': '.$conn->error); $surgeonLookupAvailable = false; $validSurgeon = false; }
                 else {
                     $staffCheck->bind_param('i', $surgeonId);
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif (!$surgeonLookupAvailable || !$anesthetistLookupAvailable) {
                 $error = 'Unable to validate the assigned theatre team. Please retry after the database issue is resolved.';
             } elseif (!$validSurgeon || !$validAnesthetist) {
-                $error = 'Select active surgeon and anaesthesia accounts, or leave the assignments unassigned.';
+                $error = 'Select existing surgeon and anaesthesia accounts, or leave the assignments unassigned.';
             } elseif ($surgeonLicenceStatus !== true || $anesthetistLicenceStatus !== true) {
                 $error = 'Assigned theatre clinicians must have an active HR staff record and a current Professional Licence with a registration number. Verify the HR staff and credential migrations and records; leave the assignment unassigned if not yet verified.';
             } elseif (strlen($procedure) > 180) {
@@ -392,7 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageLoadErrors = [];
 $patients = $conn->query('SELECT id,patient_number,full_name FROM patients ORDER BY full_name ASC LIMIT 2000');
 if (!$patients) { error_log('Theatre patient list query failed: '.$conn->error); $pageLoadErrors[] = 'Patient list could not be loaded. Scheduling is unavailable until the database issue is resolved.'; }
-$staff = $conn->query("SELECT id,full_name FROM users WHERE COALESCE(status,'Active') NOT IN ('Inactive','Disabled') ORDER BY full_name ASC");
+$staff = $conn->query("SELECT id,full_name FROM users ORDER BY full_name ASC");
 if (!$staff) { error_log('Theatre staff list query failed: '.$conn->error); $pageLoadErrors[] = 'Theatre staff list could not be loaded. Verify the user table and database connection before assigning a team.'; }
 $statsAvailable = false;
 $stats = ['today'=>'Unavailable','planned'=>'Unavailable','in_theatre'=>'Unavailable','recovery'=>'Unavailable'];
