@@ -6,6 +6,16 @@ require_login();
 require_module_access($conn, 'theatre', 'view');
 
 function theatre_h($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
+function theatre_has_current_professional_licence(mysqli $conn, int $userId): ?bool {
+    $sql = "SELECT c.id FROM hr_staff s JOIN hr_staff_credentials c ON c.staff_id=s.id WHERE s.linked_user_id=? AND s.status='Active' AND c.credential_type='Professional Licence' AND c.status='Active' AND c.registration_number IS NOT NULL AND TRIM(c.registration_number)<>'' AND (c.expiry_date IS NULL OR c.expiry_date>=CURDATE()) LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) { error_log('Theatre credential validation prepare failed: '.$conn->error); return null; }
+    $stmt->bind_param('i', $userId);
+    if (!$stmt->execute()) { error_log('Theatre credential validation execute failed: '.$stmt->error); $stmt->close(); return null; }
+    $valid = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $valid;
+}
 $canCreate = can_module_action($conn, 'theatre', 'create');
 $canEdit = can_module_action($conn, 'theatre', 'edit');
 $message = '';
@@ -91,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $staffCheck->close();
                 }
             }
+            $surgeonLicenceStatus = ($surgeonId && $surgeonId > 0 && $validSurgeon) ? theatre_has_current_professional_licence($conn, (int)$surgeonId) : true;
+            $anesthetistLicenceStatus = ($anesthetistId && $anesthetistId > 0 && $validAnesthetist) ? theatre_has_current_professional_licence($conn, (int)$anesthetistId) : true;
             $validSchedule = DateTime::createFromFormat('!Y-m-d\TH:i', $scheduled);
             $dateErrors = DateTime::getLastErrors();
             $scheduleIsValid = $validSchedule instanceof DateTime
@@ -103,7 +115,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif (!$surgeonLookupAvailable || !$anesthetistLookupAvailable) {
                 $error = 'Unable to validate the assigned theatre team. Please retry after the database issue is resolved.';
             } elseif (!$validSurgeon || !$validAnesthetist) {
-                $error = 'Select active surgeon and anesthetist accounts, or leave the assignments unassigned.';
+                $error = 'Select active surgeon and anaesthesia accounts, or leave the assignments unassigned.';
+            } elseif ($surgeonLicenceStatus !== true || $anesthetistLicenceStatus !== true) {
+                $error = 'Assigned theatre clinicians must have an active HR staff record and a current Professional Licence with a registration number. Verify the HR staff and credential migrations and records; leave the assignment unassigned if not yet verified.';
             } elseif (strlen($procedure) > 180) {
                 $error = 'The planned procedure name must not exceed 180 characters.';
             } elseif (!$scheduleIsValid) {
