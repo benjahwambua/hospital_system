@@ -57,7 +57,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif ($fhrRaw !== '' && ((int)$fhrRaw < 30 || (int)$fhrRaw > 240)) $error = 'Fetal heart rate must be between 30 and 240 bpm.';
         elseif ($cervixRaw !== '' && ((float)$cervixRaw < 0 || (float)$cervixRaw > 10)) $error = 'Cervical dilatation must be between 0 and 10 cm.';
         elseif ($contractionsRaw !== '' && ((int)$contractionsRaw < 0 || (int)$contractionsRaw > 10)) $error = 'Contractions must be between 0 and 10 per 10 minutes.';
-        elseif ($temperatureRaw !== '' && ((float)$temperatureRaw < 25 || (float)$temperatureRaw > 45)) $error = 'Check the temperature entered.';
+        elseif ($temperatureRaw !== '' && (!is_numeric($temperatureRaw) || (float)$temperatureRaw < 25 || (float)$temperatureRaw > 45)) $error = 'Check the temperature entered.';
+        elseif ($fhrRaw !== '' && filter_var($fhrRaw, FILTER_VALIDATE_INT) === false) $error = 'Fetal heart rate must be a whole number.';
+        elseif ($contractionsRaw !== '' && filter_var($contractionsRaw, FILTER_VALIDATE_INT) === false) $error = 'Contractions must be a whole number.';
+        elseif ($pulseRaw !== '' && (filter_var($pulseRaw, FILTER_VALIDATE_INT) === false || (int)$pulseRaw < 1 || (int)$pulseRaw > 300)) $error = 'Maternal pulse must be a whole number between 1 and 300 bpm.';
+        elseif (($systolicRaw === '') !== ($diastolicRaw === '')) $error = 'Enter both systolic and diastolic blood pressure, or leave both blank.';
+        elseif ($systolicRaw !== '' && (filter_var($systolicRaw, FILTER_VALIDATE_INT) === false || (int)$systolicRaw < 40 || (int)$systolicRaw > 300)) $error = 'Systolic blood pressure must be a whole number between 40 and 300.';
+        elseif ($diastolicRaw !== '' && (filter_var($diastolicRaw, FILTER_VALIDATE_INT) === false || (int)$diastolicRaw < 20 || (int)$diastolicRaw > 200)) $error = 'Diastolic blood pressure must be a whole number between 20 and 200.';
+        elseif ($systolicRaw !== '' && $diastolicRaw !== '' && (int)$systolicRaw <= (int)$diastolicRaw) $error = 'Systolic blood pressure must be greater than diastolic blood pressure.';
+        elseif ($urineRaw !== '' && (filter_var($urineRaw, FILTER_VALIDATE_INT) === false || (int)$urineRaw < 0 || (int)$urineRaw > 5000)) $error = 'Urine volume must be a whole number between 0 and 5,000 ml.';
+        elseif (strlen($liquor) > 40 || strlen($moulding) > 40 || strlen($descent) > 40 || strlen($duration) > 40 || strlen($protein) > 40 || strlen($ketones) > 40 || strlen($oxytocin) > 80 || strlen($medications) > 255 || strlen($notes) > 65535) $error = 'One or more partograph text fields exceed the permitted length.';
         if ($error === '') {
             $fhr = $fhrRaw === '' ? null : (int)$fhrRaw;
             $cervix = $cervixRaw === '' ? null : (float)$cervixRaw;
