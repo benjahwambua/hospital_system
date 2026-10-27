@@ -5,7 +5,9 @@ require_login();
 require_module_access($conn, 'radiology', 'view');
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32));
-$csrfToken=$_SESSION['csrf_token']; $message='';
+$csrfToken=$_SESSION['csrf_token'];
+$message=(string)($_SESSION['radiology_result_message']??'');
+unset($_SESSION['radiology_result_message']);
 $visitColumnCheck=$conn->query("SHOW COLUMNS FROM patient_services LIKE 'visit_id'");
 $hasVisit=$visitColumnCheck && $visitColumnCheck->num_rows>0;
 if ($visitColumnCheck) $visitColumnCheck->free();
@@ -32,7 +34,9 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_radiology_result'])
     if(!$stmt->execute()) throw new Exception('Unable to save the radiology result.');
     $stmt->close();
     $conn->commit();
-    $message='Radiology result saved and order completed.';
+    $_SESSION['radiology_result_message']='Radiology result saved and order completed.';
+    header('Location: radiology_results.php?saved=1');
+    exit;
    }catch(Throwable $e){
     $conn->rollback();
     $message='The radiology result could not be completed. Please verify the request and try again.';
