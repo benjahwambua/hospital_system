@@ -94,7 +94,7 @@ Inspect the following individually and run only when their stated preconditions 
 - `insurance_financial_reconciliation_checks.sql`
 - `insurance_legacy_allocations_backfill.sql`
 - `operational_integrity_migration.sql`
-- `patient_number_format_migration.sql)
+- `patient_number_format_migration.sql`)
 
 In particular, treat backfills and reconciliation scripts as controlled data operations, not routine repeatable migrations. Take a fresh backup before each data-changing operation.
 
