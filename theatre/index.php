@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Before handing over to recovery or completing the case, record recovery / handover notes and a valid post-operative outcome.');
                 }
                 if ($targetStatus === 'Completed') {
-                    $pacuCheck = $conn->prepare('SELECT id FROM theatre_recovery_observations WHERE case_id=? LIMIT 1 FOR UPDATE');
+                    $pacuCheck = $conn->prepare('SELECT id FROM theatre_recovery_observations WHERE case_id=? AND consciousness_level IS NOT NULL AND (heart_rate IS NOT NULL OR respiratory_rate IS NOT NULL OR (systolic_bp IS NOT NULL AND diastolic_bp IS NOT NULL) OR oxygen_saturation IS NOT NULL OR temperature_c IS NOT NULL) LIMIT 1 FOR UPDATE');
                     if (!$pacuCheck) {
                         error_log('Theatre PACU completion check prepare failed for case id '.$caseId.': '.$conn->error);
                         throw new RuntimeException('PACU observation records are not installed. Apply database/theatre_clinical_records_migration.sql before completing the case.');
@@ -249,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $hasPacuObservation = (bool)$pacuCheck->get_result()->fetch_assoc();
                     $pacuCheck->close();
                     if (!$hasPacuObservation) {
-                        throw new RuntimeException('Record at least one PACU observation during Recovery before completing the theatre case.');
+                        throw new RuntimeException('Record a structured PACU observation during Recovery with at least one vital sign and a consciousness level before completing the theatre case.');
                     }
                 }
                 if ($targetStatus === 'Completed' && $effectiveOutcome === 'Admitted') {

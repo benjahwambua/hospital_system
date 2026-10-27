@@ -117,3 +117,7 @@ The new PACU observation form is a supplemental structured record and is not a s
 - For a case completed with outcome **Admitted**, verify that the active inpatient admission is linked to the completed theatre case in `theatre_case_admissions`.
 - Confirm completion rolls back if the linkage table is missing or the link cannot be saved, and that a case with outcome Admitted cannot complete without an active admission.
 - Confirm one admission may be linked to multiple theatre cases during the same inpatient stay, while each theatre case has at most one admission link.
+
+
+- Verify a PACU observation cannot be saved with notes alone: at least one vital sign and a consciousness level are required; systolic and diastolic blood pressure must be entered together when recording BP.
+- Verify the Completed transition requires a PACU record meeting the same minimum, not merely an empty or notes-only row.

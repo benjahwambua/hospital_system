@@ -48,8 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         if ($raw['oxygen_saturation'] !== '' && (!is_numeric($raw['oxygen_saturation']) || (float)$raw['oxygen_saturation'] < 0 || (float)$raw['oxygen_saturation'] > 100)) $error = 'Oxygen saturation must be between 0 and 100.';
                         if ($raw['temperature_c'] !== '' && (!is_numeric($raw['temperature_c']) || (float)$raw['temperature_c'] < 25 || (float)$raw['temperature_c'] > 45)) $error = 'Temperature must be between 25 and 45 °C.';
+                        if (($raw['systolic_bp'] === '') !== ($raw['diastolic_bp'] === '')) $error = 'Record both systolic and diastolic blood pressure values together.';
                         $level = (string)($_POST['consciousness_level'] ?? '');
                         if (!in_array($level, ['', 'Alert','Voice','Pain','Unresponsive','Other'], true)) $error = 'Select a valid consciousness level.';
+                        $hasVitalSign = $raw['heart_rate'] !== '' || $raw['respiratory_rate'] !== '' || $raw['systolic_bp'] !== '' || $raw['diastolic_bp'] !== '' || $raw['oxygen_saturation'] !== '' || $raw['temperature_c'] !== '';
+                        if ($error === '' && (!$hasVitalSign || $level === '')) $error = 'Record at least one vital sign and the patient’s consciousness level for a PACU observation. Add further measurements and notes as clinically indicated.';
                         $oxygen = trim((string)($_POST['oxygen_support'] ?? ''));
                         $interventions = trim((string)($_POST['interventions'] ?? ''));
                         $notes = trim((string)($_POST['notes'] ?? ''));
