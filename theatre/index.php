@@ -232,11 +232,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $admissionCheck->close();
                     if (!$activeAdmission) throw new RuntimeException('This case outcome is Admitted, but the patient has no active inpatient admission. Complete the ward admission first, then complete the theatre case.');
                 }
-                // The form submits the complete checklist on every update. Respect explicit
-                // unchecking so a previously confirmed item can be revoked if its condition
-                // changes; the In Theatre gate below will block starting without all checks.
+                // The legacy six-item pre-operative gate remains required. The phased
+                // WHO-style checklist is a separate auditable record and must also be complete.
                 if ($targetStatus === 'In Theatre' && in_array(0, $checks, true)) {
                     throw new RuntimeException('The patient-safety gate is incomplete. Confirm consent, identity, site, allergies, fasting and anaesthesia review before starting theatre.');
+                }
+                if (in_array($targetStatus, ['In Theatre','Recovery'], true)) {
+                    $requiredPhases = $targetStatus === 'In Theatre' ? ['Sign In','Time Out'] : ['Sign In','Time Out','Sign Out'];
+                    $phaseStmt = $conn->prepare("SELECT phase, completed_at, items_json FROM theatre_safety_checklist_phases WHERE case_id=? AND completed_at IS NOT NULL FOR UPDATE");
+                    if (!$phaseStmt) {
+                        error_log('Theatre phased safety checklist lookup failed: '.$conn->error);
+                        throw new RuntimeException('The phased surgical safety checklist is not installed. Apply database/theatre_safety_checklist_migration.sql before progressing the case.');
+                    }
+                    $phaseStmt->bind_param('i', $caseId);
+                    if (!$phaseStmt->execute()) {
+                        $phaseStmt->close();
+                        throw new RuntimeException('Unable to verify the phased surgical safety checklist. Please retry.');
+                    }
+                    $phaseResult = $phaseStmt->get_result();
+                    $completedPhases = [];
+                    while ($phaseRow = $phaseResult->fetch_assoc()) {
+                        $items = json_decode((string)$phaseRow['items_json'], true);
+                        if (is_array($items) && count($items) > 0) $completedPhases[(string)$phaseRow['phase']] = true;
+                    }
+                    $phaseStmt->close();
+                    foreach ($requiredPhases as $requiredPhase) {
+                        if (empty($completedPhases[$requiredPhase])) {
+                            throw new RuntimeException('Complete and save the '.$requiredPhase.' surgical safety checklist before moving this case to '.$targetStatus.'. Use the Phased Safety Checklist link on the case.');
+                        }
+                    }
                 }
                 if ($targetStatus === 'In Theatre') {
                     $surgeonId = (int)($current['surgeon_id'] ?? 0);
@@ -365,7 +389,7 @@ include __DIR__ . '/../includes/sidebar.php';
       <tr><td><div class="theatre-case"><?= theatre_h($c['case_number']) ?></div><div><?= theatre_h($c['procedure_name']) ?></div><div class="theatre-muted"><?= theatre_h($c['patient_number'].' — '.$c['full_name']) ?></div><div class="theatre-muted">Priority: <?= theatre_h($c['urgency']) ?></div></td>
       <td><?= theatre_h(date('d M Y, H:i',strtotime($c['scheduled_at']))) ?><div class="theatre-muted">Surgeon: <?= theatre_h($c['surgeon_name'] ?: 'Unassigned') ?></div><div class="theatre-muted">Anaesthesia: <?= theatre_h($c['anesthetist_name'] ?: 'Unassigned') ?></div></td>
       <td><span class="theatre-pill <?= in_array($c['status'],['Completed'],true)?'good':(in_array($c['status'],['In Theatre','Recovery'],true)?'alert':'') ?>"><?= theatre_h($c['status']) ?></span><div class="theatre-muted">Pre-op safety: <?= $safetyCount ?>/6</div><?php if($c['cancellation_reason']): ?><div class="theatre-muted">Cancelled: <?= theatre_h($c['cancellation_reason']) ?></div><?php endif; ?></td>
-      <td class="theatre-edit"><?php if($canEdit && !in_array($c['status'],['Completed','Cancelled'],true)): ?>
+      <td class="theatre-edit"><a href="safety_checklist.php?case_id=<?= (int)$c['id'] ?>" style="display:inline-block;margin:0 0 8px;padding:6px 9px;border-radius:6px;background:#e8f2fb;color:#075b9d;text-decoration:none;font-weight:700">Phased Safety Checklist</a><br><a href="clinical_records.php?case_id=<?= (int)$c['id'] ?>" style="display:inline-block;margin:0 0 8px;padding:6px 9px;border-radius:6px;background:#eef5ee;color:#28613a;text-decoration:none;font-weight:700">PACU &amp; Implants</a><br><?php if($canEdit && !in_array($c['status'],['Completed','Cancelled'],true)): ?>
         <details><summary>Update checklist &amp; status</summary><form class="theatre-form" method="post"><input type="hidden" name="csrf_token" value="<?= theatre_h(csrf_token()) ?>"><input type="hidden" name="action" value="update"><input type="hidden" name="case_id" value="<?= (int)$c['id'] ?>">
           <label>Patient safety gate (all six required before In Theatre)</label><div class="theatre-checks">
           <?php foreach(['consent_confirmed'=>'Consent confirmed','identity_confirmed'=>'Identity confirmed','site_marked'=>'Site / side marked','allergies_reviewed'=>'Allergies reviewed','fasting_confirmed'=>'Fasting status confirmed','anesthesia_reviewed'=>'Anaesthesia review complete'] as $field=>$label): ?><label><input type="checkbox" name="<?= theatre_h($field) ?>" value="1" <?= !empty($c[$field])?'checked':'' ?>><?= theatre_h($label) ?></label><?php endforeach; ?>
