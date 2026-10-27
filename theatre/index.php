@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $anesthetistLookupAvailable = true;
             $validAnesthetist = true;
             if ($anesthetistId && $anesthetistId > 0) {
-                $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled') LIMIT 1");
+                $staffCheck = $conn->prepare("SELECT id FROM users WHERE id=? LIMIT 1");
                 if (!$staffCheck) { error_log('Theatre anaesthesia validation prepare failed for user id '.$anesthetistId.': '.$conn->error); $anesthetistLookupAvailable = false; $validAnesthetist = false; }
                 else {
                     $staffCheck->bind_param('i', $anesthetistId);
