@@ -45,23 +45,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $conn->begin_transaction();
                 $transactionStarted = true;
-                $s = $conn->prepare("SELECT id,total_claim_amount,claim_status FROM claim_headers WHERE id=? AND claim_status<>'Draft' LIMIT 1 FOR UPDATE");
+                $s = $conn->prepare("SELECT id,total_claim_amount,total_approved_amount,claim_status FROM claim_headers WHERE id=? AND claim_status<>'Draft' LIMIT 1 FOR UPDATE");
                 if (!$s) throw new Exception('Unable to validate the claim.');
                 $s->bind_param('i', $claimId); if (!$s->execute()) throw new Exception('Unable to load the claim.'); $claim = $s->get_result()->fetch_assoc(); $s->close();
                 if (!$claim) throw new Exception('Select an existing non-draft claim.');
                 $s = $conn->prepare("SELECT COALESCE(SUM(denied_amount),0) AS denied_total FROM claim_denials WHERE claim_id=?");
                 if (!$s) throw new Exception('Unable to check existing claim denials.');
                 $s->bind_param('i', $claimId); if (!$s->execute()) throw new Exception('Unable to check existing claim denials.'); $claimDenied = (float)$s->get_result()->fetch_assoc()['denied_total']; $s->close();
-                if ($amount > max(0, (float)$claim['total_claim_amount'] - $claimDenied)) throw new Exception('The denial amount exceeds the remaining undenied claim balance.');
+                $payerExposure = (float)$claim['total_approved_amount'] > 0 ? (float)$claim['total_approved_amount'] : (float)$claim['total_claim_amount'];
+                if ($amount > max(0, $payerExposure - $claimDenied)) throw new Exception('The denial amount exceeds the remaining undenied payer claim balance.');
                 if ($itemId !== null) {
-                    $s = $conn->prepare("SELECT id,gross_amount FROM claim_items WHERE id=? AND claim_id=? LIMIT 1");
+                    $s = $conn->prepare("SELECT id,gross_amount,covered_amount FROM claim_items WHERE id=? AND claim_id=? LIMIT 1");
                     if (!$s) throw new Exception('Unable to validate the claim item.');
                     $s->bind_param('ii', $itemId, $claimId); if (!$s->execute()) throw new Exception('Unable to load the claim item.'); $item = $s->get_result()->fetch_assoc(); $s->close();
                     if (!$item) throw new Exception('The selected claim item does not belong to this claim.');
                     $s = $conn->prepare("SELECT COALESCE(SUM(denied_amount),0) AS denied_total FROM claim_denials WHERE claim_id=? AND claim_item_id=?");
                     if (!$s) throw new Exception('Unable to check existing item denials.');
                     $s->bind_param('ii', $claimId, $itemId); if (!$s->execute()) throw new Exception('Unable to check existing item denials.'); $itemDenied = (float)$s->get_result()->fetch_assoc()['denied_total']; $s->close();
-                    if ($amount > max(0, (float)$item['gross_amount'] - $itemDenied)) throw new Exception('The denial amount exceeds the remaining undenied amount for this claim item.');
+                    $itemPayerExposure = max(0, (float)$item['covered_amount']);
+                    if ($amount > max(0, $itemPayerExposure - $itemDenied)) throw new Exception('The denial amount exceeds the remaining payer-covered amount for this claim item.');
                 }
                 $s = $conn->prepare("INSERT INTO claim_denials(claim_id,claim_item_id,denial_code,denial_reason,denial_category,denied_amount,appeal_status,notes,created_by,updated_by) VALUES(?,?,?,?,?,?,'Not Appealed',?,?,?)");
                 if (!$s) throw new Exception('Unable to prepare the denial record.');
