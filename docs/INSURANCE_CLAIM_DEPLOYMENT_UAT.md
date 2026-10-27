@@ -90,6 +90,10 @@ For each case, record Pass/Fail, tester, timestamp, test data IDs and evidence.
 - [ ] Denial/appeal actions preserve the audit trail and do not permit denials exceeding the remaining claim/item balance.
 - [ ] Users without the required Insurance permissions cannot view or perform the relevant actions.
 
+## 5A. Invoice allocation integrity checks
+
+After applying the Insurance schema and reviewing/running the legacy allocation backfill, execute `database/insurance_financial_reconciliation_checks.sql`. It is read-only and reports missing or duplicate claim allocations, claim/allocation amount mismatches, overpaid claims, overallocated remittances, payer mismatches and remittance items linked to unexpected claim statuses. Record query results and have Finance/Insurance review every exception; do not auto-correct historical amounts or statuses without source evidence.
+
 ## 6. Financial reconciliation
 
 Compare the following for each test claim:
