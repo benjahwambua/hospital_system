@@ -24,7 +24,7 @@ if ($tablesReady) {
     ] as $k=>$sql) {
         $r=$conn->query($sql); $stats[$k]=(int)($r?($r->fetch_assoc()['c']??0):0);
     }
-    $r=$conn->query("SELECT COALESCE(SUM(total_claim_amount-total_paid_amount),0) v FROM claim_headers WHERE claim_status NOT IN ('Paid','Closed','Rejected')");
+    $r=$conn->query("SELECT COALESCE(SUM(GREATEST(0,CASE WHEN total_approved_amount>0 THEN total_approved_amount-total_paid_amount ELSE total_claim_amount END)),0) v FROM claim_headers WHERE claim_status NOT IN ('Paid','Closed','Rejected')");
     if($r) $stats['open_claim_value']=(float)($r->fetch_assoc()['v']??0);
     $r=$conn->query("SELECT ch.id,ch.claim_number,ch.claim_status,ch.total_claim_amount,ch.total_approved_amount,ch.created_at,p.full_name,py.payer_name
         FROM claim_headers ch JOIN patients p ON p.id=ch.patient_id JOIN payers py ON py.id=ch.payer_id
