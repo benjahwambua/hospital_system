@@ -306,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($surgeonId <= 0 || $anesthetistId <= 0) {
                         throw new RuntimeException('Assign both a lead surgeon and an anaesthesia provider before starting the operation.');
                     }
-                    $staffCheck = $conn->prepare("SELECT COUNT(*) active_count FROM users WHERE id IN (?,?) AND COALESCE(status,'Active') NOT IN ('Inactive','Disabled')");
+                    $staffCheck = $conn->prepare("SELECT COUNT(*) active_count FROM users WHERE id IN (?,?)");
                     if (!$staffCheck) {
                         error_log('Theatre active team verification prepare failed for case id '.$caseId.': '.$conn->error);
                         throw new RuntimeException('Unable to verify the assigned theatre team.');
