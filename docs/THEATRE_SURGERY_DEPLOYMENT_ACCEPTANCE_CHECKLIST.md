@@ -109,3 +109,11 @@ The new PACU observation form is a supplemental structured record and is not a s
 
 - Confirm multiple stock issues for the same item and lot can be recorded as separate Central Stores movements against one theatre case, and that each movement remains traceable.
 - Confirm no additional stock issue is permitted after a case reaches Completed or Cancelled.
+
+
+## Theatre-to-admission linkage
+
+- Apply `database/theatre_admission_linkage_migration.sql` after the Theatre and admissions migrations.
+- For a case completed with outcome **Admitted**, verify that the active inpatient admission is linked to the completed theatre case in `theatre_case_admissions`.
+- Confirm completion rolls back if the linkage table is missing or the link cannot be saved, and that a case with outcome Admitted cannot complete without an active admission.
+- Confirm one admission may be linked to multiple theatre cases during the same inpatient stay, while each theatre case has at most one admission link.
