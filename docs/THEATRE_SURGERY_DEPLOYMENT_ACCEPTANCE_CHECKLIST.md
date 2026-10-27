@@ -82,3 +82,12 @@ The new PACU observation form is a supplemental structured record and is not a s
 - The application blocks transition to **In Theatre** until Sign In and Time Out are complete, and blocks transition to **Recovery** until Sign Out is complete. The legacy six-item pre-operative safety gate remains in force.
 - Validate wording and phase timing with the hospital's surgical, anaesthesia and nursing leads before production; this implementation is not a substitute for local policy or clinical judgement.
 - Apply the migration and test on a backed-up non-production database first. Browser UAT remains required.
+
+
+## Theatre procedure billing integration
+
+- Apply `database/theatre_billing_migration.sql` after the base Theatre/Surgery migration and the billing/service catalogue migrations.
+- After the case reaches Recovery or Completed, open **Procedure Billing**, select an active billable service in the Procedure category, and confirm the correct payer/plan tariff.
+- The charge is linked to the case, patient service, invoice and invoice item. The database unique key and transaction-level case lock block duplicate case/service charges.
+- Confirm the charge appears exactly once in the patient's invoice and accounting journal. Do not use this screen to charge unapproved services or invent tariffs.
+- Test with a backed-up non-production database; browser UAT and finance approval remain required.
