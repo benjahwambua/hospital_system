@@ -91,3 +91,11 @@ The new PACU observation form is a supplemental structured record and is not a s
 - The charge is linked to the case, patient service, invoice and invoice item. The database unique key and transaction-level case lock block duplicate case/service charges.
 - Confirm the charge appears exactly once in the patient's invoice and accounting journal. Do not use this screen to charge unapproved services or invent tariffs.
 - Test with a backed-up non-production database; browser UAT and finance approval remain required.
+
+
+## Theatre consumables and Central Stores integration
+
+- Apply `database/theatre_stock_usage_migration.sql` after the base Theatre/Surgery and Central Stores migrations.
+- From a case in Pre-op, In Theatre, Recovery or Completed, open **Theatre Stock Usage** and select an active item, issuing location, quantity and batch/expiry where tracked.
+- The workflow checks the exact lot balance, blocks expired stock and over-issues, writes an **Issue** movement into `stores_movements`, and links it to the theatre case.
+- The stock issue requires both Theatre edit and Central Stores edit permissions. Validate item balances and batch records with stores staff in a backed-up test database; browser UAT remains required.
