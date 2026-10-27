@@ -16,6 +16,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['save_radiology_result'])
  else{
   $id=(int)($_POST['record_id']??0); $findings=trim((string)($_POST['findings']??''));
   if($id<=0 || $findings==='') $message='Enter the radiology findings before saving.';
+  elseif(strlen($findings)>60000) $message='Radiology findings are too long. Please keep the result under 60,000 bytes.';
   else{
    $conn->begin_transaction();
    try{

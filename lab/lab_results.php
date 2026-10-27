@@ -23,6 +23,7 @@ if (isset($_POST['save_lab_result'])) {
         $record_id = (int)($_POST['record_id'] ?? 0);
         $findings = trim((string)($_POST['findings'] ?? ''));
         if ($record_id <= 0 || $findings === '') { $error='A valid laboratory record and result are required.'; }
+        elseif (strlen($findings) > 60000) { $error='Laboratory findings are too long. Please keep the result under 60,000 bytes.'; }
         else {
         $conn->begin_transaction();
         try {
