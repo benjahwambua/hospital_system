@@ -21,6 +21,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($mid<=0||$time==='')$error='Patient and delivery date/time are required.';
   elseif(!in_array($mode,$allowedModes,true)||!in_array($gender,$allowedGender,true)||!in_array($alive,$allowedOutcome,true))$error='Invalid delivery or newborn details.';
   elseif($babyNo===''||strlen($babyNo)>30||strlen($doctor)>150||strlen($condition)>500||strlen($comp)>500||strlen($loss)>50||strlen($notes)>2000)$error='One or more delivery fields are invalid or too long.';
+  elseif(!preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/',$time)||!DateTime::createFromFormat('!Y-m-d\\TH:i',$time))$error='Enter a valid delivery date and time.';
+  elseif($loss!==''&&(!is_numeric($loss)||(float)$loss<0||(float)$loss>10000))$error='Blood loss must be a valid amount between 0 and 10,000 ml.';
+  elseif($weight!==''&&(!is_numeric($weight)||(float)$weight<0||(float)$weight>20))$error='Newborn weight must be a valid number between 0 and 20 kg.';
+  elseif($apgar!==''&&!preg_match('/^(?:[0-9]|10)(?:\\/(?:[0-9]|10))?$/',$apgar))$error='APGAR must be a score from 0 to 10, optionally written as a total such as 9/10.';
+  elseif($babyNo!==trim($babyNo)||$doctor!==trim($doctor)||$condition!==trim($condition)||$comp!==trim($comp)||$notes!==trim($notes))$error='Remove leading or trailing spaces from delivery details.';
   else{
    $check=$conn->prepare("SELECT m.id FROM maternity m JOIN patients p ON p.id=m.patient_id WHERE m.id=? AND COALESCE(p.is_walkin,0)=0 AND p.clinic_category IN ('ANC','PNC','Maternity') LIMIT 1");
    $check->bind_param('i',$mid);$check->execute();$eligible=$check->get_result()->fetch_assoc();$check->close();
