@@ -8,10 +8,42 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($a==='create'){
    $conn->begin_transaction();$transactionStarted=true;
    $inv=(int)($_POST['invoice_id']??0);if($inv<=0)throw new Exception('Select a valid invoice.');
-   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id,pp.consultation_cover_percent,pp.pharmacy_cover_percent,pp.lab_cover_percent,pp.radiology_cover_percent,pp.procedure_cover_percent,pp.default_copay_amount FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' AND (pc.start_date IS NULL OR pc.start_date<=DATE(i.created_at)) AND (pc.end_date IS NULL OR pc.end_date>=DATE(i.created_at)) LEFT JOIN payer_plans pp ON pp.id=pc.plan_id AND pp.payer_id=pc.payer_id AND pp.active=1 WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
+   $q=$conn->prepare("SELECT i.id,i.patient_id,i.created_at,i.total,pc.id coverage_id,pc.payer_id,pc.plan_id,pp.coverage_scope,pp.consultation_cover_percent,pp.pharmacy_cover_percent,pp.lab_cover_percent,pp.radiology_cover_percent,pp.procedure_cover_percent,pp.default_copay_amount FROM invoices i JOIN patient_coverages pc ON pc.patient_id=i.patient_id AND pc.eligibility_status='Verified' AND (pc.start_date IS NULL OR pc.start_date<=DATE(i.created_at)) AND (pc.end_date IS NULL OR pc.end_date>=DATE(i.created_at)) LEFT JOIN payer_plans pp ON pp.id=pc.plan_id AND pp.payer_id=pc.payer_id AND pp.active=1 WHERE i.id=? ORDER BY pc.is_primary DESC,pc.id DESC LIMIT 1 FOR UPDATE");
    if(!$q)throw new Exception('Unable to prepare invoice and coverage validation.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to validate invoice and patient coverage.');$v=$q->get_result()->fetch_assoc();$q->close();
    if(!$v)throw new Exception('Invoice has no verified patient coverage.');
+   // Enforce the selected plan's outpatient/inpatient scope when encounter data
+   // is available. Legacy invoices without visit linkage are classified from
+   // explicit inpatient billing markers; ambiguous cases must be linked before
+   // a claim can be generated rather than silently assuming coverage.
+   $scope=strtolower(trim((string)($v['coverage_scope']??'outpatient')));
+   if(!in_array($scope,['outpatient','inpatient','both'],true))throw new Exception('The selected insurance plan has an invalid coverage scope.');
+   if($scope!=='both'){
+    $encounterKind='unknown';$visitId=0;
+    $visitColumn=$conn->query("SHOW COLUMNS FROM invoices LIKE 'visit_id'");
+    if($visitColumn&&$visitColumn->num_rows>0){
+     $visitCheck=$conn->prepare("SELECT visit_id FROM invoices WHERE id=? LIMIT 1");
+     if($visitCheck){$visitCheck->bind_param('i',$inv);$visitCheck->execute();$visitRow=$visitCheck->get_result()->fetch_assoc();$visitCheck->close();$visitId=(int)($visitRow['visit_id']??0);}
+    }
+    if($visitId>0){
+     $visitTable=$conn->query("SHOW TABLES LIKE 'visits'");
+     if($visitTable&&$visitTable->num_rows>0){
+      $visitCheck=$conn->prepare("SELECT LOWER(visit_type) visit_type FROM visits WHERE id=? AND patient_id=? LIMIT 1");
+      if($visitCheck){$patientForVisit=(int)$v['patient_id'];$visitCheck->bind_param('ii',$visitId,$patientForVisit);$visitCheck->execute();$visitRow=$visitCheck->get_result()->fetch_assoc();$visitCheck->close();
+       if($visitRow){$vt=(string)$visitRow['visit_type'];if(strpos($vt,'inpatient')!==false||strpos($vt,'ward')!==false)$encounterKind='inpatient';elseif(strpos($vt,'outpatient')!==false||strpos($vt,'emergency')!==false||strpos($vt,'casualty')!==false)$encounterKind='outpatient';}
+      }
+     }
+    }
+    if($encounterKind==='unknown'){
+     $legacyCheck=$conn->prepare("SELECT MAX(CASE WHEN LOWER(COALESCE(item_type,''))='admission' OR LOWER(COALESCE(description,'')) LIKE '%inpatient%' OR LOWER(COALESCE(description,'')) LIKE '%ward stay%' THEN 1 ELSE 0 END) inpatient_marker,MAX(CASE WHEN LOWER(COALESCE(item_type,''))='consultation' OR LOWER(COALESCE(item_type,'')) IN ('lab','radiology','pharmacy') THEN 1 ELSE 0 END) outpatient_marker FROM invoice_items WHERE invoice_id=?");
+     if($legacyCheck){$legacyCheck->bind_param('i',$inv);$legacyCheck->execute();$markers=$legacyCheck->get_result()->fetch_assoc()?:[];$legacyCheck->close();
+      if((int)($markers['inpatient_marker']??0)===1)$encounterKind='inpatient';
+      elseif((int)($markers['outpatient_marker']??0)===1)$encounterKind='outpatient';
+     }
+    }
+    if($encounterKind==='unknown')throw new Exception('Cannot verify whether this invoice is outpatient or inpatient for the selected plan. Link the invoice to a correctly classified visit, or add clear encounter billing details, before generating the claim.');
+    if($scope!==$encounterKind)throw new Exception('The selected insurance plan covers '.$scope.' care only; this invoice is classified as '.$encounterKind.'. Select a matching verified plan or correct the encounter classification.');
+   }
    $q=$conn->prepare("SELECT id,description AS item_name,quantity,unit_price,total,source,item_type,med_id FROM invoice_items WHERE invoice_id=? AND NOT (COALESCE(source,'manual')='manual' AND LOWER(COALESCE(description,'')) LIKE 'patient payment -%')");
    if(!$q)throw new Exception('Unable to prepare invoice claim items.');
    $q->bind_param('i',$inv);if(!$q->execute())throw new Exception('Unable to load invoice items.');$items=$q->get_result()->fetch_all(MYSQLI_ASSOC);$q->close();
