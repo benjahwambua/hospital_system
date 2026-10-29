@@ -310,15 +310,52 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 <style>
-.reception-page{padding:28px 24px 44px;background:#f5f7fb;min-height:calc(100vh - 72px)}
-.reception-shell{width:100%;margin:0}.reception-hero{background:linear-gradient(135deg,#063b73,#075b9d);color:#fff;border-radius:18px;padding:26px 28px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:20px;box-shadow:0 10px 28px rgba(6,59,115,.16)}.reception-hero h1{font-size:27px;margin:4px 0}.reception-hero p{margin:0;color:#d9edff;font-size:13px}.reception-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#9edcff}.reception-hero-icon{width:54px;height:54px;border-radius:15px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:22px}
-.registration-card{background:#fff;border:1px solid #e4eaf1;border-radius:16px;box-shadow:0 5px 20px rgba(31,45,61,.06);overflow:hidden}.registration-body{padding:30px 34px}.mode-selector{background:#f7f9fc;padding:7px;border:1px solid #e3e8ef;border-radius:12px;margin-bottom:26px;display:flex;gap:8px;flex-wrap:wrap}.mode-option{flex:1;min-width:230px;display:flex;align-items:center;cursor:pointer;font-weight:700;font-size:14px;color:#344054;padding:13px 15px;border-radius:9px}.mode-option:hover{background:#fff}.mode-option input{width:18px;height:18px;margin-right:10px;accent-color:#075b9d}.fee-badge{font-size:10px;padding:4px 9px;border-radius:20px;margin-left:auto;text-transform:uppercase;font-weight:800}.badge-waived{background:#e7f8ef;color:#087443;border:1px solid #c9efd9}.badge-standard{background:#fff4d6;color:#8a6200;border:1px solid #f3df9b}
-.form-section{margin-bottom:26px;padding-bottom:24px;border-bottom:1px solid #edf0f5}.section-title{font-size:13px;font-weight:800;color:#344054;text-transform:uppercase;letter-spacing:.7px;margin-bottom:18px;display:flex;align-items:center}.section-title::before{content:'';display:inline-block;width:4px;height:18px;background:#075b9d;border-radius:4px;margin-right:10px}.form-group{margin-bottom:16px}.form-group label{display:block;margin-bottom:7px;font-weight:700;color:#475467;font-size:12px}.label-required::after{content:' *';color:#d92d20}.label-optional::after{content:' (optional)';color:#98a2b3;font-weight:400}.form-control{width:100%;padding:11px 13px;border:1px solid #d7dee8;border-radius:9px;font-size:14px;color:#344054;background:#fff;transition:.2s}.form-control:focus{outline:none;border-color:#2782c4;background:#fbfdff;box-shadow:0 0 0 3px rgba(7,91,157,.08)}textarea.form-control{resize:vertical}.button-group{display:flex;gap:10px;flex-wrap:wrap;padding-top:2px}.btn{padding:11px 18px;border:0;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.btn-primary{background:#075b9d;color:#fff}.btn-primary:hover{background:#064b82;color:#fff}.btn-cancel{background:#eef2f6;color:#344054}.btn-cancel:hover{background:#e2e8f0;color:#1d2939}.alert{padding:13px 16px;margin-bottom:18px;border-radius:10px;font-size:13px}.alert-danger{background:#fff1f0;color:#b42318;border:1px solid #fecdca}.walkin-info-alert{background:#eef8ff;color:#155e8a;border:1px solid #cce8f7;border-left:4px solid #2782c4;padding:11px 14px;border-radius:9px;margin-bottom:20px;font-size:12px}.maternity-alert{background:#fff0f6;color:#b4236a;border:1px solid #f7c6dc;font-size:11px;padding:6px 11px;border-radius:20px;display:none;margin-top:8px;font-weight:700}
-@media(max-width:900px){.reception-page{padding:18px 12px 32px}.registration-body{padding:22px 20px}.form-row{grid-template-columns:1fr!important}.reception-hero{padding:22px;align-items:flex-start}.reception-hero-icon{display:none}}
+/* Reception Register — aligned with the Hospital Command Centre visual system */
+.reception-page{padding:24px 24px 100px;background:#f4f7fb;min-height:calc(100vh - 75px);width:100%;color:#25324a}
+.reception-shell{width:100%;max-width:1550px;margin:0 auto}
+.reception-hero{position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(135deg,#0b3d91 0%,#1261c9 55%,#13a8b8 100%);color:#fff;border-radius:22px;padding:30px 32px;margin-bottom:22px;display:flex;justify-content:space-between;align-items:center;gap:24px;box-shadow:0 16px 38px rgba(16,77,153,.18)}
+.reception-hero:before,.reception-hero:after{content:"";position:absolute;z-index:-1;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none}
+.reception-hero:before{width:230px;height:230px;right:-70px;top:-105px}.reception-hero:after{width:140px;height:140px;right:120px;bottom:-95px}
+.reception-hero h1{font-size:clamp(25px,2.2vw,32px);line-height:1.15;font-weight:800;letter-spacing:-.5px;margin:7px 0 9px;color:#fff}
+.reception-hero p{margin:0;color:rgba(255,255,255,.84);font-size:14px;line-height:1.5}
+.reception-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.8px;font-weight:800;color:#bfe8ff}
+.reception-hero-icon{width:58px;height:58px;flex:0 0 58px;border-radius:16px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 8px 20px rgba(0,0,0,.08)}
+.registration-card{background:#fff;border:1px solid #e7ebf2;border-radius:17px;box-shadow:0 5px 20px rgba(31,45,61,.055);overflow:hidden}
+.registration-body{padding:28px 32px}
+.mode-selector{background:#f7f9fc;padding:8px;border:1px solid #e3e8ef;border-radius:14px;margin-bottom:28px;display:flex;gap:10px;flex-wrap:wrap}
+.mode-option{flex:1;min-width:250px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:750;font-size:13px;color:#344054;padding:15px 16px;border:1px solid transparent;border-radius:10px;transition:background .18s,border-color .18s,box-shadow .18s}
+.mode-option:hover{background:#fff;border-color:#dce6f2}
+.mode-option:has(input:checked){background:#fff;border-color:#9ac7f4;box-shadow:0 3px 10px rgba(18,97,201,.08);color:#0b4f9c}
+.mode-option input{width:17px;height:17px;flex:0 0 17px;margin:0;accent-color:#1261c9}
+.fee-badge{font-size:9px;padding:5px 9px;border-radius:20px;margin-left:auto;text-transform:uppercase;letter-spacing:.35px;font-weight:800;white-space:nowrap}
+.badge-waived{background:#e7f8ef;color:#087443;border:1px solid #c9efd9}.badge-standard{background:#fff4d6;color:#8a6200;border:1px solid #f3df9b}
+.form-section{margin-bottom:25px;padding-bottom:24px;border-bottom:1px solid #edf0f5}
+.section-title{font-size:12px;font-weight:800;color:#344054;text-transform:uppercase;letter-spacing:.8px;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.section-title:before{content:"";display:inline-block;width:4px;height:19px;background:linear-gradient(180deg,#1261c9,#13a8b8);border-radius:4px;flex:0 0 4px}
+.form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px;align-items:start}
+.form-group{min-width:0;margin-bottom:16px}
+.form-group label{display:block;margin-bottom:7px;font-weight:700;color:#475467;font-size:12px;line-height:1.4}
+.label-required:after{content:" *";color:#d92d20}.label-optional:after{content:" (optional)";color:#98a2b3;font-weight:400}
+.reception-page .form-control{display:block;width:100%;min-height:44px;padding:11px 13px;border:1px solid #d7dee8;border-radius:10px;font-family:inherit;font-size:13px;line-height:1.4;color:#344054;background:#fff;transition:border-color .18s,box-shadow .18s,background .18s;box-sizing:border-box;margin:0}
+.reception-page .form-control:focus{outline:none;border-color:#2782c4;background:#fbfdff;box-shadow:0 0 0 3px rgba(18,97,201,.1)}
+.reception-page select.form-control{cursor:pointer}.reception-page textarea.form-control{resize:vertical;min-height:74px}
+.button-group{display:flex;gap:11px;flex-wrap:wrap;padding-top:2px;align-items:center}
+.reception-page .btn{min-height:43px;padding:11px 18px;border:1px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:transform .18s,box-shadow .18s,background .18s}
+.reception-page .btn:hover{transform:translateY(-1px)}
+.reception-page .btn-primary{background:linear-gradient(135deg,#1261c9,#075b9d);color:#fff;box-shadow:0 5px 12px rgba(18,97,201,.18)}
+.reception-page .btn-primary:hover{background:#064b82;color:#fff;box-shadow:0 7px 16px rgba(18,97,201,.24)}
+.reception-page .btn-cancel{background:#f1f4f8;color:#344054;border-color:#e1e7ef}
+.reception-page .btn-cancel:hover{background:#e5ebf3;color:#1d2939}
+.reception-page .alert{padding:14px 16px;margin-bottom:20px;border-radius:11px;font-size:13px;line-height:1.55}
+.reception-page .alert-danger{background:#fff5f4;color:#b42318;border:1px solid #fecdca;border-left:4px solid #d92d20}
+.walkin-info-alert{background:#eef8ff;color:#155e8a;border:1px solid #cce8f7;border-left:4px solid #2782c4;padding:13px 15px;border-radius:10px;margin-bottom:22px;font-size:12px;line-height:1.55}
+.maternity-alert{background:#fff0f6;color:#b4236a;border:1px solid #f7c6dc;font-size:11px;padding:6px 11px;border-radius:20px;display:none;margin-top:8px;font-weight:700}
+@media(max-width:1000px){.reception-page{padding:20px 16px 90px}.registration-body{padding:24px}.reception-hero{padding:26px}.form-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.reception-page{padding:16px 11px 90px}.reception-hero{padding:23px 20px;border-radius:17px;align-items:flex-start}.reception-hero-icon{display:none}.registration-body{padding:19px 16px}.mode-selector{padding:6px;gap:6px;margin-bottom:23px}.mode-option{min-width:100%;padding:12px}.form-row{grid-template-columns:minmax(0,1fr);gap:0}.form-section{margin-bottom:21px;padding-bottom:19px}.button-group{flex-direction:column;align-items:stretch}.button-group .btn{width:100%}}
 </style>
 
 <div class="reception-page"><div class="reception-shell">
-        <div class="reception-hero"><div><div class="reception-eyebrow">Front Desk</div><h1>Patient Registration</h1><p>Register a patient and assign the appropriate service.</p></div><div class="reception-hero-icon"><i class="fas fa-user-plus"></i></div></div>
+        <div class="reception-hero"><div><div class="reception-eyebrow"><i class="fas fa-hospital-user"></i> &nbsp; Front Desk / Patient Registration</div><h1>Patient Registration</h1><p>Capture patient details, select the correct clinical service and route the visit.</p></div><div class="reception-hero-icon"><i class="fas fa-user-plus"></i></div></div>
         <div class="registration-card"><div class="registration-body">
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
