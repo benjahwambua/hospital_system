@@ -92,6 +92,7 @@ function isParentActive($paths) {
                 <?php if (can_access_module($conn, 'diagnosis')): ?><a href="/hospital_system/diagnosis/index.php" class="<?= isActive('diagnosis/index.php') ?>"><i class="fas fa-notes-medical"></i> Diagnosis Coding</a><?php endif; ?>
                 <?php if (can_access_module($conn, 'referrals')): ?><a href="/hospital_system/referrals/index.php" class="<?= isActive('referrals/index.php') ?>"><i class="fas fa-share-square"></i> Referral Management</a><?php endif; ?>
                 <a href="/hospital_system/clinical/ward_management.php" class="<?= isActive('ward_management.php') ?>"><i class="fas fa-bed"></i> Ward / IPD</a>
+                <?php if (can_access_module($conn, 'icu')): ?><a href="/hospital_system/icu/index.php" class="<?= isActive('icu/index.php') ?>"><i class="fas fa-heartbeat"></i> ICU / HDU</a><?php endif; ?>
                 <a href="/hospital_system/clinical/admit_patient.php" class="<?= isActive('clinical/admit_patient.php') ?>"><i class="fas fa-procedures"></i> Admit Patient</a>
                 <a href="/hospital_system/clinical/inpatient_charges.php" class="<?= isActive('clinical/inpatient_charges.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Inpatient Charges</a>
                 <a href="/hospital_system/clinical/ward_configuration.php" class="<?= isActive('clinical/ward_configuration.php') ?>"><i class="fas fa-cog"></i> Ward &amp; Bed Configuration</a>
